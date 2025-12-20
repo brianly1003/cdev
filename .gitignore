@@ -43,7 +43,7 @@ logs/
 
 # Build artifacts
 __debug_bin*
-build/bin/
+build/
 
 # Wails / Frontend
 frontend/node_modules/
