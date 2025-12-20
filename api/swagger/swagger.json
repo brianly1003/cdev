@@ -1,0 +1,2290 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Mobile AI Coding Monitor \u0026 Controller Agent API.\nEnables remote monitoring and control of Claude Code CLI sessions from mobile devices.",
+        "title": "cdev API",
+        "contact": {
+            "name": "Brian Ly",
+            "url": "https://github.com/brianly1003/cdev"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8766",
+    "basePath": "/",
+    "paths": {
+        "/api/claude/respond": {
+            "post": {
+                "description": "Send a response to Claude's interactive prompt or permission request",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "Respond to Claude",
+                "parameters": [
+                    {
+                        "description": "Response to send to Claude",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RespondToClaudeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.RespondToClaudeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Claude not waiting for input",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Claude manager not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/claude/run": {
+            "post": {
+                "description": "Spawns a Claude CLI process with the given prompt. Supports session modes: \"new\" (default) or \"continue\" (requires session_id).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "Start Claude CLI",
+                "parameters": [
+                    {
+                        "description": "Prompt and session options",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RunClaudeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.RunClaudeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Claude already running",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Claude manager not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/claude/sessions": {
+            "get": {
+                "description": "GET: Returns a list of available Claude sessions. DELETE: Deletes session(s). Use ?session_id=xxx to delete specific session, or no param to delete all.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "List or delete Claude sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID (for DELETE only - if omitted, deletes all sessions)",
+                        "name": "session_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.SessionsResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list/delete sessions",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "GET: Returns a list of available Claude sessions. DELETE: Deletes session(s). Use ?session_id=xxx to delete specific session, or no param to delete all.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "List or delete Claude sessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID (for DELETE only - if omitted, deletes all sessions)",
+                        "name": "session_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.SessionsResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to list/delete sessions",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/claude/sessions/elements": {
+            "get": {
+                "description": "Returns pre-parsed UI elements for a session, ready for rendering in mobile apps.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "Get session UI elements",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of elements to return (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return elements before this ID (for pagination)",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return elements after this ID (for catch-up)",
+                        "name": "after",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/sessioncache.ElementsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing session_id",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/claude/sessions/messages": {
+            "get": {
+                "description": "Returns messages for a specific Claude session with pagination support.\nFor sessions with many messages (3000+), use pagination to avoid large payloads.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "Get session messages (paginated)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max messages to return (default 50, max 500)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Starting position (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order: 'asc' (oldest first) or 'desc' (newest first, default)",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.SessionMessagesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing session_id",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Session not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/claude/stop": {
+            "post": {
+                "description": "Gracefully stops the running Claude CLI process",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "claude"
+                ],
+                "summary": "Stop Claude CLI",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.StopClaudeResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Claude not running",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Claude manager not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/file": {
+            "get": {
+                "description": "Returns the content of a file in the repository",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "Get file content",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Relative path to the file",
+                        "name": "path",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.FileContentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing path parameter",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "File not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Git tracker not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/files/list": {
+            "get": {
+                "description": "Returns the contents of a directory in the repository. Supports browsing the file tree.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "file"
+                ],
+                "summary": "List directory contents",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Relative path from repo root (empty for root directory)",
+                        "name": "path",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.DirectoryListingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid path format",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Path outside repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Directory not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/branches": {
+            "get": {
+                "description": "List all local and remote branches",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "List branches",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitBranchesResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/checkout": {
+            "post": {
+                "description": "Switch to a different branch or create a new one",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Checkout branch",
+                "parameters": [
+                    {
+                        "description": "Branch to checkout",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.GitCheckoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitCheckoutResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/commit": {
+            "post": {
+                "description": "Create a commit with staged changes, optionally push",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Commit staged changes",
+                "parameters": [
+                    {
+                        "description": "Commit message and options",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.GitCommitRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitCommitResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or nothing staged",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/diff": {
+            "get": {
+                "description": "Returns the git diff for a specific file or all files if no path is provided",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Get git diff",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Relative path to the file (optional, returns all diffs if not provided)",
+                        "name": "path",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All diffs (when path not provided)",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitDiffAllResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/discard": {
+            "post": {
+                "description": "Discard unstaged changes to files",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Discard changes",
+                "parameters": [
+                    {
+                        "description": "Files to discard",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.GitDiscardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitDiscardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/pull": {
+            "post": {
+                "description": "Pull remote commits to local",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Pull commits",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitPullResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/push": {
+            "post": {
+                "description": "Push local commits to remote",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Push commits",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitPushResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/stage": {
+            "post": {
+                "description": "Stage files for commit",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Stage files",
+                "parameters": [
+                    {
+                        "description": "Files to stage",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.GitStageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitStageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/status": {
+            "get": {
+                "description": "Returns the git status with staging info, branch tracking, and diff stats",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Get enhanced git status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitEnhancedStatusResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/git/unstage": {
+            "post": {
+                "description": "Unstage files from the staging area",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "git"
+                ],
+                "summary": "Unstage files",
+                "parameters": [
+                    {
+                        "description": "Files to unstage",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.GitUnstageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.GitUnstageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not a git repository",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Git command failed",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/files/list": {
+            "get": {
+                "description": "Returns a paginated list of files in a directory with filtering and sorting options",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "List files in directory",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Directory path (empty for root)",
+                        "name": "directory",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include subdirectories",
+                        "name": "recursive",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Maximum results",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "name",
+                        "description": "Sort by: name, size, modified",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "asc",
+                        "description": "Sort order: asc, desc",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated file extensions to filter",
+                        "name": "extensions",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.FileList"
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/files/tree": {
+            "get": {
+                "description": "Returns a hierarchical tree structure of the repository",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "Get directory tree",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "\"\"",
+                        "description": "Root path",
+                        "name": "path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 2,
+                        "description": "Maximum depth",
+                        "name": "depth",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.DirectoryTree"
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/index/rebuild": {
+            "post": {
+                "description": "Triggers a full re-index of the repository",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "Rebuild repository index",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/index/status": {
+            "get": {
+                "description": "Returns the current status of the repository index",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "Get repository index status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.IndexStatus"
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/search": {
+            "get": {
+                "description": "Search for files using fuzzy, exact, prefix, or extension matching",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "Search files in repository",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "fuzzy",
+                        "description": "Search mode: fuzzy, exact, prefix, extension",
+                        "name": "mode",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum results",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated file extensions to filter",
+                        "name": "extensions",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Exclude binary files",
+                        "name": "exclude_binaries",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Only include git-tracked files",
+                        "name": "git_tracked_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.SearchResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing query parameter",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/repository/stats": {
+            "get": {
+                "description": "Returns aggregate statistics about the repository",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repository"
+                ],
+                "summary": "Get repository statistics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.RepositoryStats"
+                        }
+                    },
+                    "503": {
+                        "description": "Repository indexer not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status": {
+            "get": {
+                "description": "Returns the current status of the cdev including Claude state, connected clients, and repository info",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Get agent status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns the health status of the agent",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.HealthResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "http.DirectoryListingResponse": {
+            "type": "object",
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.FileEntry"
+                    }
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/components"
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "http.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Something went wrong"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/main.ts"
+                }
+            }
+        },
+        "http.FileContentResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "example": "console.log('hello');"
+                },
+                "encoding": {
+                    "type": "string",
+                    "example": "utf-8"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/main.ts"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "truncated": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "http.FileEntry": {
+            "type": "object",
+            "properties": {
+                "children_count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "modified": {
+                    "type": "string",
+                    "example": "2025-01-15T10:30:00Z"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "main.go"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 1024
+                },
+                "type": {
+                    "description": "\"file\" or \"directory\"",
+                    "type": "string",
+                    "example": "file"
+                }
+            }
+        },
+        "http.GitBranchInfo": {
+            "type": "object",
+            "properties": {
+                "ahead": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "behind": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "is_current": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "is_remote": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "name": {
+                    "type": "string",
+                    "example": "feature-branch"
+                },
+                "upstream": {
+                    "type": "string",
+                    "example": "origin/feature-branch"
+                }
+            }
+        },
+        "http.GitBranchesResponse": {
+            "type": "object",
+            "properties": {
+                "ahead": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "behind": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "branches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitBranchInfo"
+                    }
+                },
+                "current": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "upstream": {
+                    "type": "string",
+                    "example": "origin/main"
+                }
+            }
+        },
+        "http.GitCheckoutRequest": {
+            "type": "object",
+            "required": [
+                "branch"
+            ],
+            "properties": {
+                "branch": {
+                    "type": "string",
+                    "example": "feature-branch"
+                },
+                "create": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "http.GitCheckoutResponse": {
+            "type": "object",
+            "properties": {
+                "branch": {
+                    "type": "string",
+                    "example": "feature-branch"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Switched to branch 'feature-branch'"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitCommitRequest": {
+            "type": "object",
+            "required": [
+                "message"
+            ],
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "feat: add new feature"
+                },
+                "push": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "http.GitCommitResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "files_committed": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "message": {
+                    "type": "string",
+                    "example": "feat: add new feature"
+                },
+                "pushed": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "sha": {
+                    "type": "string",
+                    "example": "abc123def"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitDiffAllResponse": {
+            "type": "object",
+            "properties": {
+                "diffs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitDiffItem"
+                    }
+                }
+            }
+        },
+        "http.GitDiffItem": {
+            "type": "object",
+            "properties": {
+                "diff": {
+                    "type": "string",
+                    "example": "@@ -1,3 +1,4 @@\n+new line"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/main.ts"
+                }
+            }
+        },
+        "http.GitDiffResponse": {
+            "type": "object",
+            "properties": {
+                "diff": {
+                    "type": "string",
+                    "example": "@@ -1,3 +1,4 @@\n+new line"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/main.ts"
+                }
+            }
+        },
+        "http.GitDiscardRequest": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"]"
+                    ]
+                }
+            }
+        },
+        "http.GitDiscardResponse": {
+            "type": "object",
+            "properties": {
+                "discarded": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"]"
+                    ]
+                },
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitEnhancedStatusResponse": {
+            "type": "object",
+            "properties": {
+                "ahead": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "behind": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "branch": {
+                    "type": "string",
+                    "example": "main"
+                },
+                "conflicted": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitFileEntry"
+                    }
+                },
+                "repo_name": {
+                    "type": "string",
+                    "example": "myproject"
+                },
+                "repo_root": {
+                    "type": "string",
+                    "example": "/Users/dev/myproject"
+                },
+                "staged": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitFileEntry"
+                    }
+                },
+                "unstaged": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitFileEntry"
+                    }
+                },
+                "untracked": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.GitFileEntry"
+                    }
+                },
+                "upstream": {
+                    "type": "string",
+                    "example": "origin/main"
+                }
+            }
+        },
+        "http.GitFileEntry": {
+            "type": "object",
+            "properties": {
+                "additions": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "deletions": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "path": {
+                    "type": "string",
+                    "example": "src/main.ts"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "M"
+                }
+            }
+        },
+        "http.GitPullResponse": {
+            "type": "object",
+            "properties": {
+                "commits_pulled": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "conflicted_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "error": {
+                    "type": "string"
+                },
+                "files_changed": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Pulled 3 commits"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitPushResponse": {
+            "type": "object",
+            "properties": {
+                "commits_pushed": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Pushed 2 commits to origin/main"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitStageRequest": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"",
+                        " \"src/utils.ts\"]"
+                    ]
+                }
+            }
+        },
+        "http.GitStageResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "staged": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"]"
+                    ]
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.GitUnstageRequest": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"]"
+                    ]
+                }
+            }
+        },
+        "http.GitUnstageResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "unstaged": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"src/main.ts\"]"
+                    ]
+                }
+            }
+        },
+        "http.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "time": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:00Z"
+                }
+            }
+        },
+        "http.RespondToClaudeRequest": {
+            "type": "object",
+            "required": [
+                "tool_use_id"
+            ],
+            "properties": {
+                "is_error": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "response": {
+                    "type": "string",
+                    "example": "Yes, proceed with the changes"
+                },
+                "tool_use_id": {
+                    "type": "string",
+                    "example": "toolu_abc123"
+                }
+            }
+        },
+        "http.RespondToClaudeResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "sent"
+                },
+                "tool_use_id": {
+                    "type": "string",
+                    "example": "toolu_abc123"
+                }
+            }
+        },
+        "http.RunClaudeRequest": {
+            "type": "object",
+            "required": [
+                "prompt"
+            ],
+            "properties": {
+                "mode": {
+                    "enum": [
+                        "new",
+                        "continue"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/http.SessionMode"
+                        }
+                    ],
+                    "example": "new"
+                },
+                "prompt": {
+                    "type": "string",
+                    "example": "Create a hello world function"
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "http.RunClaudeResponse": {
+            "type": "object",
+            "properties": {
+                "pid": {
+                    "type": "integer",
+                    "example": 12345
+                },
+                "prompt": {
+                    "type": "string",
+                    "example": "Create a hello world function"
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "started"
+                }
+            }
+        },
+        "http.SessionInfo": {
+            "type": "object",
+            "properties": {
+                "last_updated": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:00Z"
+                },
+                "message_count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "summary": {
+                    "type": "string",
+                    "example": "Create a hello world function"
+                }
+            }
+        },
+        "http.SessionMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "example": "Create a hello world function"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "user"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2024-01-15T10:30:00Z"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "user"
+                }
+            }
+        },
+        "http.SessionMessagesResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.SessionMessage"
+                    }
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "http.SessionMode": {
+            "type": "string",
+            "enum": [
+                "new",
+                "continue"
+            ],
+            "x-enum-varnames": [
+                "SessionModeNew",
+                "SessionModeContinue"
+            ]
+        },
+        "http.SessionsResponse": {
+            "type": "object",
+            "properties": {
+                "current": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.SessionInfo"
+                    }
+                }
+            }
+        },
+        "http.StatusResponse": {
+            "type": "object",
+            "properties": {
+                "agent_session_id": {
+                    "description": "Agent instance ID (generated on startup)",
+                    "type": "string",
+                    "example": "01ce425c-5b91-4f8a-b8dd-5d14644c3494"
+                },
+                "claude_state": {
+                    "type": "string",
+                    "example": "idle"
+                },
+                "connected_clients": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "git_enabled": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "is_git_repo": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "repo_name": {
+                    "type": "string",
+                    "example": "myproject"
+                },
+                "repo_path": {
+                    "type": "string",
+                    "example": "/Users/dev/myproject"
+                },
+                "session_id": {
+                    "description": "Claude session ID (for continue) - empty if no active session",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "uptime_seconds": {
+                    "type": "integer",
+                    "example": 3600
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "watcher_enabled": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.StopClaudeResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "stopped"
+                }
+            }
+        },
+        "repository.DirectoryInfo": {
+            "type": "object",
+            "properties": {
+                "file_count": {
+                    "type": "integer"
+                },
+                "last_modified": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "total_size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.DirectoryTree": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repository.DirectoryTree"
+                    }
+                },
+                "extension": {
+                    "type": "string"
+                },
+                "file_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                },
+                "total_size_bytes": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "\"file\" or \"directory\"",
+                    "type": "string"
+                }
+            }
+        },
+        "repository.FileInfo": {
+            "type": "object",
+            "properties": {
+                "directory": {
+                    "type": "string"
+                },
+                "extension": {
+                    "type": "string"
+                },
+                "git_ignored": {
+                    "type": "boolean"
+                },
+                "git_tracked": {
+                    "type": "boolean"
+                },
+                "indexed_at": {
+                    "type": "string"
+                },
+                "is_binary": {
+                    "type": "boolean"
+                },
+                "is_sensitive": {
+                    "type": "boolean"
+                },
+                "is_symlink": {
+                    "type": "boolean"
+                },
+                "line_count": {
+                    "type": "integer"
+                },
+                "match_score": {
+                    "description": "For search results",
+                    "type": "number"
+                },
+                "modified_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.FileList": {
+            "type": "object",
+            "properties": {
+                "directories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repository.DirectoryInfo"
+                    }
+                },
+                "directory": {
+                    "type": "string"
+                },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repository.FileInfo"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/repository.PaginationInfo"
+                },
+                "total_directories": {
+                    "type": "integer"
+                },
+                "total_files": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.IndexStatus": {
+            "type": "object",
+            "properties": {
+                "database_size_bytes": {
+                    "type": "integer"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "indexed_files": {
+                    "type": "integer"
+                },
+                "is_git_repo": {
+                    "type": "boolean"
+                },
+                "last_full_scan": {
+                    "type": "string"
+                },
+                "last_update": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "ready, indexing, error",
+                    "type": "string"
+                },
+                "total_files": {
+                    "type": "integer"
+                },
+                "total_size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.PaginationInfo": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.RepositoryStats": {
+            "type": "object",
+            "properties": {
+                "binary_files": {
+                    "type": "integer"
+                },
+                "files_by_extension": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "git_ignored_files": {
+                    "type": "integer"
+                },
+                "git_tracked_files": {
+                    "type": "integer"
+                },
+                "largest_files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repository.FileInfo"
+                    }
+                },
+                "sensitive_files": {
+                    "type": "integer"
+                },
+                "total_directories": {
+                    "type": "integer"
+                },
+                "total_files": {
+                    "type": "integer"
+                },
+                "total_size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "repository.SearchMode": {
+            "type": "string",
+            "enum": [
+                "fuzzy",
+                "exact",
+                "prefix",
+                "extension"
+            ],
+            "x-enum-varnames": [
+                "SearchModeFuzzy",
+                "SearchModeExact",
+                "SearchModePrefix",
+                "SearchModeExtension"
+            ]
+        },
+        "repository.SearchResult": {
+            "type": "object",
+            "properties": {
+                "elapsed_ms": {
+                    "type": "integer"
+                },
+                "mode": {
+                    "$ref": "#/definitions/repository.SearchMode"
+                },
+                "query": {
+                    "type": "string"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/repository.FileInfo"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "sessioncache.Element": {
+            "description": "UI element with type-specific content",
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "elem_001"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2025-12-19T10:30:00Z"
+                },
+                "type": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/sessioncache.ElementType"
+                        }
+                    ],
+                    "example": "assistant_text"
+                }
+            }
+        },
+        "sessioncache.ElementType": {
+            "type": "string",
+            "enum": [
+                "user_input",
+                "assistant_text",
+                "tool_call",
+                "tool_result",
+                "diff",
+                "thinking",
+                "interrupted"
+            ],
+            "x-enum-varnames": [
+                "ElementTypeUserInput",
+                "ElementTypeAssistantText",
+                "ElementTypeToolCall",
+                "ElementTypeToolResult",
+                "ElementTypeDiff",
+                "ElementTypeThinking",
+                "ElementTypeInterrupted"
+            ]
+        },
+        "sessioncache.ElementsPagination": {
+            "type": "object",
+            "properties": {
+                "has_more_after": {
+                    "type": "boolean"
+                },
+                "has_more_before": {
+                    "type": "boolean"
+                },
+                "newest_id": {
+                    "type": "string"
+                },
+                "oldest_id": {
+                    "type": "string"
+                },
+                "returned": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "sessioncache.ElementsResponse": {
+            "type": "object",
+            "properties": {
+                "elements": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/sessioncache.Element"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/sessioncache.ElementsPagination"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "description": "Health check endpoints",
+            "name": "health"
+        },
+        {
+            "description": "Agent status endpoints",
+            "name": "status"
+        },
+        {
+            "description": "Claude CLI management endpoints",
+            "name": "claude"
+        },
+        {
+            "description": "Git operations endpoints",
+            "name": "git"
+        },
+        {
+            "description": "File operations endpoints",
+            "name": "file"
+        }
+    ]
+}

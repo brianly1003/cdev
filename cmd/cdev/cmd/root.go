@@ -1,0 +1,86 @@
+// Package cmd contains the CLI commands for cdev.
+package cmd
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+)
+
+var (
+	// Version info (set from main)
+	version   = "dev"
+	buildTime = "unknown"
+	gitCommit = "unknown"
+
+	// Global flags
+	cfgFile string
+	verbose bool
+)
+
+// rootCmd represents the base command when called without any subcommands.
+var rootCmd = &cobra.Command{
+	Use:   "cdev",
+	Short: "Mobile AI Coding Monitor & Controller Agent",
+	Long: `cdev is a lightweight daemon that enables remote monitoring and
+control of Claude Code CLI sessions from mobile devices.
+
+It watches your repository for changes, streams Claude CLI output in real-time,
+and generates git diffs - all accessible via WebSocket from your iOS app.`,
+	SilenceUsage: true,
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+func Execute() error {
+	return rootCmd.Execute()
+}
+
+// SetVersionInfo sets version information from the main package.
+func SetVersionInfo(v, bt, gc string) {
+	version = v
+	buildTime = bt
+	gitCommit = gc
+}
+
+func init() {
+	cobra.OnInitialize(initConfig)
+
+	// Global flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: ./config.yaml or ~/.cdev/config.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
+
+	// Add subcommands
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(configCmd)
+}
+
+func initConfig() {
+	// Config initialization is handled by each command that needs it
+}
+
+// versionCmd displays version information.
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("cdev %s\n", version)
+		fmt.Printf("  Build time: %s\n", buildTime)
+		fmt.Printf("  Git commit: %s\n", gitCommit)
+	},
+}
+
+// configCmd displays or manages configuration.
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Display current configuration",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := loadConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		printConfig(cfg)
+	},
+}

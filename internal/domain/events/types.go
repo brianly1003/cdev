@@ -1,0 +1,123 @@
+// Package events defines all event types used in cdev.
+package events
+
+import (
+	"encoding/json"
+	"time"
+)
+
+// EventType represents the type of event.
+type EventType string
+
+const (
+	// Claude events
+	EventTypeClaudeLog         EventType = "claude_log"
+	EventTypeClaudeMessage     EventType = "claude_message"
+	EventTypeClaudeStatus      EventType = "claude_status"
+	EventTypeClaudeWaiting     EventType = "claude_waiting"
+	EventTypeClaudePermission  EventType = "claude_permission"
+	EventTypeClaudeSessionInfo EventType = "claude_session_info"
+
+	// File events
+	EventTypeFileChanged EventType = "file_changed"
+
+	// Git events
+	EventTypeGitDiff              EventType = "git_diff"
+	EventTypeGitStatusChanged     EventType = "git_status_changed"
+	EventTypeGitOperationComplete EventType = "git_operation_completed"
+
+	// Session events
+	EventTypeSessionStart EventType = "session_start"
+	EventTypeSessionEnd   EventType = "session_end"
+
+	// Response events
+	EventTypeStatusResponse EventType = "status_response"
+	EventTypeFileContent    EventType = "file_content"
+	EventTypeError          EventType = "error"
+
+	// Connection events
+	EventTypeHeartbeat EventType = "heartbeat"
+)
+
+// Event is the base interface for all events.
+type Event interface {
+	// Type returns the event type.
+	Type() EventType
+
+	// Timestamp returns when the event occurred.
+	Timestamp() time.Time
+
+	// ToJSON serializes the event to JSON.
+	ToJSON() ([]byte, error)
+}
+
+// BaseEvent contains common fields for all events.
+type BaseEvent struct {
+	EventType  EventType   `json:"event"`
+	EventTime  time.Time   `json:"timestamp"`
+	Payload    interface{} `json:"payload"`
+	RequestID  string      `json:"request_id,omitempty"`
+}
+
+// Type returns the event type.
+func (e *BaseEvent) Type() EventType {
+	return e.EventType
+}
+
+// Timestamp returns when the event occurred.
+func (e *BaseEvent) Timestamp() time.Time {
+	return e.EventTime
+}
+
+// ToJSON serializes the event to JSON.
+func (e *BaseEvent) ToJSON() ([]byte, error) {
+	return json.Marshal(e)
+}
+
+// NewEvent creates a new base event with the given type and payload.
+func NewEvent(eventType EventType, payload interface{}) *BaseEvent {
+	return &BaseEvent{
+		EventType: eventType,
+		EventTime: time.Now().UTC(),
+		Payload:   payload,
+	}
+}
+
+// NewEventWithRequestID creates a new event with a request ID for correlation.
+func NewEventWithRequestID(eventType EventType, payload interface{}, requestID string) *BaseEvent {
+	return &BaseEvent{
+		EventType: eventType,
+		EventTime: time.Now().UTC(),
+		Payload:   payload,
+		RequestID: requestID,
+	}
+}
+
+// --- Git Event Payloads ---
+
+// GitStatusChangedPayload represents the payload for git_status_changed events.
+type GitStatusChangedPayload struct {
+	Branch        string   `json:"branch"`
+	Ahead         int      `json:"ahead"`
+	Behind        int      `json:"behind"`
+	StagedCount   int      `json:"staged_count"`
+	UnstagedCount int      `json:"unstaged_count"`
+	UntrackedCount int     `json:"untracked_count"`
+	HasConflicts  bool     `json:"has_conflicts"`
+	ChangedFiles  []string `json:"changed_files,omitempty"`
+}
+
+// GitOperationCompletedPayload represents the payload for git_operation_completed events.
+type GitOperationCompletedPayload struct {
+	Operation string `json:"operation"` // stage, unstage, discard, commit, push, pull, checkout
+	Success   bool   `json:"success"`
+	Message   string `json:"message,omitempty"`
+	Error     string `json:"error,omitempty"`
+	// Operation-specific fields
+	SHA            string   `json:"sha,omitempty"`             // for commit
+	Branch         string   `json:"branch,omitempty"`          // for checkout
+	FilesAffected  int      `json:"files_affected,omitempty"`  // for stage/unstage/discard/commit
+	CommitsPushed  int      `json:"commits_pushed,omitempty"`  // for push
+	CommitsPulled  int      `json:"commits_pulled,omitempty"`  // for pull
+	ConflictedFiles []string `json:"conflicted_files,omitempty"` // for pull with conflicts
+}

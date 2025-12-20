@@ -1,0 +1,109 @@
+# cdev Configuration
+# Copy this file to config.yaml and modify as needed
+
+# Server settings
+server:
+  websocket_port: 8765
+  http_port: 8766
+  host: "127.0.0.1"  # Bind to localhost only (recommended for security)
+
+  # External URLs for VS Code port forwarding / tunnels
+  # When set, the QR code will contain these URLs instead of localhost URLs
+  # This enables mobile devices to connect through public tunnel URLs
+  # external_ws_url: "wss://your-tunnel-8765.devtunnels.ms"
+  # external_http_url: "https://your-tunnel-8766.devtunnels.ms"
+
+# Repository settings
+repository:
+  path: ""  # Empty = current directory
+
+# File watcher settings
+watcher:
+  enabled: true
+  debounce_ms: 100
+  ignore_patterns:
+    - ".git"
+    - "node_modules"
+    - ".venv"
+    - "venv"
+    - "__pycache__"
+    - "*.pyc"
+    - ".DS_Store"
+    - "Thumbs.db"
+    - "dist"
+    - "build"
+    - "coverage"
+    - ".next"
+    - ".nuxt"
+    - "*.log"
+    - ".idea"
+    - ".vscode"
+    - "*.swp"
+    - "*.swo"
+    - "*~"
+
+# Claude CLI settings
+claude:
+  command: "claude"  # Path to claude CLI (or just "claude" if in PATH)
+  # Base args always included: ["-p", "--verbose", "--output-format", "stream-json"]
+  # Note: Do NOT add --input-format stream-json (it expects JSON on stdin, not CLI prompts)
+  args: []           # Additional arguments (appended to base args, no duplicates)
+  timeout_minutes: 30
+  skip_permissions: false  # Set true to add --dangerously-skip-permissions flag
+
+# Git settings
+git:
+  enabled: true
+  command: "git"     # Path to git CLI
+  diff_on_change: true  # Auto-generate diff on file change
+
+# Logging settings
+logging:
+  level: "info"      # debug, info, warn, error
+  format: "console"  # json, console
+
+# Resource limits
+limits:
+  max_file_size_kb: 200    # Max file size for get_file command
+  max_diff_size_kb: 500    # Max diff size to send
+  max_log_buffer: 1000     # Max log lines to buffer
+  max_prompt_len: 10000    # Max prompt length
+
+# Mobile pairing settings
+pairing:
+  token_expiry_secs: 3600     # How long pairing tokens are valid
+  show_qr_in_terminal: true   # Display QR code in terminal on startup
+
+# Repository indexer settings
+# The indexer creates a SQLite index for fast file search via /api/repository/* endpoints
+indexer:
+  enabled: true
+  # Directories to skip during scanning (customize to your needs)
+  # Note: Hidden directories (starting with .) are always skipped
+  skip_directories:
+    - ".git"
+    - ".svn"
+    - ".hg"
+    - "node_modules"
+    - "vendor"
+    - "__pycache__"
+    - ".pytest_cache"
+    - ".mypy_cache"
+    - ".tox"
+    - ".venv"
+    - "venv"
+    - ".idea"
+    - ".vscode"
+    - ".vs"
+    - "dist"
+    - "target"
+    - "coverage"
+    - ".coverage"
+    - ".nyc_output"
+    - ".next"
+    - ".nuxt"
+    - ".cache"
+    - ".parcel-cache"
+    - ".turbo"
+    # Uncomment to skip build directories:
+    # - "build"
