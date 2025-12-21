@@ -479,6 +479,8 @@ func (c *UnifiedClient) handleJSONRPC(data []byte) {
 }
 
 // handleLegacy handles legacy command messages.
+// DEPRECATED: Legacy command format is deprecated. Use JSON-RPC 2.0 instead.
+// Legacy support will be removed in version 3.0.
 func (c *UnifiedClient) handleLegacy(data []byte) {
 	if c.legacyHandler == nil {
 		log.Warn().Str("client_id", c.id).Msg("no handler for legacy commands")
@@ -491,7 +493,46 @@ func (c *UnifiedClient) handleLegacy(data []byte) {
 		return
 	}
 
+	// Log deprecation warning
+	log.Warn().
+		Str("client_id", c.id).
+		Str("command", string(cmd.Command)).
+		Msg("DEPRECATED: Legacy command format is deprecated. Please migrate to JSON-RPC 2.0. Legacy support will be removed in version 3.0.")
+
+	// Send deprecation warning to client
+	c.sendDeprecationWarning(string(cmd.Command))
+
 	c.legacyHandler(c.id, cmd)
+}
+
+// sendDeprecationWarning sends a deprecation warning event to the client.
+func (c *UnifiedClient) sendDeprecationWarning(command string) {
+	warning := map[string]interface{}{
+		"event":     "deprecation_warning",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"payload": map[string]interface{}{
+			"message":       "Legacy command format is deprecated. Please migrate to JSON-RPC 2.0.",
+			"command":       command,
+			"documentation": "See /api/rpc/discover for the JSON-RPC 2.0 API specification.",
+			"removal":       "Legacy support will be removed in version 3.0.",
+			"migration": map[string]string{
+				"run_claude":        "agent/run",
+				"stop_claude":       "agent/stop",
+				"respond_to_claude": "agent/respond",
+				"get_status":        "status/get",
+				"get_file":          "file/get",
+				"watch_session":     "session/watch",
+				"unwatch_session":   "session/unwatch",
+			},
+		},
+	}
+
+	data, err := json.Marshal(warning)
+	if err != nil {
+		return
+	}
+
+	c.SendRaw(data)
 }
 
 // writePump sends messages to the WebSocket connection.
