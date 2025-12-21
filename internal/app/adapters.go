@@ -221,62 +221,101 @@ func (a *GitProviderAdapter) Discard(ctx context.Context, paths []string) error 
 	return a.tracker.Discard(ctx, paths)
 }
 
-// Commit creates a commit.
-func (a *GitProviderAdapter) Commit(ctx context.Context, message string) (string, error) {
+// Commit creates a commit and optionally pushes.
+func (a *GitProviderAdapter) Commit(ctx context.Context, message string, push bool) (*methods.CommitResult, error) {
 	if a.tracker == nil {
-		return "", nil
+		return &methods.CommitResult{Success: false, Error: "git tracker not available"}, nil
 	}
-	result, err := a.tracker.Commit(ctx, message, false)
+	result, err := a.tracker.Commit(ctx, message, push)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return result.SHA, nil
+	return &methods.CommitResult{
+		Success:        result.Success,
+		SHA:            result.SHA,
+		Message:        result.Message,
+		FilesCommitted: result.FilesCommitted,
+		Pushed:         result.Pushed,
+		Error:          result.Error,
+	}, nil
 }
 
 // Push pushes to remote.
-func (a *GitProviderAdapter) Push(ctx context.Context) error {
+func (a *GitProviderAdapter) Push(ctx context.Context) (*methods.PushResult, error) {
 	if a.tracker == nil {
-		return nil
+		return &methods.PushResult{Success: false, Error: "git tracker not available"}, nil
 	}
-	_, err := a.tracker.Push(ctx, false, false, "", "")
-	return err
+	result, err := a.tracker.Push(ctx, false, false, "", "")
+	if err != nil {
+		return nil, err
+	}
+	return &methods.PushResult{
+		Success:       result.Success,
+		Message:       result.Message,
+		CommitsPushed: result.CommitsPushed,
+		Error:         result.Error,
+	}, nil
 }
 
 // Pull pulls from remote.
-func (a *GitProviderAdapter) Pull(ctx context.Context) error {
+func (a *GitProviderAdapter) Pull(ctx context.Context) (*methods.PullResult, error) {
 	if a.tracker == nil {
-		return nil
+		return &methods.PullResult{Success: false, Error: "git tracker not available"}, nil
 	}
-	_, err := a.tracker.Pull(ctx, false)
-	return err
+	result, err := a.tracker.Pull(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	return &methods.PullResult{
+		Success:         result.Success,
+		Message:         result.Message,
+		CommitsPulled:   result.CommitsPulled,
+		FilesChanged:    result.FilesChanged,
+		ConflictedFiles: result.ConflictedFiles,
+		Error:           result.Error,
+	}, nil
 }
 
-// Branches returns the list of branches.
-func (a *GitProviderAdapter) Branches(ctx context.Context) ([]methods.BranchInfo, error) {
+// Branches returns the list of branches with full info.
+func (a *GitProviderAdapter) Branches(ctx context.Context) (*methods.BranchesResult, error) {
 	if a.tracker == nil {
-		return nil, nil
+		return &methods.BranchesResult{Branches: []methods.BranchInfo{}}, nil
 	}
 	branchesResult, err := a.tracker.ListBranches(ctx)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]methods.BranchInfo, len(branchesResult.Branches))
+	branches := make([]methods.BranchInfo, len(branchesResult.Branches))
 	for i, b := range branchesResult.Branches {
-		result[i] = methods.BranchInfo{
+		branches[i] = methods.BranchInfo{
 			Name:    b.Name,
 			Current: b.IsCurrent,
 		}
 	}
-	return result, nil
+	return &methods.BranchesResult{
+		Current:  branchesResult.Current,
+		Upstream: branchesResult.Upstream,
+		Ahead:    branchesResult.Ahead,
+		Behind:   branchesResult.Behind,
+		Branches: branches,
+	}, nil
 }
 
 // Checkout checks out a branch.
-func (a *GitProviderAdapter) Checkout(ctx context.Context, branch string) error {
+func (a *GitProviderAdapter) Checkout(ctx context.Context, branch string) (*methods.CheckoutResult, error) {
 	if a.tracker == nil {
-		return nil
+		return &methods.CheckoutResult{Success: false, Error: "git tracker not available"}, nil
 	}
-	_, err := a.tracker.Checkout(ctx, branch, false)
-	return err
+	result, err := a.tracker.Checkout(ctx, branch, false)
+	if err != nil {
+		return nil, err
+	}
+	return &methods.CheckoutResult{
+		Success: result.Success,
+		Branch:  result.Branch,
+		Message: result.Message,
+		Error:   result.Error,
+	}, nil
 }
 
 // FileProviderAdapter wraps git.Tracker to implement methods.FileContentProvider.
@@ -412,13 +451,14 @@ func (a *ClaudeSessionAdapter) GetSessionMessages(ctx context.Context, sessionID
 	result := make([]methods.SessionMessage, len(page.Messages))
 	for i, m := range page.Messages {
 		result[i] = methods.SessionMessage{
-			ID:        m.ID,
-			SessionID: m.SessionID,
-			UUID:      m.UUID,
-			Type:      m.Type,
-			Timestamp: m.Timestamp,
-			GitBranch: m.GitBranch,
-			Message:   m.Message,
+			ID:                  m.ID,
+			SessionID:           m.SessionID,
+			Type:                m.Type,
+			UUID:                m.UUID,
+			Timestamp:           m.Timestamp,
+			GitBranch:           m.GitBranch,
+			Message:             m.Message,
+			IsContextCompaction: m.IsContextCompaction,
 		}
 	}
 

@@ -25,20 +25,20 @@ type GitProvider interface {
 	// Discard discards changes to files.
 	Discard(ctx context.Context, paths []string) error
 
-	// Commit creates a commit.
-	Commit(ctx context.Context, message string) (string, error)
+	// Commit creates a commit and optionally pushes. Returns commit result.
+	Commit(ctx context.Context, message string, push bool) (*CommitResult, error)
 
-	// Push pushes to remote.
-	Push(ctx context.Context) error
+	// Push pushes to remote. Returns push result.
+	Push(ctx context.Context) (*PushResult, error)
 
-	// Pull pulls from remote.
-	Pull(ctx context.Context) error
+	// Pull pulls from remote. Returns pull result.
+	Pull(ctx context.Context) (*PullResult, error)
 
-	// Branches returns the list of branches.
-	Branches(ctx context.Context) ([]BranchInfo, error)
+	// Branches returns the list of branches with full info.
+	Branches(ctx context.Context) (*BranchesResult, error)
 
-	// Checkout checks out a branch.
-	Checkout(ctx context.Context, branch string) error
+	// Checkout checks out a branch. Returns checkout result.
+	Checkout(ctx context.Context, branch string) (*CheckoutResult, error)
 }
 
 // GitFileStatus represents a file in git status.
@@ -234,10 +234,22 @@ type PathsParams struct {
 	Paths []string `json:"paths"`
 }
 
-// OperationResult for simple git operations.
-type OperationResult struct {
-	Status        string `json:"status"`
-	FilesAffected int    `json:"files_affected"`
+// StageResult for git/stage method - matches HTTP API format.
+type StageResult struct {
+	Success bool     `json:"success"`
+	Staged  []string `json:"staged"`
+}
+
+// UnstageResult for git/unstage method - matches HTTP API format.
+type UnstageResult struct {
+	Success  bool     `json:"success"`
+	Unstaged []string `json:"unstaged"`
+}
+
+// DiscardResult for git/discard method - matches HTTP API format.
+type DiscardResult struct {
+	Success   bool     `json:"success"`
+	Discarded []string `json:"discarded"`
 }
 
 // Stage stages files.
@@ -259,9 +271,9 @@ func (s *GitService) Stage(ctx context.Context, params json.RawMessage) (interfa
 		return nil, message.ErrGitOperationFailed("stage", err.Error())
 	}
 
-	return OperationResult{
-		Status:        "staged",
-		FilesAffected: len(p.Paths),
+	return StageResult{
+		Success: true,
+		Staged:  p.Paths,
 	}, nil
 }
 
@@ -284,9 +296,9 @@ func (s *GitService) Unstage(ctx context.Context, params json.RawMessage) (inter
 		return nil, message.ErrGitOperationFailed("unstage", err.Error())
 	}
 
-	return OperationResult{
-		Status:        "unstaged",
-		FilesAffected: len(p.Paths),
+	return UnstageResult{
+		Success:  true,
+		Unstaged: p.Paths,
 	}, nil
 }
 
@@ -309,9 +321,9 @@ func (s *GitService) Discard(ctx context.Context, params json.RawMessage) (inter
 		return nil, message.ErrGitOperationFailed("discard", err.Error())
 	}
 
-	return OperationResult{
-		Status:        "discarded",
-		FilesAffected: len(p.Paths),
+	return DiscardResult{
+		Success:   true,
+		Discarded: p.Paths,
 	}, nil
 }
 
@@ -321,10 +333,40 @@ type CommitParams struct {
 	Push    bool   `json:"push,omitempty"`
 }
 
-// CommitResult for git/commit method.
+// CommitResult for git/commit method - matches HTTP API format.
 type CommitResult struct {
-	Status string `json:"status"`
-	SHA    string `json:"sha"`
+	Success        bool   `json:"success"`
+	SHA            string `json:"sha,omitempty"`
+	Message        string `json:"message,omitempty"`
+	FilesCommitted int    `json:"files_committed,omitempty"`
+	Pushed         bool   `json:"pushed,omitempty"`
+	Error          string `json:"error,omitempty"`
+}
+
+// PushResult for git/push method - matches HTTP API format.
+type PushResult struct {
+	Success       bool   `json:"success"`
+	Message       string `json:"message,omitempty"`
+	CommitsPushed int    `json:"commits_pushed,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
+// PullResult for git/pull method - matches HTTP API format.
+type PullResult struct {
+	Success         bool     `json:"success"`
+	Message         string   `json:"message,omitempty"`
+	CommitsPulled   int      `json:"commits_pulled,omitempty"`
+	FilesChanged    int      `json:"files_changed,omitempty"`
+	ConflictedFiles []string `json:"conflicted_files,omitempty"`
+	Error           string   `json:"error,omitempty"`
+}
+
+// CheckoutResult for git/checkout method - matches HTTP API format.
+type CheckoutResult struct {
+	Success bool   `json:"success"`
+	Branch  string `json:"branch,omitempty"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // Commit creates a commit.
@@ -342,22 +384,12 @@ func (s *GitService) Commit(ctx context.Context, params json.RawMessage) (interf
 		return nil, message.ErrInvalidParams("message is required")
 	}
 
-	sha, err := s.provider.Commit(ctx, p.Message)
+	result, err := s.provider.Commit(ctx, p.Message, p.Push)
 	if err != nil {
 		return nil, message.ErrGitOperationFailed("commit", err.Error())
 	}
 
-	// Push if requested
-	if p.Push {
-		if err := s.provider.Push(ctx); err != nil {
-			return nil, message.ErrGitOperationFailed("push", err.Error())
-		}
-	}
-
-	return CommitResult{
-		Status: "committed",
-		SHA:    sha,
-	}, nil
+	return result, nil
 }
 
 // Push pushes to remote.
@@ -366,11 +398,12 @@ func (s *GitService) Push(ctx context.Context, params json.RawMessage) (interfac
 		return nil, message.ErrNotAGitRepo()
 	}
 
-	if err := s.provider.Push(ctx); err != nil {
+	result, err := s.provider.Push(ctx)
+	if err != nil {
 		return nil, message.ErrGitOperationFailed("push", err.Error())
 	}
 
-	return OperationResult{Status: "pushed"}, nil
+	return result, nil
 }
 
 // Pull pulls from remote.
@@ -379,17 +412,21 @@ func (s *GitService) Pull(ctx context.Context, params json.RawMessage) (interfac
 		return nil, message.ErrNotAGitRepo()
 	}
 
-	if err := s.provider.Pull(ctx); err != nil {
+	result, err := s.provider.Pull(ctx)
+	if err != nil {
 		return nil, message.ErrGitOperationFailed("pull", err.Error())
 	}
 
-	return OperationResult{Status: "pulled"}, nil
+	return result, nil
 }
 
-// BranchesResult for git/branches method.
+// BranchesResult for git/branches method - matches HTTP API format.
 type BranchesResult struct {
-	Branches []BranchInfo `json:"branches"`
 	Current  string       `json:"current"`
+	Upstream string       `json:"upstream,omitempty"`
+	Ahead    int          `json:"ahead"`
+	Behind   int          `json:"behind"`
+	Branches []BranchInfo `json:"branches"`
 }
 
 // Branches returns the list of branches.
@@ -398,35 +435,18 @@ func (s *GitService) Branches(ctx context.Context, params json.RawMessage) (inte
 		return nil, message.ErrNotAGitRepo()
 	}
 
-	branches, err := s.provider.Branches(ctx)
+	result, err := s.provider.Branches(ctx)
 	if err != nil {
 		return nil, message.ErrGitOperationFailed("branches", err.Error())
 	}
 
-	// Find current branch
-	current := ""
-	for _, b := range branches {
-		if b.Current {
-			current = b.Name
-			break
-		}
-	}
-
-	return BranchesResult{
-		Branches: branches,
-		Current:  current,
-	}, nil
+	return result, nil
 }
 
 // CheckoutParams for git/checkout method.
 type CheckoutParams struct {
 	Branch string `json:"branch"`
-}
-
-// CheckoutResult for git/checkout method.
-type CheckoutResult struct {
-	Status string `json:"status"`
-	Branch string `json:"branch"`
+	Create bool   `json:"create,omitempty"`
 }
 
 // Checkout checks out a branch.
@@ -444,12 +464,10 @@ func (s *GitService) Checkout(ctx context.Context, params json.RawMessage) (inte
 		return nil, message.ErrInvalidParams("branch is required")
 	}
 
-	if err := s.provider.Checkout(ctx, p.Branch); err != nil {
+	result, err := s.provider.Checkout(ctx, p.Branch)
+	if err != nil {
 		return nil, message.ErrGitOperationFailed("checkout", err.Error())
 	}
 
-	return CheckoutResult{
-		Status: "checked_out",
-		Branch: p.Branch,
-	}, nil
+	return result, nil
 }

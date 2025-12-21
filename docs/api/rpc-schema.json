@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "cdev JSON-RPC API Schema",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "methods": {
     "agent/run": {
       "description": "Start an AI agent with a prompt",
@@ -73,19 +73,57 @@
       }
     },
     "git/status": {
-      "description": "Get git repository status",
+      "description": "Get git repository status (matches HTTP API format)",
       "params": null,
       "result": {
         "type": "object",
         "properties": {
           "branch": { "type": "string" },
+          "upstream": { "type": "string" },
           "ahead": { "type": "integer" },
           "behind": { "type": "integer" },
-          "staged_count": { "type": "integer" },
-          "unstaged_count": { "type": "integer" },
-          "untracked_count": { "type": "integer" },
-          "has_conflicts": { "type": "boolean" },
-          "changed_files": { "type": "array", "items": { "type": "string" } }
+          "staged": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          },
+          "unstaged": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          },
+          "untracked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          },
+          "conflicted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          },
+          "repo_name": { "type": "string" },
+          "repo_root": { "type": "string" }
         }
       }
     },
@@ -108,7 +146,7 @@
       }
     },
     "git/stage": {
-      "description": "Stage files for commit",
+      "description": "Stage files for commit (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
@@ -119,13 +157,13 @@
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "files_affected": { "type": "integer" }
+          "success": { "type": "boolean" },
+          "staged": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "git/unstage": {
-      "description": "Unstage files from the staging area",
+      "description": "Unstage files from the staging area (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
@@ -136,13 +174,13 @@
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "files_affected": { "type": "integer" }
+          "success": { "type": "boolean" },
+          "unstaged": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "git/discard": {
-      "description": "Discard unstaged changes to files",
+      "description": "Discard unstaged changes to files (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
@@ -153,13 +191,13 @@
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "files_affected": { "type": "integer" }
+          "success": { "type": "boolean" },
+          "discarded": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "git/commit": {
-      "description": "Create a commit with staged changes",
+      "description": "Create a commit with staged changes (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
@@ -171,37 +209,53 @@
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "sha": { "type": "string" }
+          "success": { "type": "boolean" },
+          "sha": { "type": "string" },
+          "message": { "type": "string" },
+          "files_committed": { "type": "integer" },
+          "pushed": { "type": "boolean" },
+          "error": { "type": "string" }
         }
       }
     },
     "git/push": {
-      "description": "Push commits to remote repository",
+      "description": "Push commits to remote repository (matches HTTP API format)",
       "params": null,
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" }
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "commits_pushed": { "type": "integer" },
+          "error": { "type": "string" }
         }
       }
     },
     "git/pull": {
-      "description": "Pull changes from remote repository",
+      "description": "Pull changes from remote repository (matches HTTP API format)",
       "params": null,
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" }
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "commits_pulled": { "type": "integer" },
+          "files_changed": { "type": "integer" },
+          "conflicted_files": { "type": "array", "items": { "type": "string" } },
+          "error": { "type": "string" }
         }
       }
     },
     "git/branches": {
-      "description": "List all git branches",
+      "description": "List all git branches (matches HTTP API format)",
       "params": null,
       "result": {
         "type": "object",
         "properties": {
+          "current": { "type": "string" },
+          "upstream": { "type": "string" },
+          "ahead": { "type": "integer" },
+          "behind": { "type": "integer" },
           "branches": {
             "type": "array",
             "items": {
@@ -211,25 +265,27 @@
                 "current": { "type": "boolean" }
               }
             }
-          },
-          "current": { "type": "string" }
+          }
         }
       }
     },
     "git/checkout": {
-      "description": "Checkout a branch",
+      "description": "Checkout a branch (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
-          "branch": { "type": "string" }
+          "branch": { "type": "string" },
+          "create": { "type": "boolean", "default": false }
         },
         "required": ["branch"]
       },
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "branch": { "type": "string" }
+          "success": { "type": "boolean" },
+          "branch": { "type": "string" },
+          "message": { "type": "string" },
+          "error": { "type": "string" }
         }
       }
     },
@@ -337,37 +393,46 @@
       }
     },
     "session/messages": {
-      "description": "Get paginated messages for a specific session",
+      "description": "Get paginated messages for a session (matches HTTP API format)",
       "params": {
         "type": "object",
         "properties": {
           "session_id": { "type": "string" },
           "agent_type": { "type": "string" },
           "limit": { "type": "integer", "default": 50, "maximum": 500 },
-          "offset": { "type": "integer", "default": 0 }
+          "offset": { "type": "integer", "default": 0 },
+          "order": { "type": "string", "enum": ["asc", "desc"], "default": "asc" }
         },
         "required": ["session_id"]
       },
       "result": {
         "type": "object",
         "properties": {
+          "session_id": { "type": "string" },
           "messages": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
+                "id": { "type": "integer", "description": "Database row ID" },
                 "session_id": { "type": "string" },
+                "type": { "type": "string", "enum": ["user", "assistant"] },
+                "uuid": { "type": "string" },
                 "timestamp": { "type": "string", "format": "date-time" },
-                "role": { "type": "string", "enum": ["user", "assistant", "tool"] },
-                "content": { "type": "string" }
+                "git_branch": { "type": "string" },
+                "message": {
+                  "type": "object",
+                  "description": "Raw Claude API message (content, role, model, usage, etc)"
+                },
+                "is_context_compaction": { "type": "boolean" }
               }
             }
           },
           "total": { "type": "integer" },
           "limit": { "type": "integer" },
           "offset": { "type": "integer" },
-          "has_more": { "type": "boolean" }
+          "has_more": { "type": "boolean" },
+          "query_time_ms": { "type": "number" }
         }
       }
     },

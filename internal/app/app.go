@@ -253,8 +253,8 @@ func (a *App) Start(ctx context.Context) error {
 	fileService := methods.NewFileService(NewFileProviderAdapter(a.gitTracker), a.cfg.Limits.MaxFileSizeKB)
 	fileService.RegisterMethods(rpcRegistry)
 
-	// Session service
-	sessionService := methods.NewSessionService()
+	// Session service (pass streamer for real-time watching via RPC)
+	sessionService := methods.NewSessionService(a.sessionStreamer)
 	if a.sessionCache != nil && a.messageCache != nil {
 		sessionService.RegisterProvider(NewClaudeSessionAdapter(a.sessionCache, a.messageCache, a.cfg.Repository.Path))
 	}

@@ -25,7 +25,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) 
 SWAG := $(shell go env GOPATH)/bin/swag
 
 # Targets
-.PHONY: all build build-all clean test test-race fmt vet lint tidy run help swagger
+.PHONY: all build build-all clean test test-race fmt vet lint tidy run help swagger openrpc openrpc-start
 
 # Default target
 all: build
@@ -177,6 +177,30 @@ swagger:
 	$(SWAG) init -g cmd/cdev/main.go -o api/swagger --packageName swagger
 	@echo "Swagger docs generated in api/swagger/"
 
+# Generate OpenRPC schema from running server
+# Usage: make openrpc (requires server running on port 8766)
+# Or: make openrpc-start (starts server, generates schema, stops server)
+openrpc:
+	@echo "Fetching OpenRPC schema from server..."
+	@curl -s http://localhost:8766/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || \
+		(echo "Error: Server not running on port 8766. Use 'make openrpc-start' instead." && exit 1)
+	@echo "OpenRPC schema generated in api/openrpc/openrpc.json"
+
+# Generate OpenRPC schema (starts temporary server)
+openrpc-start: build
+	@echo "Starting temporary server to generate OpenRPC schema..."
+	@mkdir -p api/openrpc
+	@./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml &
+	@sleep 2
+	@curl -s http://localhost:8766/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || true
+	@pkill -f "$(BINARY_NAME) start" 2>/dev/null || true
+	@if [ -s api/openrpc/openrpc.json ]; then \
+		echo "OpenRPC schema generated in api/openrpc/openrpc.json"; \
+	else \
+		echo "Error: Failed to generate OpenRPC schema"; \
+		exit 1; \
+	fi
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning..."
@@ -226,7 +250,9 @@ help:
 	@echo "  make tidy         Tidy dependencies"
 	@echo ""
 	@echo "Documentation:"
-	@echo "  make swagger      Generate OpenAPI 3.0 docs"
+	@echo "  make swagger        Generate OpenAPI 3.0 docs"
+	@echo "  make openrpc        Generate OpenRPC schema (server must be running)"
+	@echo "  make openrpc-start  Generate OpenRPC schema (starts temp server)"
 	@echo ""
 	@echo "Build & Deploy:"
 	@echo "  make clean        Clean build artifacts"

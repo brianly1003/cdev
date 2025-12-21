@@ -215,35 +215,44 @@ func TestGitProviderAdapter_NilTracker(t *testing.T) {
 		t.Errorf("Discard with nil tracker should return nil, got %v", err)
 	}
 
-	sha, err := adapter.Commit(ctx, "test message")
+	commitResult, err := adapter.Commit(ctx, "test message", false)
 	if err != nil {
 		t.Errorf("Commit with nil tracker should return nil error, got %v", err)
 	}
-	if sha != "" {
-		t.Errorf("Commit with nil tracker should return empty sha, got %s", sha)
+	if commitResult == nil || commitResult.Success {
+		t.Errorf("Commit with nil tracker should return unsuccessful result")
 	}
 
-	err = adapter.Push(ctx)
+	pushResult, err := adapter.Push(ctx)
 	if err != nil {
-		t.Errorf("Push with nil tracker should return nil, got %v", err)
+		t.Errorf("Push with nil tracker should return nil error, got %v", err)
+	}
+	if pushResult == nil || pushResult.Success {
+		t.Errorf("Push with nil tracker should return unsuccessful result")
 	}
 
-	err = adapter.Pull(ctx)
+	pullResult, err := adapter.Pull(ctx)
 	if err != nil {
-		t.Errorf("Pull with nil tracker should return nil, got %v", err)
+		t.Errorf("Pull with nil tracker should return nil error, got %v", err)
+	}
+	if pullResult == nil || pullResult.Success {
+		t.Errorf("Pull with nil tracker should return unsuccessful result")
 	}
 
-	branches, err := adapter.Branches(ctx)
+	branchesResult, err := adapter.Branches(ctx)
 	if err != nil {
 		t.Errorf("Branches with nil tracker should return nil error, got %v", err)
 	}
-	if len(branches) != 0 {
-		t.Errorf("Branches with nil tracker should return empty slice, got %d", len(branches))
+	if branchesResult == nil || len(branchesResult.Branches) != 0 {
+		t.Errorf("Branches with nil tracker should return empty branches slice")
 	}
 
-	err = adapter.Checkout(ctx, "main")
+	checkoutResult, err := adapter.Checkout(ctx, "main")
 	if err != nil {
-		t.Errorf("Checkout with nil tracker should return nil, got %v", err)
+		t.Errorf("Checkout with nil tracker should return nil error, got %v", err)
+	}
+	if checkoutResult == nil || checkoutResult.Success {
+		t.Errorf("Checkout with nil tracker should return unsuccessful result")
 	}
 }
 
@@ -376,7 +385,7 @@ func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
 		t.Errorf("Expected 2 messages, got %d", len(result))
 	}
 
-	// Verify raw message format
+	// Verify raw message format matching HTTP API
 	if len(result) > 0 {
 		if result[0].Type != "user" {
 			t.Errorf("Expected first message type 'user', got '%s'", result[0].Type)

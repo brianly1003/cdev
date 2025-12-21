@@ -217,13 +217,14 @@ func TestSessionInfoJSON(t *testing.T) {
 // TestSessionMessageJSON tests snake_case serialization for SessionMessage.
 func TestSessionMessageJSON(t *testing.T) {
 	msg := SessionMessage{
-		ID:        1,
-		SessionID: "session-xyz",
-		UUID:      "uuid-123",
-		Type:      "assistant",
-		Timestamp: "2025-12-20T10:00:00Z",
-		GitBranch: "main",
-		Message:   json.RawMessage(`{"role":"assistant","content":"Hello"}`),
+		ID:                  1,
+		SessionID:           "session-xyz",
+		Type:                "assistant",
+		UUID:                "uuid-123",
+		Timestamp:           "2025-12-20T10:00:00Z",
+		GitBranch:           "main",
+		Message:             json.RawMessage(`{"role":"assistant","content":"Hello"}`),
+		IsContextCompaction: true,
 	}
 
 	data, err := json.Marshal(msg)
@@ -234,8 +235,8 @@ func TestSessionMessageJSON(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify snake_case field names
-	expectedFields := []string{"session_id", "git_branch"}
-	unexpectedFields := []string{"sessionId", "gitBranch"}
+	expectedFields := []string{"session_id", "git_branch", "is_context_compaction"}
+	unexpectedFields := []string{"sessionId", "gitBranch", "isContextCompaction"}
 
 	for _, field := range expectedFields {
 		if !containsField(jsonStr, field) {
@@ -383,11 +384,11 @@ func TestDiffResultJSON(t *testing.T) {
 	}
 }
 
-// TestOperationResultJSON tests snake_case serialization for OperationResult.
-func TestOperationResultJSON(t *testing.T) {
-	result := OperationResult{
-		Status:        "staged",
-		FilesAffected: 5,
+// TestStageResultJSON tests snake_case serialization for StageResult.
+func TestStageResultJSON(t *testing.T) {
+	result := StageResult{
+		Success: true,
+		Staged:  []string{"file1.go", "file2.go"},
 	}
 
 	data, err := json.Marshal(result)
@@ -397,11 +398,36 @@ func TestOperationResultJSON(t *testing.T) {
 
 	jsonStr := string(data)
 
-	if !containsField(jsonStr, "files_affected") {
-		t.Errorf("expected 'files_affected' field, got: %s", jsonStr)
+	if !containsField(jsonStr, "success") {
+		t.Errorf("expected 'success' field, got: %s", jsonStr)
 	}
-	if containsField(jsonStr, "filesAffected") {
-		t.Errorf("unexpected camelCase 'filesAffected' found: %s", jsonStr)
+	if !containsField(jsonStr, "staged") {
+		t.Errorf("expected 'staged' field, got: %s", jsonStr)
+	}
+}
+
+// TestCommitResultJSON tests snake_case serialization for CommitResult.
+func TestCommitResultJSON(t *testing.T) {
+	result := CommitResult{
+		Success:        true,
+		SHA:            "abc123",
+		Message:        "test commit",
+		FilesCommitted: 3,
+		Pushed:         false,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+
+	jsonStr := string(data)
+
+	if !containsField(jsonStr, "files_committed") {
+		t.Errorf("expected 'files_committed' field, got: %s", jsonStr)
+	}
+	if containsField(jsonStr, "filesCommitted") {
+		t.Errorf("unexpected camelCase 'filesCommitted' found: %s", jsonStr)
 	}
 }
 

@@ -38,6 +38,7 @@ type SessionInfo struct {
 
 // SessionMessage represents a raw cached message matching the HTTP API format.
 // This preserves the full Claude API response in the Message field.
+// IMPORTANT: This struct must match CachedMessage in sessioncache/messages.go
 type SessionMessage struct {
 	// ID is the database row ID.
 	ID int64 `json:"id"`
@@ -45,11 +46,11 @@ type SessionMessage struct {
 	// SessionID is the parent session ID.
 	SessionID string `json:"session_id"`
 
-	// UUID is the unique message identifier.
-	UUID string `json:"uuid,omitempty"`
-
 	// Type is the message type (user, assistant).
 	Type string `json:"type"`
+
+	// UUID is the unique message identifier.
+	UUID string `json:"uuid,omitempty"`
 
 	// Timestamp is when the message was created (ISO 8601 string).
 	Timestamp string `json:"timestamp,omitempty"`
@@ -59,6 +60,10 @@ type SessionMessage struct {
 
 	// Message is the raw Claude API message (content, role, model, usage, etc).
 	Message json.RawMessage `json:"message"`
+
+	// IsContextCompaction is true when this is an auto-generated message
+	// created by Claude Code when the context window was maxed out.
+	IsContextCompaction bool `json:"is_context_compaction,omitempty"`
 }
 
 // ToolCall represents a tool invocation.
@@ -129,15 +134,29 @@ type SessionProvider interface {
 	AgentType() string
 }
 
+// SessionStreamer defines the interface for real-time session watching.
+type SessionStreamer interface {
+	// WatchSession starts watching a session for new messages.
+	WatchSession(sessionID string) error
+
+	// UnwatchSession stops watching the current session.
+	UnwatchSession()
+
+	// GetWatchedSession returns the currently watched session ID.
+	GetWatchedSession() string
+}
+
 // SessionService provides session-related RPC methods.
 type SessionService struct {
 	providers map[string]SessionProvider // keyed by agent type
+	streamer  SessionStreamer            // for real-time watching
 }
 
 // NewSessionService creates a new session service.
-func NewSessionService() *SessionService {
+func NewSessionService(streamer SessionStreamer) *SessionService {
 	return &SessionService{
 		providers: make(map[string]SessionProvider),
+		streamer:  streamer,
 	}
 }
 
@@ -567,8 +586,7 @@ type WatchSessionResult struct {
 }
 
 // WatchSession starts watching a session for real-time updates.
-// Note: The actual watching is handled by the WebSocket connection management.
-// This method validates the session exists and signals intent to watch.
+// This method validates the session exists and starts the file watcher.
 func (s *SessionService) WatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p WatchSessionParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -580,31 +598,47 @@ func (s *SessionService) WatchSession(ctx context.Context, params json.RawMessag
 	}
 
 	// Verify session exists by trying to get it
+	sessionFound := false
 	for _, provider := range s.providers {
 		session, err := provider.GetSession(ctx, p.SessionID)
 		if err == nil && session != nil {
-			// Session exists - watching is handled by WebSocket layer
-			return WatchSessionResult{
-				Status:   "watching",
-				Watching: true,
-			}, nil
+			sessionFound = true
+			break
 		}
 	}
 
-	return nil, message.ErrSessionNotFound(p.SessionID)
+	if !sessionFound {
+		return nil, message.ErrSessionNotFound(p.SessionID)
+	}
+
+	// Start watching the session file for real-time updates
+	if s.streamer != nil {
+		if err := s.streamer.WatchSession(p.SessionID); err != nil {
+			return nil, message.ErrInternalError("failed to watch session: " + err.Error())
+		}
+	}
+
+	return WatchSessionResult{
+		Status:   "watching",
+		Watching: true,
+	}, nil
 }
 
 // UnwatchSessionResult for session/unwatch method.
 type UnwatchSessionResult struct {
-	Status string `json:"status"`
+	Status   string `json:"status"`
+	Watching bool   `json:"watching"`
 }
 
 // UnwatchSession stops watching the current session.
-// Note: The actual unwatching is handled by the WebSocket connection management.
 func (s *SessionService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-	// Unwatching is handled by the WebSocket layer
-	// This method just acknowledges the request
+	// Stop watching the session file
+	if s.streamer != nil {
+		s.streamer.UnwatchSession()
+	}
+
 	return UnwatchSessionResult{
-		Status: "unwatched",
+		Status:   "unwatched",
+		Watching: false,
 	}, nil
 }
