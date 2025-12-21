@@ -217,17 +217,13 @@ func TestSessionInfoJSON(t *testing.T) {
 // TestSessionMessageJSON tests snake_case serialization for SessionMessage.
 func TestSessionMessageJSON(t *testing.T) {
 	msg := SessionMessage{
-		ID:        "msg-1",
+		ID:        1,
 		SessionID: "session-xyz",
-		Timestamp: time.Now(),
-		Role:      "assistant",
-		Content:   "Hello",
-		ToolCalls: []ToolCall{
-			{ID: "tool-1", Name: "Bash", Input: map[string]interface{}{"command": "ls"}},
-		},
-		Thinking: "Considering options...",
-		Model:    "claude-3-opus",
-		Tokens:   &TokenUsage{Input: 100, Output: 50},
+		UUID:      "uuid-123",
+		Type:      "assistant",
+		Timestamp: "2025-12-20T10:00:00Z",
+		GitBranch: "main",
+		Message:   json.RawMessage(`{"role":"assistant","content":"Hello"}`),
 	}
 
 	data, err := json.Marshal(msg)
@@ -238,8 +234,8 @@ func TestSessionMessageJSON(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify snake_case field names
-	expectedFields := []string{"session_id", "tool_calls"}
-	unexpectedFields := []string{"sessionId", "toolCalls"}
+	expectedFields := []string{"session_id", "git_branch"}
+	unexpectedFields := []string{"sessionId", "gitBranch"}
 
 	for _, field := range expectedFields {
 		if !containsField(jsonStr, field) {

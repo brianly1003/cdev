@@ -4,7 +4,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
 	"github.com/brianly1003/cdev/internal/adapters/git"
@@ -387,40 +386,28 @@ func (a *ClaudeSessionAdapter) GetSession(ctx context.Context, sessionID string)
 }
 
 // GetSessionMessages returns messages for a session.
-func (a *ClaudeSessionAdapter) GetSessionMessages(ctx context.Context, sessionID string, limit, offset int) ([]methods.SessionMessage, int, error) {
+// Returns raw CachedMessage format matching the HTTP API.
+// Order can be "asc" or "desc".
+func (a *ClaudeSessionAdapter) GetSessionMessages(ctx context.Context, sessionID string, limit, offset int, order string) ([]methods.SessionMessage, int, error) {
 	if a.messageCache == nil {
 		return nil, 0, nil
 	}
 
-	page, err := a.messageCache.GetMessages(sessionID, limit, offset, "asc")
+	page, err := a.messageCache.GetMessages(sessionID, limit, offset, order)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	result := make([]methods.SessionMessage, len(page.Messages))
 	for i, m := range page.Messages {
-		var msgContent string
-		var msgData map[string]interface{}
-		if err := json.Unmarshal(m.Message, &msgData); err == nil {
-			if content, ok := msgData["content"].(string); ok {
-				msgContent = content
-			}
-		}
-
-		// Parse timestamp
-		ts := time.Now()
-		if m.Timestamp != "" {
-			if parsed, err := time.Parse(time.RFC3339, m.Timestamp); err == nil {
-				ts = parsed
-			}
-		}
-
 		result[i] = methods.SessionMessage{
-			ID:        m.UUID,
-			SessionID: sessionID,
-			Timestamp: ts,
-			Role:      m.Type,
-			Content:   msgContent,
+			ID:        m.ID,
+			SessionID: m.SessionID,
+			UUID:      m.UUID,
+			Type:      m.Type,
+			Timestamp: m.Timestamp,
+			GitBranch: m.GitBranch,
+			Message:   m.Message,
 		}
 	}
 

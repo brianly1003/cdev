@@ -36,34 +36,29 @@ type SessionInfo struct {
 	ProjectPath string `json:"project_path,omitempty"`
 }
 
-// SessionMessage represents a unified message from any AI CLI session.
+// SessionMessage represents a raw cached message matching the HTTP API format.
+// This preserves the full Claude API response in the Message field.
 type SessionMessage struct {
-	// ID is the unique message identifier.
-	ID string `json:"id"`
+	// ID is the database row ID.
+	ID int64 `json:"id"`
 
 	// SessionID is the parent session ID.
 	SessionID string `json:"session_id"`
 
-	// Timestamp is when the message was created.
-	Timestamp time.Time `json:"timestamp"`
+	// UUID is the unique message identifier.
+	UUID string `json:"uuid,omitempty"`
 
-	// Role is the message role (user, assistant, tool).
-	Role string `json:"role"`
+	// Type is the message type (user, assistant).
+	Type string `json:"type"`
 
-	// Content is the message content.
-	Content string `json:"content,omitempty"`
+	// Timestamp is when the message was created (ISO 8601 string).
+	Timestamp string `json:"timestamp,omitempty"`
 
-	// ToolCalls contains tool invocations (if any).
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	// GitBranch is the git branch when message was created.
+	GitBranch string `json:"git_branch,omitempty"`
 
-	// Thinking contains agent reasoning (if available).
-	Thinking string `json:"thinking,omitempty"`
-
-	// Model is the model used (if known).
-	Model string `json:"model,omitempty"`
-
-	// Tokens contains token usage info (if available).
-	Tokens *TokenUsage `json:"tokens,omitempty"`
+	// Message is the raw Claude API message (content, role, model, usage, etc).
+	Message json.RawMessage `json:"message"`
 }
 
 // ToolCall represents a tool invocation.
@@ -118,7 +113,8 @@ type SessionProvider interface {
 	GetSession(ctx context.Context, sessionID string) (*SessionInfo, error)
 
 	// GetSessionMessages returns messages for a session.
-	GetSessionMessages(ctx context.Context, sessionID string, limit, offset int) ([]SessionMessage, int, error)
+	// Order can be "asc" or "desc" (default: "asc").
+	GetSessionMessages(ctx context.Context, sessionID string, limit, offset int, order string) ([]SessionMessage, int, error)
 
 	// GetSessionElements returns pre-parsed UI elements for a session.
 	GetSessionElements(ctx context.Context, sessionID string, limit int, beforeID, afterID string) ([]SessionElement, int, error)
@@ -181,6 +177,7 @@ func (s *SessionService) RegisterMethods(r *handler.Registry) {
 			{Name: "agent_type", Description: "Agent type (optional)", Required: false, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "limit", Description: "Maximum messages to return (default 50, max 500)", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
 			{Name: "offset", Description: "Offset for pagination", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
+			{Name: "order", Description: "Sort order: 'asc' or 'desc' (default 'asc')", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"asc", "desc"}, "default": "asc"}},
 		},
 		Result: &handler.OpenRPCResult{Name: "SessionMessagesResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionMessagesResult"}},
 		Errors: []string{"SessionNotFound"},
@@ -326,19 +323,24 @@ type GetSessionMessagesParams struct {
 	AgentType string `json:"agent_type,omitempty"`
 	Limit     int    `json:"limit,omitempty"`
 	Offset    int    `json:"offset,omitempty"`
+	Order     string `json:"order,omitempty"` // "asc" or "desc" (default: "asc")
 }
 
 // GetSessionMessagesResult for session/messages method.
 type GetSessionMessagesResult struct {
-	Messages []SessionMessage `json:"messages"`
-	Total    int              `json:"total"`
-	Limit    int              `json:"limit"`
-	Offset   int              `json:"offset"`
-	HasMore  bool             `json:"has_more"`
+	SessionID   string           `json:"session_id"`
+	Messages    []SessionMessage `json:"messages"`
+	Total       int              `json:"total"`
+	Limit       int              `json:"limit"`
+	Offset      int              `json:"offset"`
+	HasMore     bool             `json:"has_more"`
+	QueryTimeMs float64          `json:"query_time_ms"`
 }
 
 // GetSessionMessages returns messages for a session.
 func (s *SessionService) GetSessionMessages(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	startTime := time.Now()
+
 	var p GetSessionMessagesParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.ErrInvalidParams("invalid params: " + err.Error())
@@ -356,20 +358,29 @@ func (s *SessionService) GetSessionMessages(ctx context.Context, params json.Raw
 		limit = 500
 	}
 
+	// Default order is "asc"
+	order := p.Order
+	if order == "" {
+		order = "asc"
+	}
+
 	// Try each provider until we find the session
 	for agentType, provider := range s.providers {
 		if p.AgentType != "" && p.AgentType != agentType {
 			continue
 		}
 
-		messages, total, err := provider.GetSessionMessages(ctx, p.SessionID, limit, p.Offset)
+		messages, total, err := provider.GetSessionMessages(ctx, p.SessionID, limit, p.Offset, order)
 		if err == nil {
+			queryTimeMs := float64(time.Since(startTime).Microseconds()) / 1000.0
 			return GetSessionMessagesResult{
-				Messages: messages,
-				Total:    total,
-				Limit:    limit,
-				Offset:   p.Offset,
-				HasMore:  p.Offset+len(messages) < total,
+				SessionID:   p.SessionID,
+				Messages:    messages,
+				Total:       total,
+				Limit:       limit,
+				Offset:      p.Offset,
+				HasMore:     p.Offset+len(messages) < total,
+				QueryTimeMs: queryTimeMs,
 			}, nil
 		}
 	}

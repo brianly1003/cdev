@@ -297,7 +297,7 @@ func TestClaudeSessionAdapter_NilMessageCache(t *testing.T) {
 	adapter := NewClaudeSessionAdapter(nil, nil, "/test/repo")
 	ctx := context.Background()
 
-	messages, total, err := adapter.GetSessionMessages(ctx, "test-session", 10, 0)
+	messages, total, err := adapter.GetSessionMessages(ctx, "test-session", 10, 0, "asc")
 	if err != nil {
 		t.Errorf("GetSessionMessages with nil messageCache should return nil error, got %v", err)
 	}
@@ -364,7 +364,7 @@ func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Test GetSessionMessages
-	result, total, err := adapter.GetSessionMessages(ctx, sessionID, 10, 0)
+	result, total, err := adapter.GetSessionMessages(ctx, sessionID, 10, 0, "asc")
 	if err != nil {
 		t.Fatalf("GetSessionMessages failed: %v", err)
 	}
@@ -376,12 +376,26 @@ func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
 		t.Errorf("Expected 2 messages, got %d", len(result))
 	}
 
-	// Verify content
-	if len(result) > 0 && result[0].Content != "Hello" {
-		t.Errorf("Expected first message content 'Hello', got '%s'", result[0].Content)
+	// Verify raw message format
+	if len(result) > 0 {
+		if result[0].Type != "user" {
+			t.Errorf("Expected first message type 'user', got '%s'", result[0].Type)
+		}
+		if result[0].UUID != "uuid-1" {
+			t.Errorf("Expected first message UUID 'uuid-1', got '%s'", result[0].UUID)
+		}
+		// Verify Message contains raw content
+		if result[0].Message == nil {
+			t.Error("Expected first message Message field to be non-nil")
+		}
 	}
-	if len(result) > 1 && result[1].Content != "Hi there" {
-		t.Errorf("Expected second message content 'Hi there', got '%s'", result[1].Content)
+	if len(result) > 1 {
+		if result[1].Type != "assistant" {
+			t.Errorf("Expected second message type 'assistant', got '%s'", result[1].Type)
+		}
+		if result[1].UUID != "uuid-2" {
+			t.Errorf("Expected second message UUID 'uuid-2', got '%s'", result[1].UUID)
+		}
 	}
 }
 
