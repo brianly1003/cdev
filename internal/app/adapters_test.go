@@ -3,8 +3,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
 )
@@ -301,6 +306,82 @@ func TestClaudeSessionAdapter_NilMessageCache(t *testing.T) {
 	}
 	if total != 0 {
 		t.Errorf("GetSessionMessages with nil messageCache should return total 0, got %d", total)
+	}
+}
+
+func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
+	// Create temp sessions dir
+	sessionsDir, err := os.MkdirTemp("", "cdev-sessions-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(sessionsDir)
+
+	// Create a session file
+	sessionID := "test-session-1"
+	filePath := filepath.Join(sessionsDir, sessionID+".jsonl")
+
+	// Create sample messages
+	messages := []map[string]interface{}{
+		{
+			"type":      "user",
+			"uuid":      "uuid-1",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"message": map[string]interface{}{
+				"content": "Hello",
+			},
+		},
+		{
+			"type":      "assistant",
+			"uuid":      "uuid-2",
+			"timestamp": time.Now().Add(time.Second).Format(time.RFC3339),
+			"message": map[string]interface{}{
+				"content": "Hi there",
+			},
+		},
+	}
+
+	f, err := os.Create(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, msg := range messages {
+		data, _ := json.Marshal(msg)
+		f.Write(data)
+		f.WriteString("\n")
+	}
+	f.Close()
+
+	// Initialize MessageCache
+	msgCache, err := sessioncache.NewMessageCache(sessionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize Adapter
+	adapter := NewClaudeSessionAdapter(nil, msgCache, "/repo")
+	ctx := context.Background()
+
+	// Test GetSessionMessages
+	result, total, err := adapter.GetSessionMessages(ctx, sessionID, 10, 0)
+	if err != nil {
+		t.Fatalf("GetSessionMessages failed: %v", err)
+	}
+
+	if total != 2 {
+		t.Errorf("Expected total 2, got %d", total)
+	}
+	if len(result) != 2 {
+		t.Errorf("Expected 2 messages, got %d", len(result))
+	}
+
+	// Verify content
+	if len(result) > 0 && result[0].Content != "Hello" {
+		t.Errorf("Expected first message content 'Hello', got '%s'", result[0].Content)
+	}
+	if len(result) > 1 && result[1].Content != "Hi there" {
+		t.Errorf("Expected second message content 'Hi there', got '%s'", result[1].Content)
 	}
 }
 
