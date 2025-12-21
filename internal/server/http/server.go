@@ -15,8 +15,9 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
-	"github.com/brianly1003/cdev/internal/adapters/repository"
 	"github.com/brianly1003/cdev/internal/adapters/git"
+	"github.com/brianly1003/cdev/internal/adapters/repository"
+	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
@@ -24,9 +25,13 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// WebSocketHandler is a function that handles WebSocket connections.
+type WebSocketHandler func(http.ResponseWriter, *http.Request)
+
 // Server is the HTTP API server.
 type Server struct {
 	server        *http.Server
+	mux           *http.ServeMux
 	addr          string
 	statusFn      func() map[string]interface{}
 	claudeManager *claude.Manager
@@ -37,6 +42,8 @@ type Server struct {
 	repoIndexer   *repository.SQLiteIndexer
 	maxFileSizeKB int
 	repoPath      string
+	wsHandler     WebSocketHandler
+	rpcRegistry   *handler.Registry
 }
 
 // New creates a new HTTP server.
@@ -53,52 +60,47 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 		eventHub:      eventHub,
 		maxFileSizeKB: maxFileSizeKB,
 		repoPath:      repoPath,
+		mux:           http.NewServeMux(),
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", s.handleHealth)
-	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/claude/sessions", s.handleClaudeSessions)
-	mux.HandleFunc("/api/claude/sessions/messages", s.handleClaudeSessionMessages)
-	mux.HandleFunc("/api/claude/sessions/elements", s.handleClaudeSessionElements)
-	mux.HandleFunc("/api/claude/run", s.handleClaudeRun)
-	mux.HandleFunc("/api/claude/stop", s.handleClaudeStop)
-	mux.HandleFunc("/api/claude/respond", s.handleClaudeRespond)
-	mux.HandleFunc("/api/file", s.handleGetFile)
-	mux.HandleFunc("/api/files/list", s.handleFilesList)
-	mux.HandleFunc("/api/git/status", s.handleGitStatus)
-	mux.HandleFunc("/api/git/diff", s.handleGitDiff)
-	mux.HandleFunc("/api/git/stage", s.handleGitStage)
-	mux.HandleFunc("/api/git/unstage", s.handleGitUnstage)
-	mux.HandleFunc("/api/git/discard", s.handleGitDiscard)
-	mux.HandleFunc("/api/git/commit", s.handleGitCommit)
-	mux.HandleFunc("/api/git/push", s.handleGitPush)
-	mux.HandleFunc("/api/git/pull", s.handleGitPull)
-	mux.HandleFunc("/api/git/branches", s.handleGitBranches)
-	mux.HandleFunc("/api/git/checkout", s.handleGitCheckout)
+	s.mux.HandleFunc("/health", s.handleHealth)
+	s.mux.HandleFunc("/api/status", s.handleStatus)
+	s.mux.HandleFunc("/api/claude/sessions", s.handleClaudeSessions)
+	s.mux.HandleFunc("/api/claude/sessions/messages", s.handleClaudeSessionMessages)
+	s.mux.HandleFunc("/api/claude/sessions/elements", s.handleClaudeSessionElements)
+	s.mux.HandleFunc("/api/claude/run", s.handleClaudeRun)
+	s.mux.HandleFunc("/api/claude/stop", s.handleClaudeStop)
+	s.mux.HandleFunc("/api/claude/respond", s.handleClaudeRespond)
+	s.mux.HandleFunc("/api/file", s.handleGetFile)
+	s.mux.HandleFunc("/api/files/list", s.handleFilesList)
+	s.mux.HandleFunc("/api/git/status", s.handleGitStatus)
+	s.mux.HandleFunc("/api/git/diff", s.handleGitDiff)
+	s.mux.HandleFunc("/api/git/stage", s.handleGitStage)
+	s.mux.HandleFunc("/api/git/unstage", s.handleGitUnstage)
+	s.mux.HandleFunc("/api/git/discard", s.handleGitDiscard)
+	s.mux.HandleFunc("/api/git/commit", s.handleGitCommit)
+	s.mux.HandleFunc("/api/git/push", s.handleGitPush)
+	s.mux.HandleFunc("/api/git/pull", s.handleGitPull)
+	s.mux.HandleFunc("/api/git/branches", s.handleGitBranches)
+	s.mux.HandleFunc("/api/git/checkout", s.handleGitCheckout)
 
 	// Repository indexer endpoints
-	mux.HandleFunc("/api/repository/index/status", s.handleRepositoryIndexStatus)
-	mux.HandleFunc("/api/repository/index/rebuild", s.handleRepositoryRebuild)
-	mux.HandleFunc("/api/repository/search", s.handleRepositorySearch)
-	mux.HandleFunc("/api/repository/files/list", s.handleRepositoryFilesList)
-	mux.HandleFunc("/api/repository/files/tree", s.handleRepositoryTree)
-	mux.HandleFunc("/api/repository/stats", s.handleRepositoryStats)
+	s.mux.HandleFunc("/api/repository/index/status", s.handleRepositoryIndexStatus)
+	s.mux.HandleFunc("/api/repository/index/rebuild", s.handleRepositoryRebuild)
+	s.mux.HandleFunc("/api/repository/search", s.handleRepositorySearch)
+	s.mux.HandleFunc("/api/repository/files/list", s.handleRepositoryFilesList)
+	s.mux.HandleFunc("/api/repository/files/tree", s.handleRepositoryTree)
+	s.mux.HandleFunc("/api/repository/stats", s.handleRepositoryStats)
 
-	// Swagger UI endpoint
-	mux.Handle("/swagger/", httpSwagger.Handler(
+	// Swagger UI endpoint (REST API docs)
+	s.mux.Handle("/swagger/", httpSwagger.Handler(
 		httpSwagger.DeepLinking(true),
 		httpSwagger.DocExpansion("none"),
 		httpSwagger.DomID("swagger-ui"),
 	))
 
-	// Chain middlewares: timeout -> cors -> handler
-	s.server = &http.Server{
-		Addr:    addr,
-		Handler: timeoutMiddleware(10*time.Second, corsMiddleware(mux)),
-		// Note: ReadTimeout and WriteTimeout removed to let our middleware handle it
-		// This prevents interference with the timeout middleware
-	}
+	// OpenRPC endpoint (JSON-RPC API docs)
+	s.mux.HandleFunc("/api/rpc/discover", s.handleOpenRPCDiscover)
 
 	return s
 }
@@ -107,8 +109,8 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip timeout for certain paths that need longer processing
-		// (e.g., swagger UI, health checks)
-		if r.URL.Path == "/health" || strings.HasPrefix(r.URL.Path, "/swagger/") {
+		// (e.g., swagger UI, health checks, WebSocket upgrades)
+		if r.URL.Path == "/health" || r.URL.Path == "/ws" || strings.HasPrefix(r.URL.Path, "/swagger/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -213,7 +215,28 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // Start starts the HTTP server.
+// SetWebSocketHandler sets the handler for WebSocket connections.
+// Must be called before Start().
+func (s *Server) SetWebSocketHandler(handler WebSocketHandler) {
+	s.wsHandler = handler
+}
+
 func (s *Server) Start() error {
+	// Add WebSocket handler if set (must be done before creating http.Server)
+	if s.wsHandler != nil {
+		s.mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			s.wsHandler(w, r)
+		})
+		log.Debug().Msg("WebSocket handler registered at /ws")
+	}
+
+	// Create the http.Server with middleware chain
+	// Note: WebSocket upgrades bypass timeout middleware via path check
+	s.server = &http.Server{
+		Addr:    s.addr,
+		Handler: timeoutMiddleware(10*time.Second, corsMiddleware(s.mux)),
+	}
+
 	log.Info().Str("addr", s.addr).Msg("HTTP server starting")
 
 	go func() {

@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0
 **Status:** Strategic Planning
-**Last Updated:** December 2025
+**Last Updated:** 21 Dec 2025
 
 ---
 
@@ -564,15 +564,19 @@ cdev_active_clients 5
 
 ## Implementation Roadmap
 
-### Phase 1: Protocol Foundation (Q1)
+### Phase 1: Protocol Foundation (Q1) ✅ COMPLETE
 
-| Task | Priority | Effort |
+| Task | Priority | Status |
 |------|----------|--------|
-| Adopt JSON-RPC 2.0 message format | P0 | 1 week |
-| Add capability negotiation | P0 | 1 week |
-| Add stdio transport | P0 | 1 week |
-| Create TypeScript SDK | P0 | 2 weeks |
-| Write formal protocol specification | P0 | 1 week |
+| Adopt JSON-RPC 2.0 message format | P0 | ✅ Done |
+| Add capability negotiation | P0 | ✅ Done |
+| Add stdio transport | P0 | ✅ Done |
+| Agent-agnostic method naming (agent/* vs claude/*) | P0 | ✅ Done |
+| OpenRPC auto-generation from registry | P0 | ✅ Done |
+| Dual-protocol support (legacy + JSON-RPC) | P0 | ✅ Done |
+| Port consolidation (single port 8766) | P0 | ✅ Done |
+| Create TypeScript SDK | P0 | Planned |
+| Write formal protocol specification | P0 | ✅ Done |
 
 ### Phase 2: Enterprise Features (Q2)
 
@@ -657,12 +661,16 @@ Ensure license is acquisition-friendly:
 
 | Category | Requirement | Status |
 |----------|-------------|--------|
-| **Protocol** | JSON-RPC 2.0 format | Planned |
-| **Protocol** | Capability negotiation | Planned |
-| **Protocol** | Formal specification | Planned |
-| **Protocol** | Semantic versioning | Done |
-| **Transport** | WebSocket | Done |
-| **Transport** | stdio (LSP-style) | Planned |
+| **Protocol** | JSON-RPC 2.0 format | ✅ Done |
+| **Protocol** | Capability negotiation | ✅ Done |
+| **Protocol** | Agent-agnostic method naming (agent/* vs claude/*) | ✅ Done |
+| **Protocol** | OpenRPC auto-generation | ✅ Done |
+| **Protocol** | Formal specification | ✅ Done |
+| **Protocol** | Semantic versioning | ✅ Done |
+| **Protocol** | Dual-protocol support (legacy + JSON-RPC) | ✅ Done |
+| **Transport** | WebSocket | ✅ Done |
+| **Transport** | stdio (LSP-style) | ✅ Done |
+| **Transport** | Port consolidation (single port 8766) | ✅ Done |
 | **Transport** | gRPC | Future |
 | **SDK** | TypeScript | Planned |
 | **SDK** | Python | Planned |
@@ -676,7 +684,7 @@ Ensure license is acquisition-friendly:
 | **DevOps** | OpenTelemetry | Planned |
 | **Ecosystem** | VS Code extension | Planned |
 | **Ecosystem** | Extension API | Planned |
-| **Legal** | MIT/Apache license | Done |
+| **Legal** | MIT/Apache license | ✅ Done |
 | **Legal** | CLA | Planned |
 
 ---

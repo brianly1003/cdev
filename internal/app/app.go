@@ -20,8 +20,10 @@ import (
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/hub"
 	"github.com/brianly1003/cdev/internal/pairing"
+	"github.com/brianly1003/cdev/internal/rpc/handler"
+	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
-	wsserver "github.com/brianly1003/cdev/internal/server/websocket"
+	"github.com/brianly1003/cdev/internal/server/unified"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -41,7 +43,8 @@ type App struct {
 	sessionStreamer *sessioncache.SessionStreamer
 	repoIndexer     *repository.SQLiteIndexer
 	httpServer      *httpserver.Server
-	wsServer        *wsserver.Server
+	unifiedServer   *unified.Server
+	rpcDispatcher   *handler.Dispatcher
 	qrGenerator     *pairing.QRGenerator
 
 	// Session info
@@ -200,9 +203,10 @@ func (a *App) Start(ctx context.Context) error {
 	if a.gitTracker.IsGitRepo() {
 		repoName = a.gitTracker.GetRepoName()
 	}
+	// Use HTTPPort for both since WebSocket is now consolidated at /ws endpoint
 	a.qrGenerator = pairing.NewQRGenerator(
 		a.cfg.Server.Host,
-		a.cfg.Server.WebSocketPort,
+		a.cfg.Server.HTTPPort, // Same port for WebSocket (/ws endpoint)
 		a.cfg.Server.HTTPPort,
 		a.sessionID,
 		repoName,
@@ -227,7 +231,88 @@ func (a *App) Start(ctx context.Context) error {
 	// Print connection info
 	a.printConnectionInfo()
 
-	// Start HTTP server
+	// Create RPC registry and dispatcher for JSON-RPC methods
+	rpcRegistry := handler.NewRegistry()
+
+	// Register RPC method services
+	// Status service
+	statusService := methods.NewStatusService(a)
+	statusService.RegisterMethods(rpcRegistry)
+
+	// Agent service (using Claude manager wrapped as AgentManager)
+	agentService := methods.NewAgentService(NewClaudeAgentAdapter(a.claudeManager))
+	agentService.RegisterMethods(rpcRegistry)
+
+	// Git service
+	if a.gitTracker != nil {
+		gitService := methods.NewGitService(NewGitProviderAdapter(a.gitTracker))
+		gitService.RegisterMethods(rpcRegistry)
+	}
+
+	// File service
+	fileService := methods.NewFileService(NewFileProviderAdapter(a.gitTracker), a.cfg.Limits.MaxFileSizeKB)
+	fileService.RegisterMethods(rpcRegistry)
+
+	// Session service
+	sessionService := methods.NewSessionService()
+	if a.sessionCache != nil && a.messageCache != nil {
+		sessionService.RegisterProvider(NewClaudeSessionAdapter(a.sessionCache, a.messageCache, a.cfg.Repository.Path))
+	}
+	sessionService.RegisterMethods(rpcRegistry)
+
+	// Lifecycle service with capabilities
+	caps := methods.ServerCapabilities{
+		Agent: &methods.AgentCapabilities{
+			Run:          a.claudeManager != nil,
+			Stop:         a.claudeManager != nil,
+			Respond:      a.claudeManager != nil,
+			Sessions:     a.sessionCache != nil,
+			SessionWatch: a.sessionCache != nil,
+		},
+		Git: &methods.GitCapabilities{
+			Status:   a.gitTracker != nil,
+			Diff:     a.gitTracker != nil,
+			Stage:    a.gitTracker != nil,
+			Unstage:  a.gitTracker != nil,
+			Commit:   a.gitTracker != nil,
+			Push:     a.gitTracker != nil,
+			Pull:     a.gitTracker != nil,
+			Branches: a.gitTracker != nil,
+			Checkout: a.gitTracker != nil,
+		},
+		File: &methods.FileCapabilities{
+			Get:  a.gitTracker != nil,
+			List: a.repoIndexer != nil,
+		},
+		Repository: &methods.RepositoryCapabilities{
+			Index:  a.repoIndexer != nil,
+			Search: a.repoIndexer != nil,
+			Tree:   a.repoIndexer != nil,
+		},
+		Notifications:   []string{"agent_log", "agent_state", "file_changed", "git_status"},
+		SupportedAgents: []string{"claude"},
+	}
+	lifecycleService := methods.NewLifecycleService(a.version, caps)
+	lifecycleService.RegisterMethods(rpcRegistry)
+
+	a.rpcDispatcher = handler.NewDispatcher(rpcRegistry)
+
+	// Create unified server for dual-protocol WebSocket support
+	// For port consolidation, we use the HTTP server's port
+	a.unifiedServer = unified.NewServer(
+		a.cfg.Server.Host,
+		a.cfg.Server.HTTPPort,
+		a.rpcDispatcher,
+		a.hub,
+	)
+	// Set legacy handler for backward compatibility with existing clients
+	a.unifiedServer.SetLegacyHandler(a.handleLegacyCommand)
+	// Set status provider for heartbeats
+	a.unifiedServer.SetStatusProvider(a)
+	// Start background tasks (heartbeat)
+	a.unifiedServer.StartBackgroundTasks()
+
+	// Start HTTP server with unified WebSocket handler
 	a.httpServer = httpserver.New(
 		a.cfg.Server.Host,
 		a.cfg.Server.HTTPPort,
@@ -244,19 +329,12 @@ func (a *App) Start(ctx context.Context) error {
 	if a.repoIndexer != nil {
 		a.httpServer.SetRepositoryIndexer(a.repoIndexer)
 	}
+	// Set RPC registry for dynamic OpenRPC spec generation
+	a.httpServer.SetRPCRegistry(rpcRegistry)
+	// Set WebSocket handler for port consolidation
+	a.httpServer.SetWebSocketHandler(a.unifiedServer.HandleWebSocket)
 	if err := a.httpServer.Start(); err != nil {
 		return fmt.Errorf("failed to start HTTP server: %w", err)
-	}
-
-	// Start WebSocket server
-	a.wsServer = wsserver.NewServer(
-		a.cfg.Server.Host,
-		a.cfg.Server.WebSocketPort,
-		a.handleWebSocketCommand,
-		a.hub,
-	)
-	if err := a.wsServer.Start(); err != nil {
-		return fmt.Errorf("failed to start WebSocket server: %w", err)
 	}
 
 	// Start file watcher
@@ -333,10 +411,10 @@ func (a *App) shutdown() error {
 		cancel()
 	}
 
-	// Stop WebSocket server
-	if a.wsServer != nil {
+	// Stop unified server
+	if a.unifiedServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		a.wsServer.Stop(shutdownCtx)
+		a.unifiedServer.Stop(shutdownCtx)
 		cancel()
 	}
 
@@ -355,20 +433,28 @@ func (a *App) shutdown() error {
 	return nil
 }
 
-// handleWebSocketCommand handles incoming WebSocket commands.
-func (a *App) handleWebSocketCommand(clientID string, message []byte) {
-	// Parse command
-	cmd, err := commands.ParseCommand(message)
-	if err != nil {
-		log.Warn().Err(err).Str("client_id", clientID).Msg("failed to parse command")
-		a.sendErrorToClient(clientID, "INVALID_COMMAND", "Failed to parse command", "")
-		return
+// GetAgentStatus returns the current agent status for heartbeats.
+// Implements common.StatusProvider.
+func (a *App) GetAgentStatus() string {
+	if a.claudeManager == nil {
+		return string(events.ClaudeStateIdle)
 	}
+	return string(a.claudeManager.State())
+}
 
+// GetUptimeSeconds returns the server uptime in seconds.
+// Implements common.StatusProvider.
+func (a *App) GetUptimeSeconds() int64 {
+	return a.UptimeSeconds()
+}
+
+// handleLegacyCommand handles incoming legacy WebSocket commands.
+// This is used by the unified server for backward compatibility.
+func (a *App) handleLegacyCommand(clientID string, cmd *commands.Command) {
 	log.Debug().
 		Str("client_id", clientID).
 		Str("command", string(cmd.Command)).
-		Msg("received command")
+		Msg("received legacy command")
 
 	ctx := context.Background()
 
@@ -421,7 +507,7 @@ func (a *App) handleWebSocketCommand(clientID string, message []byte) {
 	case commands.CommandGetStatus:
 		event := events.NewStatusResponseEvent(events.StatusResponsePayload{
 			ClaudeState:      a.claudeManager.State(),
-			ConnectedClients: a.wsServer.ClientCount(),
+			ConnectedClients: a.unifiedServer.ClientCount(),
 			RepoPath:         a.cfg.Repository.Path,
 			RepoName:         filepath.Base(a.cfg.Repository.Path),
 			UptimeSeconds:    a.UptimeSeconds(),
@@ -493,7 +579,7 @@ func (a *App) sendErrorToClient(clientID, code, message, requestID string) {
 
 // sendEventToClient sends an event to a specific client.
 func (a *App) sendEventToClient(clientID string, event events.Event) {
-	client := a.wsServer.GetClient(clientID)
+	client := a.unifiedServer.GetClient(clientID)
 	if client == nil {
 		return
 	}
@@ -501,7 +587,7 @@ func (a *App) sendEventToClient(clientID string, event events.Event) {
 	if err != nil {
 		return
 	}
-	client.Send(data)
+	client.SendRaw(data)
 }
 
 // handleFileChangeForGitDiff generates a git diff when a file changes.
@@ -615,8 +701,8 @@ func (a *App) getStatus() map[string]interface{} {
 	}
 
 	wsClients := 0
-	if a.wsServer != nil {
-		wsClients = a.wsServer.ClientCount()
+	if a.unifiedServer != nil {
+		wsClients = a.unifiedServer.ClientCount()
 	}
 
 	// Get current Claude session ID (for continue operations)
@@ -645,7 +731,8 @@ func (a *App) printConnectionInfo() {
 	repoName := filepath.Base(a.cfg.Repository.Path)
 
 	// Determine which URLs to display (external URLs take precedence)
-	wsURL := fmt.Sprintf("ws://%s:%d", a.cfg.Server.Host, a.cfg.Server.WebSocketPort)
+	// With port consolidation, WebSocket is served at /ws on the HTTP port
+	wsURL := fmt.Sprintf("ws://%s:%d/ws", a.cfg.Server.Host, a.cfg.Server.HTTPPort)
 	httpURL := fmt.Sprintf("http://%s:%d", a.cfg.Server.Host, a.cfg.Server.HTTPPort)
 	usingExternal := false
 
@@ -660,13 +747,13 @@ func (a *App) printConnectionInfo() {
 
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     cdev ready                       ║")
+	fmt.Println("║                     cdev ready                             ║")
 	fmt.Println("╠════════════════════════════════════════════════════════════╣")
 	fmt.Printf("║  Session ID: %-46s ║\n", a.sessionID[:8]+"...")
 	fmt.Printf("║  Repository: %-46s ║\n", truncateString(repoName, 46))
 	fmt.Println("╠════════════════════════════════════════════════════════════╣")
+	fmt.Printf("║  API:        %-46s ║\n", truncateString(httpURL, 46))
 	fmt.Printf("║  WebSocket:  %-46s ║\n", truncateString(wsURL, 46))
-	fmt.Printf("║  HTTP API:   %-46s ║\n", truncateString(httpURL, 46))
 	if usingExternal {
 		fmt.Println("║  (using external URLs for port forwarding)                 ║")
 	}

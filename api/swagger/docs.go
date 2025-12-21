@@ -1346,6 +1346,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/rpc/discover": {
+            "get": {
+                "description": "Returns the OpenRPC specification for the JSON-RPC WebSocket API",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Documentation"
+                ],
+                "summary": "Get OpenRPC specification",
+                "responses": {
+                    "200": {
+                        "description": "OpenRPC specification",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
         "/api/status": {
             "get": {
                 "description": "Returns the current status of the cdev including Claude state, connected clients, and repository info",

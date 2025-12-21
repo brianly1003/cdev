@@ -1,0 +1,460 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "cdev Unified API",
+    "description": "JSON-RPC 2.0 API for cdev mobile AI coding agent",
+    "version": "1.0.0",
+    "contact": {
+      "name": "cdev"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "name": "Local Development",
+      "url": "ws://localhost:8766/ws"
+    }
+  ],
+  "methods": [
+    {
+      "name": "agent/run",
+      "summary": "Start an AI agent with a prompt",
+      "description": "Starts the specified AI agent (Claude, Gemini, or Codex) with the given prompt. Can start a new session or continue an existing one.",
+      "params": [
+        {
+          "name": "prompt",
+          "description": "The prompt to send to the agent",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "mode",
+          "description": "Session mode: 'new' for new session, 'continue' to continue existing",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": ["new", "continue"],
+            "default": "new"
+          }
+        },
+        {
+          "name": "session_id",
+          "description": "Session ID to continue (required if mode is 'continue')",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "description": "Type of AI agent to use",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": ["claude", "gemini", "codex"],
+            "default": "claude"
+          }
+        }
+      ],
+      "result": {
+        "name": "AgentRunResult",
+        "schema": {
+          "$ref": "#/components/schemas/AgentRunResult"
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/AgentAlreadyRunning" },
+        { "$ref": "#/components/errors/AgentNotConfigured" }
+      ],
+      "examples": [
+        {
+          "name": "Start new session",
+          "params": [
+            { "name": "prompt", "value": "Fix the bug in auth.go" }
+          ],
+          "result": {
+            "name": "Success",
+            "value": {
+              "status": "started",
+              "session_id": "sess_abc123",
+              "agent_type": "claude"
+            }
+          }
+        },
+        {
+          "name": "Continue session",
+          "params": [
+            { "name": "prompt", "value": "Now add tests" },
+            { "name": "mode", "value": "continue" },
+            { "name": "session_id", "value": "sess_abc123" }
+          ],
+          "result": {
+            "name": "Success",
+            "value": {
+              "status": "started",
+              "session_id": "sess_abc123",
+              "agent_type": "claude"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/stop",
+      "summary": "Stop the running agent",
+      "description": "Stops the currently running AI agent gracefully.",
+      "params": [],
+      "result": {
+        "name": "AgentStopResult",
+        "schema": {
+          "$ref": "#/components/schemas/AgentStopResult"
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/AgentNotRunning" }
+      ]
+    },
+    {
+      "name": "agent/respond",
+      "summary": "Respond to agent tool use request",
+      "description": "Sends a response to an agent's tool use request (e.g., permission approval).",
+      "params": [
+        {
+          "name": "tool_use_id",
+          "description": "The tool use ID from the agent's request",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "response",
+          "description": "The response content",
+          "required": true,
+          "schema": { "type": "string" }
+        },
+        {
+          "name": "is_error",
+          "description": "Whether this is an error response",
+          "required": false,
+          "schema": { "type": "boolean", "default": false }
+        }
+      ],
+      "result": {
+        "name": "AgentRespondResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" }
+          }
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/AgentNotRunning" }
+      ]
+    },
+    {
+      "name": "status/get",
+      "summary": "Get server status",
+      "description": "Returns the current status of the cdev server including agent state, connected clients, and configuration.",
+      "params": [],
+      "result": {
+        "name": "StatusResult",
+        "schema": {
+          "$ref": "#/components/schemas/StatusResult"
+        }
+      }
+    },
+    {
+      "name": "git/status",
+      "summary": "Get git repository status",
+      "description": "Returns the current git status including staged, unstaged, and untracked files.",
+      "params": [],
+      "result": {
+        "name": "GitStatusResult",
+        "schema": {
+          "$ref": "#/components/schemas/GitStatusResult"
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/GitError" }
+      ]
+    },
+    {
+      "name": "git/diff",
+      "summary": "Get file diff",
+      "description": "Returns the git diff for a specific file.",
+      "params": [
+        {
+          "name": "path",
+          "description": "File path relative to repository root",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "result": {
+        "name": "GitDiffResult",
+        "schema": {
+          "$ref": "#/components/schemas/GitDiffResult"
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/FileNotFound" },
+        { "$ref": "#/components/errors/GitError" }
+      ]
+    },
+    {
+      "name": "file/get",
+      "summary": "Get file content",
+      "description": "Returns the content of a file from the repository.",
+      "params": [
+        {
+          "name": "path",
+          "description": "File path relative to repository root",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "result": {
+        "name": "FileGetResult",
+        "schema": {
+          "$ref": "#/components/schemas/FileGetResult"
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/FileNotFound" }
+      ]
+    },
+    {
+      "name": "session/list",
+      "summary": "List sessions",
+      "description": "Returns a list of available sessions.",
+      "params": [
+        {
+          "name": "limit",
+          "description": "Maximum number of sessions to return",
+          "required": false,
+          "schema": { "type": "integer", "default": 20 }
+        }
+      ],
+      "result": {
+        "name": "SessionListResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionListResult"
+        }
+      }
+    },
+    {
+      "name": "session/watch",
+      "summary": "Watch a session",
+      "description": "Start watching a session for real-time updates.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to watch",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "result": {
+        "name": "SessionWatchResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" },
+            "watching": { "type": "boolean" }
+          }
+        }
+      },
+      "errors": [
+        { "$ref": "#/components/errors/SessionNotFound" }
+      ]
+    },
+    {
+      "name": "session/unwatch",
+      "summary": "Stop watching session",
+      "description": "Stop watching the current session.",
+      "params": [],
+      "result": {
+        "name": "SessionUnwatchResult",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "name": "initialize",
+      "summary": "Initialize connection",
+      "description": "Initialize the connection and negotiate capabilities.",
+      "params": [
+        {
+          "name": "client_info",
+          "description": "Client information",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/ClientInfo"
+          }
+        },
+        {
+          "name": "capabilities",
+          "description": "Requested capabilities",
+          "required": false,
+          "schema": { "type": "object" }
+        }
+      ],
+      "result": {
+        "name": "InitializeResult",
+        "schema": {
+          "$ref": "#/components/schemas/InitializeResult"
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "AgentRunResult": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "Operation status" },
+          "session_id": { "type": "string", "description": "Session ID" },
+          "agent_type": { "type": "string", "description": "Agent type used" }
+        },
+        "required": ["status", "session_id", "agent_type"]
+      },
+      "AgentStopResult": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      },
+      "StatusResult": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Claude session ID (for continue)" },
+          "agent_session_id": { "type": "string", "description": "Agent instance ID" },
+          "agent_state": {
+            "type": "string",
+            "enum": ["idle", "starting", "running", "stopping"],
+            "description": "Current agent state"
+          },
+          "agent_type": { "type": "string" },
+          "connected_clients": { "type": "integer" },
+          "repo_path": { "type": "string" },
+          "repo_name": { "type": "string" },
+          "uptime_seconds": { "type": "integer" },
+          "version": { "type": "string" },
+          "watcher_enabled": { "type": "boolean" },
+          "git_enabled": { "type": "boolean" }
+        }
+      },
+      "GitStatusResult": {
+        "type": "object",
+        "properties": {
+          "branch": { "type": "string" },
+          "staged": { "type": "array", "items": { "type": "string" } },
+          "unstaged": { "type": "array", "items": { "type": "string" } },
+          "untracked": { "type": "array", "items": { "type": "string" } },
+          "is_clean": { "type": "boolean" }
+        }
+      },
+      "GitDiffResult": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "diff": { "type": "string" },
+          "is_staged": { "type": "boolean" },
+          "is_new": { "type": "boolean" }
+        }
+      },
+      "FileGetResult": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "content": { "type": "string" },
+          "size": { "type": "integer" },
+          "truncated": { "type": "boolean" }
+        }
+      },
+      "SessionListResult": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionInfo"
+            }
+          }
+        }
+      },
+      "SessionInfo": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "message_count": { "type": "integer" }
+        }
+      },
+      "ClientInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      },
+      "InitializeResult": {
+        "type": "object",
+        "properties": {
+          "server_info": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": "string" }
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "agents": { "type": "array", "items": { "type": "string" } },
+              "features": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "AgentAlreadyRunning": {
+        "code": -32001,
+        "message": "An agent is already running"
+      },
+      "AgentNotRunning": {
+        "code": -32002,
+        "message": "No agent is currently running"
+      },
+      "AgentError": {
+        "code": -32003,
+        "message": "Agent execution error"
+      },
+      "AgentNotConfigured": {
+        "code": -32004,
+        "message": "Agent type not configured"
+      },
+      "FileNotFound": {
+        "code": -32010,
+        "message": "Requested file not found"
+      },
+      "GitError": {
+        "code": -32011,
+        "message": "Git operation failed"
+      },
+      "SessionNotFound": {
+        "code": -32012,
+        "message": "Session not found"
+      }
+    }
+  }
+}

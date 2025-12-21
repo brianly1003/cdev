@@ -1,28 +1,39 @@
 # cdev Protocol Specification
 
-**Version:** 1.0.0-draft
-**Status:** Draft
-**Last Updated:** December 2025
+**Version:** 2.0.0
+**Status:** Implemented
+**Last Updated:** 21 Dec 2025
 
 ---
 
 ## Overview
 
-The cdev protocol defines the communication standard between cdev (server) and cdev-ios (client) for remote supervision and control of Claude Code CLI sessions.
+The cdev protocol defines the communication standard between cdev (server) and clients (cdev-ios, VS Code extensions, etc.) for remote supervision and control of AI coding assistant sessions.
+
+### Protocol Evolution
+
+| Version | Description |
+|---------|-------------|
+| 1.0 | Legacy custom commands (deprecated but supported) |
+| 2.0 | JSON-RPC 2.0 with agent-agnostic naming (current) |
 
 ### Design Principles
 
-1. **Real-time First** - WebSocket for live updates, HTTP for reliable actions
-2. **Mobile-Optimized** - Handles network transitions, background states, reconnection
-3. **Event-Driven** - All state changes broadcast as events
-4. **Request-Response Correlation** - `request_id` links commands to responses
+1. **JSON-RPC 2.0 Standard** - Industry-standard message format for IDE integration
+2. **Agent-Agnostic** - Methods use `agent/*` prefix to support Claude, Gemini, Codex, etc.
+3. **Dual-Protocol Support** - Single WebSocket endpoint handles both JSON-RPC and legacy commands
+4. **OpenRPC Discovery** - Auto-generated API specification at `/api/rpc/discover`
+5. **Mobile-Optimized** - Handles network transitions, background states, reconnection
+6. **Capability Negotiation** - LSP-style initialize/initialized handshake
 
 ### Transport Layers
 
 | Layer | Port | Purpose |
 |-------|------|---------|
-| HTTP | 8766 | REST API for commands and queries |
-| WebSocket | 8767 | Real-time events and bidirectional commands |
+| HTTP | 8766 | REST API, health checks, OpenRPC discovery |
+| WebSocket | 8766 | Real-time events via `/ws` endpoint (JSON-RPC 2.0 + legacy) |
+
+**Note:** Port consolidation complete - single port 8766 serves all traffic.
 
 ---
 
@@ -40,6 +51,92 @@ The cdev protocol defines the communication standard between cdev (server) and c
 ---
 
 ## Message Format
+
+### JSON-RPC 2.0 Format (Recommended)
+
+The preferred format for new clients. Follows the JSON-RPC 2.0 specification.
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "agent/run",
+  "params": {
+    "prompt": "Fix the bug in app.js"
+  }
+}
+```
+
+**Response (Success):**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "status": "started",
+    "session_id": "sess_abc123"
+  }
+}
+```
+
+**Response (Error):**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32001,
+    "message": "Agent already running"
+  }
+}
+```
+
+**Notification (Server → Client):**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event/agent_status",
+  "params": {
+    "state": "running",
+    "agent_type": "claude"
+  }
+}
+```
+
+### JSON-RPC 2.0 Methods
+
+| Method | Description |
+|--------|-------------|
+| `initialize` | Capability negotiation (LSP-style) |
+| `initialized` | Confirm initialization complete |
+| `shutdown` | Graceful shutdown |
+| `agent/run` | Start AI agent with prompt |
+| `agent/stop` | Stop running agent |
+| `agent/respond` | Respond to tool use request |
+| `status/get` | Get server status |
+| `file/get` | Get file content |
+| `git/status` | Get git status |
+| `git/diff` | Get file diff |
+| `git/stage` | Stage files |
+| `git/unstage` | Unstage files |
+| `git/discard` | Discard changes |
+| `git/commit` | Create commit |
+| `git/push` | Push to remote |
+| `git/pull` | Pull from remote |
+| `git/branches` | List branches |
+| `git/checkout` | Checkout branch |
+| `session/list` | List sessions |
+| `session/get` | Get session details |
+| `session/messages` | Get session messages |
+| `session/watch` | Watch session for updates |
+| `session/unwatch` | Stop watching |
+
+---
+
+### Legacy Event Structure (Deprecated)
+
+Legacy format for backward compatibility. New clients should use JSON-RPC 2.0.
 
 ### Base Event Structure
 
@@ -809,7 +906,19 @@ In failed state: Retry every 60s
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0.0-draft | Dec 2025 | Initial draft specification |
+| 2.0.0 | 21 Dec 2025 | JSON-RPC 2.0 adoption, agent-agnostic naming, port consolidation |
+| 1.0.0-draft | Dec 2025 | Initial draft specification (legacy format) |
+
+### Migration to 2.0
+
+Key changes from 1.0 to 2.0:
+
+1. **JSON-RPC 2.0 Format**: Use `jsonrpc`, `id`, `method`, `params` instead of `command`, `request_id`, `payload`
+2. **Agent-Agnostic Naming**: `claude/run` → `agent/run`, `claude/stop` → `agent/stop`
+3. **Port Consolidation**: Single port 8766 instead of 8765 (WebSocket) + 8766 (HTTP)
+4. **Unified Endpoint**: WebSocket at `/ws` instead of root
+5. **OpenRPC Discovery**: Auto-generated spec at `/api/rpc/discover`
+6. **Capability Negotiation**: `initialize`/`initialized` handshake
 
 ---
 

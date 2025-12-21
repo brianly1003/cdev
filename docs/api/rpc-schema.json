@@ -1,0 +1,299 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cdev JSON-RPC API Schema",
+  "version": "1.0.0",
+  "methods": {
+    "agent/run": {
+      "description": "Start an AI agent with a prompt",
+      "params": {
+        "type": "object",
+        "properties": {
+          "prompt": { "type": "string", "description": "The prompt to send" },
+          "mode": { "type": "string", "enum": ["new", "continue"], "default": "new" },
+          "session_id": { "type": "string", "description": "Required if mode is 'continue'" },
+          "agent_type": { "type": "string", "enum": ["claude", "gemini", "codex"], "default": "claude" }
+        },
+        "required": ["prompt"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" }
+        }
+      }
+    },
+    "agent/stop": {
+      "description": "Stop the running agent",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "agent/respond": {
+      "description": "Send a response to an agent's tool use request",
+      "params": {
+        "type": "object",
+        "properties": {
+          "tool_use_id": { "type": "string" },
+          "response": { "type": "string" },
+          "is_error": { "type": "boolean", "default": false }
+        },
+        "required": ["tool_use_id", "response"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "status/get": {
+      "description": "Get current server status",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_session_id": { "type": "string" },
+          "agent_state": { "type": "string", "enum": ["idle", "starting", "running", "stopping"] },
+          "agent_type": { "type": "string" },
+          "connected_clients": { "type": "integer" },
+          "repo_path": { "type": "string" },
+          "repo_name": { "type": "string" },
+          "uptime_seconds": { "type": "integer" },
+          "version": { "type": "string" },
+          "watcher_enabled": { "type": "boolean" },
+          "git_enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "git/status": {
+      "description": "Get git repository status",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "branch": { "type": "string" },
+          "staged": { "type": "array", "items": { "type": "string" } },
+          "unstaged": { "type": "array", "items": { "type": "string" } },
+          "untracked": { "type": "array", "items": { "type": "string" } },
+          "is_clean": { "type": "boolean" }
+        }
+      }
+    },
+    "git/diff": {
+      "description": "Get diff for a file",
+      "params": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" }
+        },
+        "required": ["path"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "diff": { "type": "string" },
+          "is_staged": { "type": "boolean" },
+          "is_new": { "type": "boolean" }
+        }
+      }
+    },
+    "file/get": {
+      "description": "Get file content",
+      "params": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" }
+        },
+        "required": ["path"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "content": { "type": "string" },
+          "size": { "type": "integer" },
+          "truncated": { "type": "boolean" }
+        }
+      }
+    },
+    "session/list": {
+      "description": "List available sessions",
+      "params": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer", "default": 20 }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "created_at": { "type": "string", "format": "date-time" },
+                "message_count": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "session/watch": {
+      "description": "Start watching a session for real-time updates",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" }
+        },
+        "required": ["session_id"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "watching": { "type": "boolean" }
+        }
+      }
+    },
+    "session/unwatch": {
+      "description": "Stop watching the current session",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "initialize": {
+      "description": "Initialize the connection",
+      "params": {
+        "type": "object",
+        "properties": {
+          "client_info": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": "string" }
+            }
+          },
+          "capabilities": { "type": "object" }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "server_info": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": "string" }
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "agents": { "type": "array", "items": { "type": "string" } },
+              "features": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "notifications": {
+    "event/heartbeat": {
+      "description": "Periodic heartbeat",
+      "params": {
+        "type": "object",
+        "properties": {
+          "server_time": { "type": "string", "format": "date-time" },
+          "sequence": { "type": "integer" },
+          "agent_status": { "type": "string" },
+          "uptime_seconds": { "type": "integer" }
+        }
+      }
+    },
+    "event/agent_started": {
+      "description": "Agent has started",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" },
+          "prompt": { "type": "string" }
+        }
+      }
+    },
+    "event/agent_output": {
+      "description": "Agent output",
+      "params": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["text", "tool_use", "tool_result", "thinking"] },
+          "content": { "type": "string" },
+          "tool_name": { "type": "string" },
+          "tool_id": { "type": "string" },
+          "tool_input": { "type": "object" }
+        }
+      }
+    },
+    "event/agent_stopped": {
+      "description": "Agent has stopped",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "reason": { "type": "string", "enum": ["completed", "stopped", "error"] }
+        }
+      }
+    },
+    "event/file_changed": {
+      "description": "File change detected",
+      "params": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "change": { "type": "string", "enum": ["created", "modified", "deleted", "renamed"] }
+        }
+      }
+    },
+    "event/git_status_changed": {
+      "description": "Git status changed",
+      "params": {
+        "type": "object",
+        "properties": {
+          "branch": { "type": "string" },
+          "staged": { "type": "array", "items": { "type": "string" } },
+          "unstaged": { "type": "array", "items": { "type": "string" } },
+          "untracked": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "errors": {
+    "-32700": { "name": "ParseError", "message": "Invalid JSON" },
+    "-32600": { "name": "InvalidRequest", "message": "Not a valid JSON-RPC request" },
+    "-32601": { "name": "MethodNotFound", "message": "Method does not exist" },
+    "-32602": { "name": "InvalidParams", "message": "Invalid method parameters" },
+    "-32603": { "name": "InternalError", "message": "Internal server error" },
+    "-32001": { "name": "AgentAlreadyRunning", "message": "An agent is already running" },
+    "-32002": { "name": "AgentNotRunning", "message": "No agent is currently running" },
+    "-32003": { "name": "AgentError", "message": "Agent execution error" },
+    "-32004": { "name": "AgentNotConfigured", "message": "Agent type not configured" },
+    "-32010": { "name": "FileNotFound", "message": "Requested file not found" },
+    "-32011": { "name": "GitError", "message": "Git operation failed" },
+    "-32012": { "name": "SessionNotFound", "message": "Session not found" }
+  }
+}

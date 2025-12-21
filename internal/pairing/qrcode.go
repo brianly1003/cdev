@@ -55,8 +55,17 @@ func (g *QRGenerator) SetToken(token string) {
 
 // GetPairingInfo returns the pairing information.
 // If external URLs are set, they are used instead of local host:port URLs.
+// Note: With port consolidation, WebSocket is now served at /ws on the HTTP port.
 func (g *QRGenerator) GetPairingInfo() *PairingInfo {
-	wsURL := fmt.Sprintf("ws://%s:%d", g.host, g.wsPort)
+	// For port consolidation, WebSocket uses the HTTP port with /ws path
+	// If wsPort is 0 or same as httpPort, use the consolidated endpoint
+	var wsURL string
+	if g.wsPort == 0 || g.wsPort == g.httpPort {
+		wsURL = fmt.Sprintf("ws://%s:%d/ws", g.host, g.httpPort)
+	} else {
+		// Legacy mode: separate WebSocket port (deprecated)
+		wsURL = fmt.Sprintf("ws://%s:%d", g.host, g.wsPort)
+	}
 	httpURL := fmt.Sprintf("http://%s:%d", g.host, g.httpPort)
 
 	// Use external URLs if configured (for VS Code port forwarding, etc.)
