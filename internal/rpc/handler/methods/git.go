@@ -46,11 +46,11 @@ type GitStatusInfo struct {
 	Branch         string   `json:"branch"`
 	Ahead          int      `json:"ahead"`
 	Behind         int      `json:"behind"`
-	StagedCount    int      `json:"stagedCount"`
-	UnstagedCount  int      `json:"unstagedCount"`
-	UntrackedCount int      `json:"untrackedCount"`
-	HasConflicts   bool     `json:"hasConflicts"`
-	ChangedFiles   []string `json:"changedFiles,omitempty"`
+	StagedCount    int      `json:"staged_count"`
+	UnstagedCount  int      `json:"unstaged_count"`
+	UntrackedCount int      `json:"untracked_count"`
+	HasConflicts   bool     `json:"has_conflicts"`
+	ChangedFiles   []string `json:"changed_files,omitempty"`
 }
 
 // BranchInfo represents information about a git branch.
@@ -191,8 +191,8 @@ type DiffParams struct {
 type DiffResult struct {
 	Path     string `json:"path,omitempty"`
 	Diff     string `json:"diff"`
-	IsStaged bool   `json:"isStaged"`
-	IsNew    bool   `json:"isNew"`
+	IsStaged bool   `json:"is_staged"`
+	IsNew    bool   `json:"is_new"`
 }
 
 // Diff returns the diff for a file or all files.
@@ -229,7 +229,7 @@ type PathsParams struct {
 // OperationResult for simple git operations.
 type OperationResult struct {
 	Status        string `json:"status"`
-	FilesAffected int    `json:"filesAffected"`
+	FilesAffected int    `json:"files_affected"`
 }
 
 // Stage stages files.

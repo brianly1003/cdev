@@ -68,28 +68,28 @@ func (s *StatusService) RegisterMethods(r *handler.Registry) {
 // GetStatusResult for status/get method.
 type GetStatusResult struct {
 	// ClaudeState is the current Claude state.
-	ClaudeState string `json:"claudeState"`
+	ClaudeState string `json:"claude_state"`
 
 	// ConnectedClients is the number of connected clients.
-	ConnectedClients int `json:"connectedClients"`
+	ConnectedClients int `json:"connected_clients"`
 
 	// RepoPath is the repository path.
-	RepoPath string `json:"repoPath"`
+	RepoPath string `json:"repo_path"`
 
 	// RepoName is the repository name (basename of path).
-	RepoName string `json:"repoName"`
+	RepoName string `json:"repo_name"`
 
 	// UptimeSeconds is the server uptime in seconds.
-	UptimeSeconds int64 `json:"uptimeSeconds"`
+	UptimeSeconds int64 `json:"uptime_seconds"`
 
 	// AgentVersion is the server version.
-	AgentVersion string `json:"agentVersion"`
+	AgentVersion string `json:"agent_version"`
 
 	// WatcherEnabled indicates if the file watcher is enabled.
-	WatcherEnabled bool `json:"watcherEnabled"`
+	WatcherEnabled bool `json:"watcher_enabled"`
 
 	// GitEnabled indicates if git integration is enabled.
-	GitEnabled bool `json:"gitEnabled"`
+	GitEnabled bool `json:"git_enabled"`
 }
 
 // GetStatus returns the current server status.
@@ -118,7 +118,7 @@ func (s *StatusService) GetStatus(ctx context.Context, params json.RawMessage) (
 // HealthResult for status/health method.
 type HealthResult struct {
 	Status        string `json:"status"`
-	UptimeSeconds int64  `json:"uptimeSeconds"`
+	UptimeSeconds int64  `json:"uptime_seconds"`
 }
 
 // Health returns a simple health check response.

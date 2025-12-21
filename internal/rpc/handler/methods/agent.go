@@ -75,7 +75,7 @@ func (s *AgentService) RegisterMethods(r *handler.Registry) {
 		Params: []handler.OpenRPCParam{
 			{Name: "prompt", Description: "The prompt to send to the agent", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "mode", Description: "Session mode: 'new' for new session, 'continue' to continue existing", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}, "default": "new"}},
-			{Name: "sessionId", Description: "Session ID to continue (required if mode is 'continue')", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "session_id", Description: "Session ID to continue (required if mode is 'continue')", Required: false, Schema: map[string]interface{}{"type": "string"}},
 		},
 		Result: &handler.OpenRPCResult{Name: "AgentRunResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/AgentRunResult"}},
 		Errors: []string{"AgentAlreadyRunning", "AgentNotConfigured"},
@@ -95,11 +95,11 @@ func (s *AgentService) RegisterMethods(r *handler.Registry) {
 		Summary:     "Respond to agent tool use request",
 		Description: "Sends a response to an agent's tool use request (e.g., permission approval).",
 		Params: []handler.OpenRPCParam{
-			{Name: "toolUseId", Description: "The tool use ID from the agent's request", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "tool_use_id", Description: "The tool use ID from the agent's request", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "response", Description: "The response content", Required: true, Schema: map[string]interface{}{"type": "string"}},
-			{Name: "isError", Description: "Whether this is an error response", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+			{Name: "is_error", Description: "Whether this is an error response", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
 		},
-		Result: &handler.OpenRPCResult{Name: "AgentRespondResult", Schema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{"status": map[string]interface{}{"type": "string"}, "toolUseId": map[string]interface{}{"type": "string"}}}},
+		Result: &handler.OpenRPCResult{Name: "AgentRespondResult", Schema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{"status": map[string]interface{}{"type": "string"}, "tool_use_id": map[string]interface{}{"type": "string"}}}},
 		Errors: []string{"AgentNotRunning"},
 	})
 
@@ -122,7 +122,7 @@ type AgentRunParams struct {
 	Mode string `json:"mode,omitempty"`
 
 	// SessionID is required when mode is "continue".
-	SessionID string `json:"sessionId,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // AgentRunResult for agent/run method.
@@ -134,13 +134,13 @@ type AgentRunResult struct {
 	PID int `json:"pid"`
 
 	// SessionID is the agent session ID.
-	SessionID string `json:"sessionId,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 
 	// Mode is the session mode used.
 	Mode string `json:"mode"`
 
 	// AgentType is the type of agent (e.g., "claude", "gemini", "codex").
-	AgentType string `json:"agentType"`
+	AgentType string `json:"agent_type"`
 }
 
 // Run starts the agent with the given prompt.
@@ -207,19 +207,19 @@ func (s *AgentService) Stop(ctx context.Context, params json.RawMessage) (interf
 // AgentRespondParams for agent/respond method.
 type AgentRespondParams struct {
 	// ToolUseID is the ID of the tool use to respond to.
-	ToolUseID string `json:"toolUseId"`
+	ToolUseID string `json:"tool_use_id"`
 
 	// Response is the response content.
 	Response string `json:"response"`
 
 	// IsError indicates if the response is an error.
-	IsError bool `json:"isError,omitempty"`
+	IsError bool `json:"is_error,omitempty"`
 }
 
 // AgentRespondResult for agent/respond method.
 type AgentRespondResult struct {
 	Status    string `json:"status"`
-	ToolUseID string `json:"toolUseId"`
+	ToolUseID string `json:"tool_use_id"`
 }
 
 // Respond sends a response to the agent's interactive prompt.
@@ -256,13 +256,13 @@ type AgentStatusResult struct {
 	PID int `json:"pid,omitempty"`
 
 	// SessionID is the current session ID.
-	SessionID string `json:"sessionId,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
 
 	// AgentType is the type of agent (e.g., "claude", "gemini", "codex").
-	AgentType string `json:"agentType"`
+	AgentType string `json:"agent_type"`
 
 	// WaitingFor describes what the agent is waiting for (if any).
-	WaitingFor string `json:"waitingFor,omitempty"`
+	WaitingFor string `json:"waiting_for,omitempty"`
 }
 
 // Status returns the current agent status.
