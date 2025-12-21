@@ -105,6 +105,28 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 	return s
 }
 
+// requestLoggingMiddleware logs all incoming requests for debugging.
+func requestLoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		log.Debug().
+			Str("method", r.Method).
+			Str("path", r.URL.Path).
+			Str("remote_addr", r.RemoteAddr).
+			Str("host", r.Host).
+			Str("user_agent", r.UserAgent()).
+			Msg("incoming request")
+
+		next.ServeHTTP(w, r)
+
+		log.Debug().
+			Str("method", r.Method).
+			Str("path", r.URL.Path).
+			Dur("duration", time.Since(start)).
+			Msg("request completed")
+	})
+}
+
 // timeoutMiddleware wraps handlers with a timeout to prevent hanging requests.
 func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +247,13 @@ func (s *Server) Start() error {
 	// Add WebSocket handler if set (must be done before creating http.Server)
 	if s.wsHandler != nil {
 		s.mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			log.Info().
+				Str("remote_addr", r.RemoteAddr).
+				Str("path", r.URL.Path).
+				Str("host", r.Host).
+				Str("user_agent", r.UserAgent()).
+				Str("origin", r.Header.Get("Origin")).
+				Msg("WebSocket upgrade request received at /ws")
 			s.wsHandler(w, r)
 		})
 		log.Debug().Msg("WebSocket handler registered at /ws")
@@ -234,7 +263,7 @@ func (s *Server) Start() error {
 	// Note: WebSocket upgrades bypass timeout middleware via path check
 	s.server = &http.Server{
 		Addr:    s.addr,
-		Handler: timeoutMiddleware(10*time.Second, corsMiddleware(s.mux)),
+		Handler: requestLoggingMiddleware(timeoutMiddleware(10*time.Second, corsMiddleware(s.mux))),
 	}
 
 	log.Info().Str("addr", s.addr).Msg("HTTP server starting")

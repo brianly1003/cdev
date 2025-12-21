@@ -224,24 +224,178 @@ Get current server status.
 #### `git/status`
 Get git repository status.
 
+**Params:** None
+
 **Result:**
 ```json
 {
   "branch": "main",
-  "staged": ["file1.go"],
-  "unstaged": ["file2.go"],
-  "untracked": ["file3.go"],
-  "is_clean": false
+  "ahead": 2,
+  "behind": 0,
+  "staged_count": 1,
+  "unstaged_count": 2,
+  "untracked_count": 1,
+  "has_conflicts": false,
+  "changed_files": ["file1.go", "file2.go"]
 }
 ```
 
+---
+
 #### `git/diff`
-Get diff for a file.
+Get diff for a file or all files.
 
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| path | string | Yes | File path relative to repo root |
+| path | string | No | File path relative to repo root (omit for all files) |
+
+**Result:**
+```json
+{
+  "path": "src/main.go",
+  "diff": "--- a/src/main.go\n+++ b/src/main.go\n@@ -1,3 +1,4 @@...",
+  "is_staged": false,
+  "is_new": false
+}
+```
+
+---
+
+#### `git/stage`
+Stage files for commit.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| paths | string[] | Yes | Array of file paths to stage |
+
+**Result:**
+```json
+{
+  "status": "staged",
+  "files_affected": 2
+}
+```
+
+---
+
+#### `git/unstage`
+Unstage files from the staging area.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| paths | string[] | Yes | Array of file paths to unstage |
+
+**Result:**
+```json
+{
+  "status": "unstaged",
+  "files_affected": 2
+}
+```
+
+---
+
+#### `git/discard`
+Discard unstaged changes to files.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| paths | string[] | Yes | Array of file paths to discard changes |
+
+**Result:**
+```json
+{
+  "status": "discarded",
+  "files_affected": 2
+}
+```
+
+---
+
+#### `git/commit`
+Create a commit with staged changes.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| message | string | Yes | Commit message |
+| push | boolean | No | Push to remote after commit (default: false) |
+
+**Result:**
+```json
+{
+  "status": "committed",
+  "sha": "a1b2c3d4e5f6..."
+}
+```
+
+---
+
+#### `git/push`
+Push commits to remote repository.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "status": "pushed"
+}
+```
+
+---
+
+#### `git/pull`
+Pull changes from remote repository.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "status": "pulled"
+}
+```
+
+---
+
+#### `git/branches`
+List all git branches.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "branches": [
+    {"name": "main", "current": true},
+    {"name": "feature/auth", "current": false}
+  ],
+  "current": "main"
+}
+```
+
+---
+
+#### `git/checkout`
+Checkout a branch.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| branch | string | Yes | Branch name to checkout |
+
+**Result:**
+```json
+{
+  "status": "checked_out",
+  "branch": "feature/auth"
+}
+```
 
 ---
 
@@ -260,8 +414,31 @@ Get file content.
 {
   "path": "src/main.go",
   "content": "package main...",
+  "encoding": "utf-8",
   "size": 1234,
   "truncated": false
+}
+```
+
+---
+
+#### `file/list`
+List directory contents.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| path | string | No | Relative path from repo root (empty for root directory) |
+
+**Result:**
+```json
+{
+  "path": "src",
+  "entries": [
+    {"name": "main.go", "type": "file", "size": 1234, "modified": "2025-01-15T10:30:00Z"},
+    {"name": "utils", "type": "directory", "children_count": 5}
+  ],
+  "total_count": 2
 }
 ```
 
@@ -270,23 +447,190 @@ Get file content.
 ### Session Methods
 
 #### `session/list`
-List available sessions.
+List available sessions from all configured AI agents.
 
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| limit | number | No | Max sessions to return (default: 20) |
+| agent_type | string | No | Filter by agent type (claude, gemini, codex) |
+| limit | number | No | Max sessions to return (default: 50) |
+
+**Result:**
+```json
+{
+  "sessions": [
+    {
+      "session_id": "sess_abc123",
+      "agent_type": "claude",
+      "summary": "Fix authentication bug",
+      "message_count": 15,
+      "start_time": "2025-01-15T10:00:00Z",
+      "last_updated": "2025-01-15T10:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+#### `session/get`
+Get detailed information about a specific session.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| session_id | string | Yes | Session ID to retrieve |
+| agent_type | string | No | Agent type (optional, searches all if not specified) |
+
+**Result:**
+```json
+{
+  "session_id": "sess_abc123",
+  "agent_type": "claude",
+  "summary": "Fix authentication bug",
+  "message_count": 15,
+  "start_time": "2025-01-15T10:00:00Z",
+  "last_updated": "2025-01-15T10:30:00Z",
+  "branch": "main",
+  "project_path": "/Users/dev/my-project"
+}
+```
+
+---
+
+#### `session/messages`
+Get paginated messages for a specific session.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| session_id | string | Yes | Session ID to get messages from |
+| agent_type | string | No | Agent type (optional) |
+| limit | number | No | Max messages to return (default: 50, max: 500) |
+| offset | number | No | Offset for pagination (default: 0) |
+
+**Result:**
+```json
+{
+  "messages": [
+    {
+      "id": "msg_001",
+      "session_id": "sess_abc123",
+      "timestamp": "2025-01-15T10:00:00Z",
+      "role": "user",
+      "content": "Fix the authentication bug"
+    }
+  ],
+  "total": 15,
+  "limit": 50,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+---
+
+#### `session/elements`
+Get pre-parsed UI elements for a session, ready for rendering in mobile apps.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| session_id | string | Yes | Session ID to get elements from |
+| agent_type | string | No | Agent type (optional) |
+| limit | number | No | Max elements to return (default: 50, max: 100) |
+| before | string | No | Return elements before this ID (for pagination) |
+| after | string | No | Return elements after this ID (for catch-up) |
+
+**Result:**
+```json
+{
+  "session_id": "sess_abc123",
+  "elements": [
+    {
+      "id": "elem_001",
+      "type": "user_input",
+      "timestamp": "2025-01-15T10:00:00Z",
+      "content": {"text": "Fix the authentication bug"}
+    },
+    {
+      "id": "elem_002",
+      "type": "assistant_text",
+      "timestamp": "2025-01-15T10:00:05Z",
+      "content": {"text": "I'll analyze the authentication code..."}
+    }
+  ],
+  "pagination": {
+    "total": 25,
+    "returned": 2,
+    "has_more_before": false,
+    "has_more_after": true,
+    "oldest_id": "elem_001",
+    "newest_id": "elem_002"
+  }
+}
+```
+
+---
+
+#### `session/delete`
+Delete a specific session or all sessions.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| session_id | string | No | Session ID to delete (if omitted, deletes all) |
+| agent_type | string | No | Agent type (optional) |
+
+**Result (single deletion):**
+```json
+{
+  "status": "deleted",
+  "session_id": "sess_abc123",
+  "deleted": 1
+}
+```
+
+**Result (all deletion):**
+```json
+{
+  "status": "deleted",
+  "deleted": 5
+}
+```
+
+---
 
 #### `session/watch`
-Start watching a session for real-time updates.
+Start watching a session for real-time updates. The client will receive notifications when new messages are added.
 
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | session_id | string | Yes | Session ID to watch |
 
+**Result:**
+```json
+{
+  "status": "watching",
+  "watching": true
+}
+```
+
+---
+
 #### `session/unwatch`
 Stop watching the current session.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "status": "unwatched"
+}
+```
 
 ---
 

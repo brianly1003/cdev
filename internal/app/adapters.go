@@ -288,6 +288,35 @@ func (a *FileProviderAdapter) GetFileContent(ctx context.Context, path string, m
 	return content, truncated, err
 }
 
+// ListDirectory returns entries in a directory.
+func (a *FileProviderAdapter) ListDirectory(ctx context.Context, path string) ([]methods.FileEntry, error) {
+	if a.tracker == nil {
+		return nil, nil
+	}
+	entries, err := a.tracker.ListDirectory(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]methods.FileEntry, len(entries))
+	for i, e := range entries {
+		entry := methods.FileEntry{
+			Name: e.Name,
+			Type: e.Type,
+		}
+		if e.Size != nil {
+			entry.Size = e.Size
+		}
+		if e.Modified != nil {
+			entry.Modified = e.Modified
+		}
+		if e.ChildrenCount != nil {
+			entry.ChildrenCount = e.ChildrenCount
+		}
+		result[i] = entry
+	}
+	return result, nil
+}
+
 // ClaudeSessionAdapter wraps sessioncache.Cache and MessageCache to implement methods.SessionProvider.
 type ClaudeSessionAdapter struct {
 	cache        *sessioncache.Cache
@@ -396,4 +425,105 @@ func (a *ClaudeSessionAdapter) GetSessionMessages(ctx context.Context, sessionID
 	}
 
 	return result, page.Total, nil
+}
+
+// GetSessionElements returns pre-parsed UI elements for a session.
+func (a *ClaudeSessionAdapter) GetSessionElements(ctx context.Context, sessionID string, limit int, beforeID, afterID string) ([]methods.SessionElement, int, error) {
+	if a.messageCache == nil {
+		return nil, 0, nil
+	}
+
+	// Get all messages for the session
+	page, err := a.messageCache.GetMessages(sessionID, 500, 0, "asc")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Convert CachedMessage to json.RawMessage with proper structure for parsing
+	rawMessages := make([]json.RawMessage, len(page.Messages))
+	for i, m := range page.Messages {
+		// Create structured message with type and timestamp
+		wrapper := map[string]interface{}{
+			"type":      m.Type,
+			"uuid":      m.UUID,
+			"timestamp": m.Timestamp,
+			"message":   json.RawMessage(m.Message),
+		}
+		if data, err := json.Marshal(wrapper); err == nil {
+			rawMessages[i] = data
+		}
+	}
+
+	// Parse messages into elements using sessioncache.ParseSessionToElements
+	elements, err := sessioncache.ParseSessionToElements(rawMessages, sessionID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Convert to methods.SessionElement
+	result := make([]methods.SessionElement, len(elements))
+	for i, e := range elements {
+		result[i] = methods.SessionElement{
+			ID:        e.ID,
+			Type:      string(e.Type),
+			Timestamp: e.Timestamp,
+			Content:   e.Content,
+		}
+	}
+
+	total := len(result)
+
+	// Handle pagination
+	startIdx := 0
+	endIdx := len(result)
+
+	// If after is specified, find the element and start from there
+	if afterID != "" {
+		for i, e := range result {
+			if e.ID == afterID {
+				startIdx = i + 1
+				break
+			}
+		}
+	}
+
+	// If before is specified, find the element and end there
+	if beforeID != "" {
+		for i, e := range result {
+			if e.ID == beforeID {
+				endIdx = i
+				break
+			}
+		}
+	}
+
+	// Apply limit
+	if endIdx > startIdx+limit {
+		endIdx = startIdx + limit
+	}
+
+	if startIdx >= len(result) {
+		return nil, total, nil
+	}
+	if endIdx > len(result) {
+		endIdx = len(result)
+	}
+
+	return result[startIdx:endIdx], total, nil
+}
+
+// DeleteSession deletes a specific session.
+func (a *ClaudeSessionAdapter) DeleteSession(ctx context.Context, sessionID string) error {
+	if a.cache == nil {
+		return nil
+	}
+	return a.cache.DeleteSession(sessionID)
+}
+
+// DeleteAllSessions deletes all sessions.
+func (a *ClaudeSessionAdapter) DeleteAllSessions(ctx context.Context) (int, error) {
+	if a.cache == nil {
+		return 0, nil
+	}
+	return a.cache.DeleteAllSessions()
 }

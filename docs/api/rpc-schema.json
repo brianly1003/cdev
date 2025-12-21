@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "cdev JSON-RPC API Schema",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "methods": {
     "agent/run": {
       "description": "Start an AI agent with a prompt",
@@ -79,21 +79,23 @@
         "type": "object",
         "properties": {
           "branch": { "type": "string" },
-          "staged": { "type": "array", "items": { "type": "string" } },
-          "unstaged": { "type": "array", "items": { "type": "string" } },
-          "untracked": { "type": "array", "items": { "type": "string" } },
-          "is_clean": { "type": "boolean" }
+          "ahead": { "type": "integer" },
+          "behind": { "type": "integer" },
+          "staged_count": { "type": "integer" },
+          "unstaged_count": { "type": "integer" },
+          "untracked_count": { "type": "integer" },
+          "has_conflicts": { "type": "boolean" },
+          "changed_files": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "git/diff": {
-      "description": "Get diff for a file",
+      "description": "Get diff for a file or all files",
       "params": {
         "type": "object",
         "properties": {
-          "path": { "type": "string" }
-        },
-        "required": ["path"]
+          "path": { "type": "string", "description": "File path (optional, omit for all files)" }
+        }
       },
       "result": {
         "type": "object",
@@ -102,6 +104,132 @@
           "diff": { "type": "string" },
           "is_staged": { "type": "boolean" },
           "is_new": { "type": "boolean" }
+        }
+      }
+    },
+    "git/stage": {
+      "description": "Stage files for commit",
+      "params": {
+        "type": "object",
+        "properties": {
+          "paths": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["paths"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "files_affected": { "type": "integer" }
+        }
+      }
+    },
+    "git/unstage": {
+      "description": "Unstage files from the staging area",
+      "params": {
+        "type": "object",
+        "properties": {
+          "paths": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["paths"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "files_affected": { "type": "integer" }
+        }
+      }
+    },
+    "git/discard": {
+      "description": "Discard unstaged changes to files",
+      "params": {
+        "type": "object",
+        "properties": {
+          "paths": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["paths"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "files_affected": { "type": "integer" }
+        }
+      }
+    },
+    "git/commit": {
+      "description": "Create a commit with staged changes",
+      "params": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "push": { "type": "boolean", "default": false }
+        },
+        "required": ["message"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "sha": { "type": "string" }
+        }
+      }
+    },
+    "git/push": {
+      "description": "Push commits to remote repository",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "git/pull": {
+      "description": "Pull changes from remote repository",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "git/branches": {
+      "description": "List all git branches",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "current": { "type": "boolean" }
+              }
+            }
+          },
+          "current": { "type": "string" }
+        }
+      }
+    },
+    "git/checkout": {
+      "description": "Checkout a branch",
+      "params": {
+        "type": "object",
+        "properties": {
+          "branch": { "type": "string" }
+        },
+        "required": ["branch"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "branch": { "type": "string" }
         }
       }
     },
@@ -119,17 +247,48 @@
         "properties": {
           "path": { "type": "string" },
           "content": { "type": "string" },
+          "encoding": { "type": "string" },
           "size": { "type": "integer" },
           "truncated": { "type": "boolean" }
         }
       }
     },
-    "session/list": {
-      "description": "List available sessions",
+    "file/list": {
+      "description": "List directory contents",
       "params": {
         "type": "object",
         "properties": {
-          "limit": { "type": "integer", "default": 20 }
+          "path": { "type": "string", "description": "Relative path from repo root (empty for root)" }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string", "enum": ["file", "directory"] },
+                "size": { "type": "integer" },
+                "modified": { "type": "string", "format": "date-time" },
+                "children_count": { "type": "integer" }
+              }
+            }
+          },
+          "total_count": { "type": "integer" }
+        }
+      }
+    },
+    "session/list": {
+      "description": "List available sessions from all configured AI agents",
+      "params": {
+        "type": "object",
+        "properties": {
+          "agent_type": { "type": "string", "description": "Filter by agent type" },
+          "limit": { "type": "integer", "default": 50 }
         }
       },
       "result": {
@@ -140,12 +299,136 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "created_at": { "type": "string", "format": "date-time" },
-                "message_count": { "type": "integer" }
+                "session_id": { "type": "string" },
+                "agent_type": { "type": "string" },
+                "summary": { "type": "string" },
+                "message_count": { "type": "integer" },
+                "start_time": { "type": "string", "format": "date-time" },
+                "last_updated": { "type": "string", "format": "date-time" }
               }
             }
+          },
+          "total": { "type": "integer" }
+        }
+      }
+    },
+    "session/get": {
+      "description": "Get detailed information about a specific session",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" }
+        },
+        "required": ["session_id"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" },
+          "summary": { "type": "string" },
+          "message_count": { "type": "integer" },
+          "start_time": { "type": "string", "format": "date-time" },
+          "last_updated": { "type": "string", "format": "date-time" },
+          "branch": { "type": "string" },
+          "project_path": { "type": "string" }
+        }
+      }
+    },
+    "session/messages": {
+      "description": "Get paginated messages for a specific session",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" },
+          "limit": { "type": "integer", "default": 50, "maximum": 500 },
+          "offset": { "type": "integer", "default": 0 }
+        },
+        "required": ["session_id"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "session_id": { "type": "string" },
+                "timestamp": { "type": "string", "format": "date-time" },
+                "role": { "type": "string", "enum": ["user", "assistant", "tool"] },
+                "content": { "type": "string" }
+              }
+            }
+          },
+          "total": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "has_more": { "type": "boolean" }
+        }
+      }
+    },
+    "session/elements": {
+      "description": "Get pre-parsed UI elements for a session",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "agent_type": { "type": "string" },
+          "limit": { "type": "integer", "default": 50, "maximum": 100 },
+          "before": { "type": "string", "description": "Return elements before this ID" },
+          "after": { "type": "string", "description": "Return elements after this ID" }
+        },
+        "required": ["session_id"]
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string" },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "type": { "type": "string", "enum": ["user_input", "assistant_text", "tool_call", "tool_result", "diff", "thinking"] },
+                "timestamp": { "type": "string", "format": "date-time" },
+                "content": { "type": "object" }
+              }
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "returned": { "type": "integer" },
+              "has_more_before": { "type": "boolean" },
+              "has_more_after": { "type": "boolean" },
+              "oldest_id": { "type": "string" },
+              "newest_id": { "type": "string" }
+            }
           }
+        }
+      }
+    },
+    "session/delete": {
+      "description": "Delete a specific session or all sessions",
+      "params": {
+        "type": "object",
+        "properties": {
+          "session_id": { "type": "string", "description": "Session ID to delete (omit for all)" },
+          "agent_type": { "type": "string" }
+        }
+      },
+      "result": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "session_id": { "type": "string" },
+          "deleted": { "type": "integer" }
         }
       }
     },
@@ -177,10 +460,11 @@
       }
     },
     "initialize": {
-      "description": "Initialize the connection",
+      "description": "Initialize the connection and negotiate capabilities",
       "params": {
         "type": "object",
         "properties": {
+          "protocol_version": { "type": "string" },
           "client_info": {
             "type": "object",
             "properties": {
@@ -194,6 +478,7 @@
       "result": {
         "type": "object",
         "properties": {
+          "protocol_version": { "type": "string" },
           "server_info": {
             "type": "object",
             "properties": {
@@ -208,6 +493,21 @@
               "features": { "type": "array", "items": { "type": "string" } }
             }
           }
+        }
+      }
+    },
+    "initialized": {
+      "description": "Notification that client initialization is complete",
+      "params": null,
+      "result": null
+    },
+    "shutdown": {
+      "description": "Request the server to shut down gracefully",
+      "params": null,
+      "result": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" }
         }
       }
     }

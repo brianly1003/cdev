@@ -15,6 +15,7 @@ This directory contains all project documentation organized by category.
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
 | **Integrate with VS Code** | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) |
 | **Acquisition strategy** | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) |
+| **Multi-agent (Claude/Gemini/Codex)** | [architecture/MULTI-AGENT-ARCHITECTURE.md](./architecture/MULTI-AGENT-ARCHITECTURE.md) |
 
 ---
 
@@ -37,7 +38,8 @@ docs/
 │   ├── DESKTOP-APP-DESIGN.md  # Desktop app design spec
 │   ├── ACQUISITION-READY-ARCHITECTURE.md  # Acquisition strategy
 │   ├── VSCODE-INTEGRATION-STRATEGY.md     # VS Code integration guide
-│   └── TRANSPORT-ARCHITECTURE-ANALYSIS.md # WebSocket vs HTTP analysis
+│   ├── TRANSPORT-ARCHITECTURE-ANALYSIS.md # WebSocket vs HTTP analysis
+│   └── MULTI-AGENT-ARCHITECTURE.md        # Multi-agent (Claude/Gemini/Codex)
 ├── security/                  # Security docs
 │   ├── SECURITY.md            # Security guidelines & threat model
 │   ├── TECHNICAL-REVIEW.md    # Security analysis
@@ -99,6 +101,7 @@ docs/
 | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) | **Strategy** - Making cdev acquisition-ready for VS Code/Microsoft |
 | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) | **Strategy** - Detailed VS Code integration and JSON-RPC 2.0 migration |
 | [architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md](./architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md) | **Analysis** - WebSocket vs HTTP dual-protocol evaluation |
+| [architecture/MULTI-AGENT-ARCHITECTURE.md](./architecture/MULTI-AGENT-ARCHITECTURE.md) | **Strategy** - Multi-agent support for Claude, Gemini, and Codex |
 
 **Key Topics:**
 - Hexagonal architecture (ports & adapters)
@@ -108,6 +111,7 @@ docs/
 - JSON-RPC 2.0 protocol alignment (LSP-compatible)
 - VS Code extension architecture
 - Acquisition readiness and multi-IDE support
+- Multi-agent support (Claude, Gemini, Codex)
 
 ---
 
@@ -180,6 +184,7 @@ docs/
 | ACQUISITION-READY-ARCHITECTURE.md | architecture | 1.0 | Active |
 | VSCODE-INTEGRATION-STRATEGY.md | architecture | 1.0 | Active |
 | TRANSPORT-ARCHITECTURE-ANALYSIS.md | architecture | 1.0 | Active |
+| MULTI-AGENT-ARCHITECTURE.md | architecture | 1.0 | Active |
 | SECURITY.md | security | 1.0 | Draft |
 | TECHNICAL-REVIEW.md | security | 1.0 | Current |
 | IMAGE-UPLOAD-SECURITY-ANALYSIS.md | security | 1.0 | Current |

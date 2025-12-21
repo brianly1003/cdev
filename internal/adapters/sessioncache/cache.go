@@ -780,3 +780,73 @@ func (c *Cache) ListSessionsPaginated(limit, offset int) ([]SessionInfo, int, er
 func init() {
 	_ = sort.Slice
 }
+
+// DeleteSession deletes a specific session from the cache and disk.
+func (c *Cache) DeleteSession(sessionID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Get the file path from database
+	var filePath string
+	err := c.db.QueryRow("SELECT file_path FROM sessions WHERE session_id = ?", sessionID).Scan(&filePath)
+	if err == sql.ErrNoRows {
+		return nil // Session not found, nothing to delete
+	}
+	if err != nil {
+		return err
+	}
+
+	// Delete from database
+	_, err = c.db.Exec("DELETE FROM sessions WHERE session_id = ?", sessionID)
+	if err != nil {
+		return err
+	}
+
+	// Delete the file if it exists
+	if filePath != "" {
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+			log.Warn().Err(err).Str("path", filePath).Msg("failed to delete session file")
+		}
+	}
+
+	log.Info().Str("session_id", sessionID).Msg("deleted session")
+	return nil
+}
+
+// DeleteAllSessions deletes all sessions from the cache and disk.
+func (c *Cache) DeleteAllSessions() (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Get all file paths
+	rows, err := c.db.Query("SELECT session_id, file_path FROM sessions")
+	if err != nil {
+		return 0, err
+	}
+
+	var filePaths []string
+	for rows.Next() {
+		var sessionID, filePath string
+		if err := rows.Scan(&sessionID, &filePath); err == nil && filePath != "" {
+			filePaths = append(filePaths, filePath)
+		}
+	}
+	rows.Close()
+
+	// Delete all from database
+	result, err := c.db.Exec("DELETE FROM sessions")
+	if err != nil {
+		return 0, err
+	}
+	deleted, _ := result.RowsAffected()
+
+	// Delete files
+	for _, filePath := range filePaths {
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+			log.Warn().Err(err).Str("path", filePath).Msg("failed to delete session file")
+		}
+	}
+
+	log.Info().Int64("count", deleted).Msg("deleted all sessions")
+	return int(deleted), nil
+}

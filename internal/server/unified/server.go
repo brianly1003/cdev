@@ -156,9 +156,22 @@ func (s *Server) Stop(ctx context.Context) error {
 // HandleWebSocket handles WebSocket upgrade requests.
 // This can be used as a handler in HTTP servers for WebSocket upgrades.
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log.Debug().
+		Str("remote_addr", r.RemoteAddr).
+		Str("path", r.URL.Path).
+		Str("upgrade", r.Header.Get("Upgrade")).
+		Str("connection", r.Header.Get("Connection")).
+		Str("sec_websocket_key", r.Header.Get("Sec-WebSocket-Key")).
+		Msg("processing WebSocket upgrade")
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to upgrade connection")
+		log.Error().
+			Err(err).
+			Str("remote_addr", r.RemoteAddr).
+			Str("upgrade_header", r.Header.Get("Upgrade")).
+			Str("connection_header", r.Header.Get("Connection")).
+			Msg("failed to upgrade connection to WebSocket")
 		return
 	}
 

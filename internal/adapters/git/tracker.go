@@ -1092,3 +1092,78 @@ func (t *Tracker) Checkout(ctx context.Context, branch string, create bool) (*Ch
 		Message: fmt.Sprintf("%s branch '%s'", action, branch),
 	}, nil
 }
+
+// DirectoryEntry represents a file or directory entry.
+type DirectoryEntry struct {
+	Name          string  `json:"name"`
+	Type          string  `json:"type"` // "file" or "directory"
+	Size          *int64  `json:"size,omitempty"`
+	Modified      *string `json:"modified,omitempty"`
+	ChildrenCount *int    `json:"children_count,omitempty"`
+}
+
+// ListDirectory returns entries in a directory.
+func (t *Tracker) ListDirectory(ctx context.Context, path string) ([]DirectoryEntry, error) {
+	fullPath := t.repoRoot
+	if path != "" {
+		fullPath = filepath.Join(t.repoRoot, path)
+	}
+
+	// Validate path is within repo
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return nil, err
+	}
+
+	absRoot, err := filepath.Abs(t.repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	if !strings.HasPrefix(absPath, absRoot) {
+		return nil, domain.ErrPathOutsideRepo
+	}
+
+	// Read directory
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]DirectoryEntry, 0, len(entries))
+	for _, entry := range entries {
+		// Skip hidden files and common ignored directories
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if entry.Name() == "node_modules" || entry.Name() == "__pycache__" || entry.Name() == "vendor" {
+			continue
+		}
+
+		dirEntry := DirectoryEntry{
+			Name: entry.Name(),
+		}
+
+		if entry.IsDir() {
+			dirEntry.Type = "directory"
+			// Count children
+			subPath := filepath.Join(absPath, entry.Name())
+			if subEntries, err := os.ReadDir(subPath); err == nil {
+				count := len(subEntries)
+				dirEntry.ChildrenCount = &count
+			}
+		} else {
+			dirEntry.Type = "file"
+			if info, err := entry.Info(); err == nil {
+				size := info.Size()
+				dirEntry.Size = &size
+				modTime := info.ModTime().Format(time.RFC3339)
+				dirEntry.Modified = &modTime
+			}
+		}
+
+		result = append(result, dirEntry)
+	}
+
+	return result, nil
+}
