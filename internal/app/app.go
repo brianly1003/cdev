@@ -579,6 +579,9 @@ func (a *App) sendErrorToClient(clientID, code, message, requestID string) {
 
 // sendEventToClient sends an event to a specific client.
 func (a *App) sendEventToClient(clientID string, event events.Event) {
+	if a.unifiedServer == nil {
+		return
+	}
 	client := a.unifiedServer.GetClient(clientID)
 	if client == nil {
 		return
