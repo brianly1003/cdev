@@ -309,14 +309,19 @@ func TestGetSessionMessagesResultJSON(t *testing.T) {
 // TestGitStatusInfoJSON tests snake_case serialization for GitStatusInfo.
 func TestGitStatusInfoJSON(t *testing.T) {
 	status := GitStatusInfo{
-		Branch:         "main",
-		Ahead:          2,
-		Behind:         1,
-		StagedCount:    3,
-		UnstagedCount:  5,
-		UntrackedCount: 10,
-		HasConflicts:   false,
-		ChangedFiles:   []string{"file1.go", "file2.go"},
+		Branch:   "main",
+		Upstream: "origin/main",
+		Ahead:    2,
+		Behind:   1,
+		Staged:   []GitFileStatus{{Path: "file1.go", Status: "M"}},
+		Unstaged: []GitFileStatus{{Path: "file2.go", Status: "M"}},
+		Untracked: []GitFileStatus{
+			{Path: "file3.go", Status: "?"},
+			{Path: "file4.go", Status: "?"},
+		},
+		Conflicted: []GitFileStatus{},
+		RepoName:   "cdev",
+		RepoRoot:   "/Users/test/cdev",
 	}
 
 	data, err := json.Marshal(status)
@@ -328,12 +333,10 @@ func TestGitStatusInfoJSON(t *testing.T) {
 
 	// Verify snake_case field names
 	expectedFields := []string{
-		"staged_count", "unstaged_count", "untracked_count",
-		"has_conflicts", "changed_files",
+		"repo_name", "repo_root",
 	}
 	unexpectedFields := []string{
-		"stagedCount", "unstagedCount", "untrackedCount",
-		"hasConflicts", "changedFiles",
+		"repoName", "repoRoot",
 	}
 
 	for _, field := range expectedFields {

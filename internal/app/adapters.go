@@ -123,7 +123,7 @@ func NewGitProviderAdapter(tracker *git.Tracker) *GitProviderAdapter {
 	return &GitProviderAdapter{tracker: tracker}
 }
 
-// Status returns the git status.
+// Status returns the git status matching HTTP API format.
 func (a *GitProviderAdapter) Status(ctx context.Context) (methods.GitStatusInfo, error) {
 	if a.tracker == nil {
 		return methods.GitStatusInfo{}, nil
@@ -135,27 +135,38 @@ func (a *GitProviderAdapter) Status(ctx context.Context) (methods.GitStatusInfo,
 		return methods.GitStatusInfo{}, err
 	}
 
-	// Collect file paths
-	var changedFiles []string
-	for _, f := range enhanced.Staged {
-		changedFiles = append(changedFiles, f.Path)
+	// Convert FileEntry arrays to GitFileStatus arrays
+	staged := make([]methods.GitFileStatus, len(enhanced.Staged))
+	for i, f := range enhanced.Staged {
+		staged[i] = methods.GitFileStatus{Path: f.Path, Status: f.Status}
 	}
-	for _, f := range enhanced.Unstaged {
-		changedFiles = append(changedFiles, f.Path)
+
+	unstaged := make([]methods.GitFileStatus, len(enhanced.Unstaged))
+	for i, f := range enhanced.Unstaged {
+		unstaged[i] = methods.GitFileStatus{Path: f.Path, Status: f.Status}
 	}
-	for _, f := range enhanced.Untracked {
-		changedFiles = append(changedFiles, f.Path)
+
+	untracked := make([]methods.GitFileStatus, len(enhanced.Untracked))
+	for i, f := range enhanced.Untracked {
+		untracked[i] = methods.GitFileStatus{Path: f.Path, Status: f.Status}
+	}
+
+	conflicted := make([]methods.GitFileStatus, len(enhanced.Conflicted))
+	for i, f := range enhanced.Conflicted {
+		conflicted[i] = methods.GitFileStatus{Path: f.Path, Status: f.Status}
 	}
 
 	return methods.GitStatusInfo{
-		Branch:         enhanced.Branch,
-		Ahead:          enhanced.Ahead,
-		Behind:         enhanced.Behind,
-		StagedCount:    len(enhanced.Staged),
-		UnstagedCount:  len(enhanced.Unstaged),
-		UntrackedCount: len(enhanced.Untracked),
-		ChangedFiles:   changedFiles,
-		HasConflicts:   len(enhanced.Conflicted) > 0,
+		Branch:     enhanced.Branch,
+		Upstream:   enhanced.Upstream,
+		Ahead:      enhanced.Ahead,
+		Behind:     enhanced.Behind,
+		Staged:     staged,
+		Unstaged:   unstaged,
+		Untracked:  untracked,
+		Conflicted: conflicted,
+		RepoName:   enhanced.RepoName,
+		RepoRoot:   enhanced.RepoRoot,
 	}, nil
 }
 

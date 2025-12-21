@@ -1,0 +1,557 @@
+{
+  "cache_hit" : true,
+  "has_more" : true,
+  "limit" : 20,
+  "messages" : [
+    {
+      "git_branch" : "main",
+      "id" : 344,
+      "message" : {
+        "content" : [
+          {
+            "text" : "Hello! How can I help you?",
+            "type" : "text"
+          }
+        ],
+        "id" : "msg_01DnryRxvorbkyXiokkNdHBb",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 107311
+          },
+          "cache_creation_input_tokens" : 107311,
+          "cache_read_input_tokens" : 0,
+          "input_tokens" : 3,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T14:13:29.603Z",
+      "type" : "assistant",
+      "uuid" : "2f3c068b-da96-4e78-b5e4-541be5bbbf69"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 343,
+      "message" : {
+        "content" : "hello bro",
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T14:13:23.076Z",
+      "type" : "user",
+      "uuid" : "5d25054c-7b69-4717-9f7e-0073e8419bb7"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 342,
+      "message" : {
+        "content" : [
+          {
+            "text" : "All files moved successfully.\n\n**Summary:**\n```\nSource: \/Users\/brianly\/Projects\/cdev-agent\/\nDestination: \/Users\/brianly\/Projects\/cdev\/\nFiles: 3027 transferred\n.git: preserved (separate repo)\n```\n\nThe `\/Users\/brianly\/Projects\/cdev\/` now has all your project files with its own `.git` repository intact.",
+            "type" : "text"
+          }
+        ],
+        "id" : "msg_01F98k6k77EeA9TwjUzfprua",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 1032
+          },
+          "cache_creation_input_tokens" : 1032,
+          "cache_read_input_tokens" : 116960,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:09.919Z",
+      "type" : "assistant",
+      "uuid" : "6692b332-c45c-465a-b45e-5b06d071d17b"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 341,
+      "message" : {
+        "content" : [
+          {
+            "signature" : "EqsCCkYIChgCKkCuttaX23+zoE3gRzWx5TsebZ7cMZGvfiRQILxRfQg+3fOaP9vCr2lN32uzibK7174OLom7cn27sukrFE6Uv\/SYEgyRtdodLXlPNq5o\/XoaDNRaGo3nAp1KTrS0TyIwOLtFMiY+K3qhL8DmJfLIs3fmB4EFdrAr1VVzGwzsDAQAuQaTAqZB7TNAgDIlHTICKpIBocNDay9TZFWPWijzE9kHEJ91tTajw8zV5uQdkwxAPdxW0jwlB8+GWA0KkCrJaa40k65nRoBbuYv4UuJJ4fyjsnB9+LU58uSatWurROtr1x\/28a2LFwEotyZG\/c2AR+4jMUEjtxvYGQxrhZ87+lgo8y+hPaPNYexP+9nu6SV9h+nAdYRHars7kg7KF\/g3V1CR7QoYAQ==",
+            "thinking" : "The files have been copied successfully. The destination has the separate .git folder preserved. Let me show the user the summary.",
+            "type" : "thinking"
+          }
+        ],
+        "id" : "msg_01F98k6k77EeA9TwjUzfprua",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 1032
+          },
+          "cache_creation_input_tokens" : 1032,
+          "cache_read_input_tokens" : 116960,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:07.858Z",
+      "type" : "assistant",
+      "uuid" : "32c0b494-9e84-410a-8ea0-3c2f5bfb64aa"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 340,
+      "message" : {
+        "content" : [
+          {
+            "content" : "total 200\ndrwxr-xr-x@  30 brianly  staff    960 Dec 20 20:26 .\ndrwxr-xr-x  171 brianly  staff   5472 Dec 20 20:16 ..\n-rw-r--r--@   1 brianly  staff   6148 Dec 17 22:29 .DS_Store\ndrwxr-xr-x@   4 brianly  staff    128 Dec 20 20:25 .cdev\ndrwx------@   3 brianly  staff     96 Dec 20 20:29 .claude\ndrwxr-xr-x@   9 brianly  staff    288 Dec 20 20:16 .git\n-rw-r--r--@   1 brianly  staff    501 Dec 20 20:22 .gitignore\n-rw-------@   1 brianly  staff    981 Dec 20 18:19 .testcoverage.yml\ndrwx------@   3 brianly  staff     96 Dec 17 22:22 .vscode\n-rw-r--r--@   1 brianly  staff   4621 Dec 20 20:22 CLAUDE.md\n-rw-r--r--@   1 brianly  staff   8310 Dec 20 18:25 Makefile\n-rw-r--r--@   1 brianly  staff  10918 Dec 20 20:22 README.md\ndrwxr-xr-x@   3 brianly  staff     96 Dec 17 22:33 api\n-rw-r--r--@   1 brianly  staff   9625 Dec 19 14:40 app.go\ndrwxr-xr-x@   3 brianly  staff     96 Dec 20 20:25 bin\ndrwxr-xr-x@   7 brianly  staff    224 Dec 19 14:41 build\ndrwxr-xr-x@   3 brianly  staff     96 Dec 19 14:24 cmd\n-rw-------@   1 brianly  staff   2866 Dec 19 17:56 config.yaml\ndrwxr-xr-x@   4 brianly  staff    128 Dec 19 18:00 configs\ndrwxr-xr-x@  18 brianly  staff    576 Dec 20 20:23 docs\ndrwxr-xr-x@  13 brianly  staff    416 Dec 19 14:48 frontend\n-rw-r--r--@   1 brianly  staff   3647 Dec 19 14:42 go.mod\n-rw-r--r--@   1 brianly  staff  21013 Dec 19 14:42 go.sum\ndrwxr-xr-x@  10 brianly  staff    320 Dec 20 17:32 internal",
+            "is_error" : false,
+            "tool_use_id" : "toolu_01KPPD4VZ8jK5a8tgvV8E7gY",
+            "type" : "tool_result"
+          }
+        ],
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:04.024Z",
+      "type" : "user",
+      "uuid" : "e8461bfe-18a1-43b6-96c0-1d9253eb169d"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 339,
+      "message" : {
+        "content" : [
+          {
+            "id" : "toolu_01KPPD4VZ8jK5a8tgvV8E7gY",
+            "input" : {
+              "command" : "ls -la \/Users\/brianly\/Projects\/cdev\/ | head -25",
+              "description" : "Verify destination"
+            },
+            "name" : "Bash",
+            "type" : "tool_use"
+          }
+        ],
+        "id" : "msg_012tLBivhqr84z7CX8piK1ja",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 9689
+          },
+          "cache_creation_input_tokens" : 9689,
+          "cache_read_input_tokens" : 107271,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:03.124Z",
+      "type" : "assistant",
+      "uuid" : "3acadcfc-bca8-4850-9a0e-63cb11d10232"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 338,
+      "message" : {
+        "content" : [
+          {
+            "text" : "Done! All files copied to `\/Users\/brianly\/Projects\/cdev\/` (3027 files transferred).",
+            "type" : "text"
+          }
+        ],
+        "id" : "msg_012tLBivhqr84z7CX8piK1ja",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 9689
+          },
+          "cache_creation_input_tokens" : 9689,
+          "cache_read_input_tokens" : 107271,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:02.081Z",
+      "type" : "assistant",
+      "uuid" : "cd29f63c-e6da-46b1-9923-1ed7db2d3eff"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 337,
+      "message" : {
+        "content" : [
+          {
+            "signature" : "EqACCkYIChgCKkA+L7fxZEZGlZExy7sD8yHEQKT0VsE5BeUgcDgIIlGdEEy0qpAFqrlCgnqibBmMQfQe6jl7Xd0HCO3OBirYokOxEgyxOmoVJeY+xIULgmsaDGnDz7Oj8CVvacGQYCIwsr2f6YDz9+q00sHCeJ9jB0YcuNpMHUlyogYQJL8F6H0ZUKZseeKtIZ+F75tSu7dYKocBwEUzC4lu8OBM87IvsTqH26x79l5Wza4DEJRDzKawN\/vjsy+Gjw1HSaeRA9uQHYi4FdIDjl3qOo8\/xeaW1syefRrCVj0XMiv310xdSd7euX+R0+flDhhcuzCVBVXK21MgH7m9cqvoJCgB4kFYx9KV7Jw6tx6mxLwNKXpVFpMUKdWmwy92gDzhGAE=",
+            "thinking" : "The copy completed successfully - all 3027 files were transferred. Let me verify the copy and show the user the result.",
+            "type" : "thinking"
+          }
+        ],
+        "id" : "msg_012tLBivhqr84z7CX8piK1ja",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 9689
+          },
+          "cache_creation_input_tokens" : 9689,
+          "cache_read_input_tokens" : 107271,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:30:00.951Z",
+      "type" : "assistant",
+      "uuid" : "0332b4d1-9243-4db5-9cd6-0278b7bd3f99"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 336,
+      "message" : {
+        "content" : [
+          {
+            "content" : "Transfer starting: 3027 files\n.\/\n.DS_Store\n.gitignore\n.testcoverage.yml\nCLAUDE.md\nMakefile\nREADME.md\napp.go\nconfig.yaml\ngo.mod\ngo.sum\nmain.go\nwails.json\n.cdev\/\n.cdev\/images\/\n.cdev\/logs\/\n.claude\/\n.claude\/settings.local.json\n.vscode\/\n.vscode\/launch.json\napi\/\napi\/swagger\/\napi\/swagger\/docs.go\napi\/swagger\/swagger.json\napi\/swagger\/swagger.yaml\nbin\/\nbin\/cdev-agent\nbuild\/\nbuild\/README.md\nbuild\/appicon.png\nbuild\/bin\/\nbuild\/bin\/cdev-desktop.app\/\nbuild\/bin\/cdev-desktop.app\/Contents\/\nbuild\/bin\/cdev-desktop.app\/Contents\/Info.plist\nbuild\/bin\/cdev-desktop.app\/Contents\/MacOS\/\nbuild\/bin\/cdev-desktop.app\/Contents\/MacOS\/cdev-desktop\nbuild\/bin\/cdev-desktop.app\/Contents\/Resources\/\nbuild\/bin\/cdev-desktop.app\/Contents\/Resources\/iconfile.icns\nbuild\/darwin\/\nbuild\/darwin\/Info.dev.plist\nbuild\/darwin\/Info.plist\nbuild\/windows\/\nbuild\/windows\/icon.ico\nbuild\/windows\/info.json\nbuild\/windows\/wails.exe.manifest\nbuild\/windows\/installer\/\nbuild\/windows\/installer\/project.nsi\nbuild\/windows\/installer\/wails_tools.nsh\ncmd\/\ncmd\/cdev-agent\/\ncmd\/cdev-agent\/main.go\ncmd\/cdev-agent\/cmd\/\ncmd\/cdev-agent\/cmd\/root.go\ncmd\/cdev-agent\/cmd\/start.go\nconfigs\/\nconfigs\/config.example.yaml\nconfigs\/config.yaml\ndocs\/\ndocs\/API-REFERENCE.md\ndocs\/ARCHITECTURE.md\ndocs\/BACKLOG.md\ndocs\/CLAUDE-CLI.md\ndocs\/DESIGN-SPEC.md\ndocs\/DESKTOP-APP-DESIGN.md\ndocs\/ELEMENTS-API.md\ndocs\/POC-TESTING-GUIDE.md\ndocs\/PROTOCOL.md\ndocs\/README.md\ndocs\/REALTIME-CHAT-INTEGRATION.md\ndocs\/REPOSITORY-INDEXER.md\ndocs\/SECURITY.md\ndocs\/STRATEGIC-ROADMAP.md\ndocs\/TECHNICAL-REVIEW.md\ndocs\/WEBSOCKET-STABILITY.md\nfrontend\/\nfrontend\/index.html\nfrontend\/package-lock.json\nfrontend\/package.json\nfrontend\/package.json.md5\nfrontend\/tsconfig.json\nfrontend\/tsconfig.node.json\nfrontend\/vite.config.ts\nfrontend\/dist\/\nfrontend\/dist\/index.html\nfrontend\/dist\/assets\/\nfrontend\/dist\/assets\/index.a7896656.js\nfrontend\/dist\/assets\/index.bcd0b093.css\nfrontend\/node_modules\/\nfrontend\/node_modules\/.package-lock.json\nfrontend\/node_modules\/.bin\/\nfrontend\/node_modules\/.bin\/baseline-browser-mapping\nfrontend\/node_modules\/.bin\/browserslist\nfrontend\/node_modules\/.bin\/esbuild\nfrontend\/node_modules\/.bin\/jsesc\nfrontend\/node_modules\/.bin\/json5\nfrontend\/node_modules\/.bin\/loose-envify\nfrontend\/node_modules\/.bin\/nanoid\nfrontend\/node_modules\/.bin\/parser\nfrontend\/node_modules\/.bin\/resolve\nfrontend\/node_modules\/.bin\/rollup\nfrontend\/node_modules\/.bin\/semver\nfrontend\/node_modules\/.bin\/tsc\nfrontend\/node_modules\/.bin\/tsserver\nfrontend\/node_modules\/.bin\/update-browserslist-db\nfrontend\/node_modules\/.bin\/vite\nfrontend\/node_modules\/@babel\/\nfrontend\/node_modules\/@babel\/code-frame\/\nfrontend\/node_modules\/@babel\/code-frame\/LICENSE\nfrontend\/node_modules\/@babel\/code-frame\/README.md\nfrontend\/node_modules\/@babel\/code-frame\/package.json\nfrontend\/node_modules\/@babel\/code-frame\/lib\/\nfrontend\/node_modules\/@babel\/code-frame\/lib\/index.js\nfrontend\/node_modules\/@babel\/code-frame\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/compat-data\/\nfrontend\/node_modules\/@babel\/compat-data\/LICENSE\nfrontend\/node_modules\/@babel\/compat-data\/README.md\nfrontend\/node_modules\/@babel\/compat-data\/corejs2-built-ins.js\nfrontend\/node_modules\/@babel\/compat-data\/corejs3-shipped-proposals.js\nfrontend\/node_modules\/@babel\/compat-data\/native-modules.js\nfrontend\/node_modules\/@babel\/compat-data\/overlapping-plugins.js\nfrontend\/node_modules\/@babel\/compat-data\/package.json\nfrontend\/node_modules\/@babel\/compat-data\/plugin-bugfixes.js\nfrontend\/node_modules\/@babel\/compat-data\/plugins.js\nfrontend\/node_modules\/@babel\/compat-data\/data\/\nfrontend\/node_modules\/@babel\/compat-data\/data\/corejs2-built-ins.json\nfrontend\/node_modules\/@babel\/compat-data\/data\/corejs3-shipped-proposals.json\nfrontend\/node_modules\/@babel\/compat-data\/data\/native-modules.json\nfrontend\/node_modules\/@babel\/compat-data\/data\/overlapping-plugins.json\nfrontend\/node_modules\/@babel\/compat-data\/data\/plugin-bugfixes.json\nfrontend\/node_modules\/@babel\/compat-data\/data\/plugins.json\nfrontend\/node_modules\/@babel\/core\/\nfrontend\/node_modules\/@babel\/core\/LICENSE\nfrontend\/node_modules\/@babel\/core\/README.md\nfrontend\/node_modules\/@babel\/core\/package.json\nfrontend\/node_modules\/@babel\/core\/lib\/\nfrontend\/node_modules\/@babel\/core\/lib\/index.js\nfrontend\/node_modules\/@babel\/core\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/parse.js\nfrontend\/node_modules\/@babel\/core\/lib\/parse.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transform-ast.js\nfrontend\/node_modules\/@babel\/core\/lib\/transform-ast.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transform-file-browser.js\nfrontend\/node_modules\/@babel\/core\/lib\/transform-file-browser.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transform-file.js\nfrontend\/node_modules\/@babel\/core\/lib\/transform-file.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transform.js\nfrontend\/node_modules\/@babel\/core\/lib\/transform.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/\nfrontend\/node_modules\/@babel\/core\/lib\/config\/cache-contexts.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/cache-contexts.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/caching.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/caching.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/config-chain.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/config-chain.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/config-descriptors.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/config-descriptors.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/full.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/full.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/index.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/index.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/item.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/item.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/partial.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/partial.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/pattern-to-regex.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/pattern-to-regex.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/plugin.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/plugin.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/printer.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/printer.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/resolve-targets-browser.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/resolve-targets-browser.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/resolve-targets.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/resolve-targets.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/util.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/util.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/configuration.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/configuration.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/import.cjs\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/import.cjs.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/index-browser.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/index-browser.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/index.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/index.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/module-types.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/module-types.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/package.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/package.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/plugins.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/plugins.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/types.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/types.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/utils.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/files\/utils.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/config-api.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/config-api.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/deep-array.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/deep-array.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/environment.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/helpers\/environment.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/option-assertions.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/option-assertions.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/options.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/options.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/plugins.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/plugins.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/removed.js\nfrontend\/node_modules\/@babel\/core\/lib\/config\/validation\/removed.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/errors\/\nfrontend\/node_modules\/@babel\/core\/lib\/errors\/config-error.js\nfrontend\/node_modules\/@babel\/core\/lib\/errors\/config-error.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/errors\/rewrite-stack-trace.js\nfrontend\/node_modules\/@babel\/core\/lib\/errors\/rewrite-stack-trace.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/async.js\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/async.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/fs.js\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/fs.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/functional.js\nfrontend\/node_modules\/@babel\/core\/lib\/gensync-utils\/functional.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/index.js\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/index.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/util\/\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/util\/missing-plugin-helper.js\nfrontend\/node_modules\/@babel\/core\/lib\/parser\/util\/missing-plugin-helper.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/tools\/\nfrontend\/node_modules\/@babel\/core\/lib\/tools\/build-external-helpers.js\nfrontend\/node_modules\/@babel\/core\/lib\/tools\/build-external-helpers.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/block-hoist-plugin.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/block-hoist-plugin.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/index.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/index.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/normalize-file.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/normalize-file.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/normalize-opts.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/normalize-opts.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/plugin-pass.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/plugin-pass.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/babel-7-helpers.cjs\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/babel-7-helpers.cjs.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/file.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/file.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/generate.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/generate.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/merge-map.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/file\/merge-map.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/util\/\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/util\/clone-deep.js\nfrontend\/node_modules\/@babel\/core\/lib\/transformation\/util\/clone-deep.js.map\nfrontend\/node_modules\/@babel\/core\/lib\/vendor\/\nfrontend\/node_modules\/@babel\/core\/lib\/vendor\/import-meta-resolve.js\nfrontend\/node_modules\/@babel\/core\/lib\/vendor\/import-meta-resolve.js.map\nfrontend\/node_modules\/@babel\/core\/src\/\nfrontend\/node_modules\/@babel\/core\/src\/transform-file-browser.ts\nfrontend\/node_modules\/@babel\/core\/src\/transform-file.ts\nfrontend\/node_modules\/@babel\/core\/src\/config\/\nfrontend\/node_modules\/@babel\/core\/src\/config\/resolve-targets-browser.ts\nfrontend\/node_modules\/@babel\/core\/src\/config\/resolve-targets.ts\nfrontend\/node_modules\/@babel\/core\/src\/config\/files\/\nfrontend\/node_modules\/@babel\/core\/src\/config\/files\/index-browser.ts\nfrontend\/node_modules\/@babel\/core\/src\/config\/files\/index.ts\nfrontend\/node_modules\/@babel\/generator\/\nfrontend\/node_modules\/@babel\/generator\/LICENSE\nfrontend\/node_modules\/@babel\/generator\/README.md\nfrontend\/node_modules\/@babel\/generator\/package.json\nfrontend\/node_modules\/@babel\/generator\/lib\/\nfrontend\/node_modules\/@babel\/generator\/lib\/buffer.js\nfrontend\/node_modules\/@babel\/generator\/lib\/buffer.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/index.js\nfrontend\/node_modules\/@babel\/generator\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/printer.js\nfrontend\/node_modules\/@babel\/generator\/lib\/printer.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/source-map.js\nfrontend\/node_modules\/@babel\/generator\/lib\/source-map.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/token-map.js\nfrontend\/node_modules\/@babel\/generator\/lib\/token-map.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/base.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/base.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/classes.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/classes.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/deprecated.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/deprecated.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/expressions.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/expressions.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/flow.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/flow.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/index.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/index.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/jsx.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/jsx.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/methods.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/methods.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/modules.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/modules.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/statements.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/statements.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/template-literals.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/template-literals.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/types.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/types.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/typescript.js\nfrontend\/node_modules\/@babel\/generator\/lib\/generators\/typescript.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/index.js\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/index.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/parentheses.js\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/parentheses.js.map\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/whitespace.js\nfrontend\/node_modules\/@babel\/generator\/lib\/node\/whitespace.js.map\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/LICENSE\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/README.md\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/package.json\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/lib\/\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-annotate-as-pure\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/LICENSE\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/README.md\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/package.json\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/debug.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/debug.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/filter-items.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/filter-items.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/options.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/options.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/pretty.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/pretty.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/targets.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/targets.js.map\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/utils.js\nfrontend\/node_modules\/@babel\/helper-compilation-targets\/lib\/utils.js.map\nfrontend\/node_modules\/@babel\/helper-globals\/\nfrontend\/node_modules\/@babel\/helper-globals\/LICENSE\nfrontend\/node_modules\/@babel\/helper-globals\/README.md\nfrontend\/node_modules\/@babel\/helper-globals\/package.json\nfrontend\/node_modules\/@babel\/helper-globals\/data\/\nfrontend\/node_modules\/@babel\/helper-globals\/data\/browser-upper.json\nfrontend\/node_modules\/@babel\/helper-globals\/data\/builtin-lower.json\nfrontend\/node_modules\/@babel\/helper-globals\/data\/builtin-upper.json\nfrontend\/node_modules\/@babel\/helper-module-imports\/\nfrontend\/node_modules\/@babel\/helper-module-imports\/LICENSE\nfrontend\/node_modules\/@babel\/helper-module-imports\/README.md\nfrontend\/node_modules\/@babel\/helper-module-imports\/package.json\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/import-builder.js\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/import-builder.js.map\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/import-injector.js\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/import-injector.js.map\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/is-module.js\nfrontend\/node_modules\/@babel\/helper-module-imports\/lib\/is-module.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/\nfrontend\/node_modules\/@babel\/helper-module-transforms\/LICENSE\nfrontend\/node_modules\/@babel\/helper-module-transforms\/README.md\nfrontend\/node_modules\/@babel\/helper-module-transforms\/package.json\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/dynamic-import.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/dynamic-import.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/get-module-name.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/get-module-name.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/lazy-modules.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/lazy-modules.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/normalize-and-load-metadata.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/normalize-and-load-metadata.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/rewrite-live-references.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/rewrite-live-references.js.map\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/rewrite-this.js\nfrontend\/node_modules\/@babel\/helper-module-transforms\/lib\/rewrite-this.js.map\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/LICENSE\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/README.md\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/package.json\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/lib\/\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-plugin-utils\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-string-parser\/\nfrontend\/node_modules\/@babel\/helper-string-parser\/LICENSE\nfrontend\/node_modules\/@babel\/helper-string-parser\/README.md\nfrontend\/node_modules\/@babel\/helper-string-parser\/package.json\nfrontend\/node_modules\/@babel\/helper-string-parser\/lib\/\nfrontend\/node_modules\/@babel\/helper-string-parser\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-string-parser\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/LICENSE\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/README.md\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/package.json\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/identifier.js\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/identifier.js.map\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/keyword.js\nfrontend\/node_modules\/@babel\/helper-validator-identifier\/lib\/keyword.js.map\nfrontend\/node_modules\/@babel\/helper-validator-option\/\nfrontend\/node_modules\/@babel\/helper-validator-option\/LICENSE\nfrontend\/node_modules\/@babel\/helper-validator-option\/README.md\nfrontend\/node_modules\/@babel\/helper-validator-option\/package.json\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/find-suggestion.js\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/find-suggestion.js.map\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/index.js\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/validator.js\nfrontend\/node_modules\/@babel\/helper-validator-option\/lib\/validator.js.map\nfrontend\/node_modules\/@babel\/helpers\/\nfrontend\/node_modules\/@babel\/helpers\/LICENSE\nfrontend\/node_modules\/@babel\/helpers\/README.md\nfrontend\/node_modules\/@babel\/helpers\/package.json\nfrontend\/node_modules\/@babel\/helpers\/lib\/\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers-generated.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers-generated.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/index.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/index.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/AwaitValue.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/AwaitValue.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/OverloadYield.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/OverloadYield.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecoratedDescriptor.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecoratedDescriptor.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2203.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2203.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2203R.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2203R.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2301.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2301.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2305.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2305.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2311.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/applyDecs2311.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayLikeToArray.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayLikeToArray.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayWithHoles.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayWithHoles.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayWithoutHoles.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/arrayWithoutHoles.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/assertClassBrand.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/assertClassBrand.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/assertThisInitialized.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/assertThisInitialized.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncGeneratorDelegate.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncGeneratorDelegate.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncIterator.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncIterator.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncToGenerator.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/asyncToGenerator.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/awaitAsyncGenerator.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/awaitAsyncGenerator.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/callSuper.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/callSuper.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/checkInRHS.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/checkInRHS.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/checkPrivateRedeclaration.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/checkPrivateRedeclaration.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorDestructureSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorDestructureSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorGet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorGet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classApplyDescriptorSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCallCheck.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCallCheck.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCheckPrivateStaticAccess.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCheckPrivateStaticAccess.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCheckPrivateStaticFieldDescriptor.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classCheckPrivateStaticFieldDescriptor.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classExtractFieldDescriptor.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classExtractFieldDescriptor.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classNameTDZError.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classNameTDZError.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldDestructureSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldDestructureSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldGet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldGet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldGet2.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldGet2.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldInitSpec.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldInitSpec.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldLooseBase.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldLooseBase.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldLooseKey.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldLooseKey.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldSet2.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateFieldSet2.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateGetter.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateGetter.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodGet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodGet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodInitSpec.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodInitSpec.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateMethodSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateSetter.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classPrivateSetter.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldDestructureSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldDestructureSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldSpecGet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldSpecGet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldSpecSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateFieldSpecSet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateMethodGet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateMethodGet.js.map\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateMethodSet.js\nfrontend\/node_modules\/@babel\/helpers\/lib\/helpers\/classStaticPrivateMethodSet.js.map\nfrontend\/node_modules\/@\n\n... [2508 lines truncated] ...",
+            "is_error" : false,
+            "tool_use_id" : "toolu_01MEqyACpASqd4GdDgsx1Ltm",
+            "type" : "tool_result"
+          }
+        ],
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:56.137Z",
+      "type" : "user",
+      "uuid" : "4b55de9c-5591-498f-823c-bb900adce2e9"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 335,
+      "message" : {
+        "content" : [
+          {
+            "id" : "toolu_01MEqyACpASqd4GdDgsx1Ltm",
+            "input" : {
+              "command" : "rsync -av --exclude='.git' \/Users\/brianly\/Projects\/cdev-agent\/ \/Users\/brianly\/Projects\/cdev\/",
+              "description" : "Copy all files except .git",
+              "timeout" : 60000
+            },
+            "name" : "Bash",
+            "type" : "tool_use"
+          }
+        ],
+        "id" : "msg_017oLZoMbgshZFnKQSdrWkKj",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 414
+          },
+          "cache_creation_input_tokens" : 414,
+          "cache_read_input_tokens" : 106857,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:42.020Z",
+      "type" : "assistant",
+      "uuid" : "d0052053-7d42-4943-a95f-88c31f957909"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 334,
+      "message" : {
+        "content" : [
+          {
+            "signature" : "EuYCCkYIChgCKkBGSR95R5aG7POOylts2QtUOQqqxtjEKp84Ibe1xIyBi9Za7+IRI+ofsa4O4fYstzloxDAvtWdtT5C9uv7M0arqEgyvg4B1zDtNHEtvVW8aDJogv5oCcBlo1YtWGiIwTikZgqbbfLRBrYRXXZu4lOLmuEd3IbJrydH7jNL6O7\/qfL2J43ZaZbdmqXBWasahKs0BbHGKOHUQWz0fKWJyBEOVpvoQvyphlpJBVlsifDZVyC+Ffp0mUMS7YSl+nTqw6OvuFHo+3pSVfLmQG4UsTp0Nl3UDrzPhxLQFUjXfLqv4XdfDPn4gdzdVvZ+COnQAIVU+w5rKb5hsipHhS9LQlZmz0ItV16hZrJgYkayGT0rbhDVeY3YIdN8bLwsp9B9J\/h08k2CDtCRfqyUllKnPzN\/EG+VA4jOpWsiaHKI7C2PVhukIcYAC8wEcJdlumAE0+gWzflgrOX15fj9YEZKQpBgB",
+            "thinking" : "Good, the destination directory exists and has its own .git folder. I need to copy all files from cdev-agent to cdev, excluding the .git directory. I'll use rsync which is perfect for this.",
+            "type" : "thinking"
+          }
+        ],
+        "id" : "msg_017oLZoMbgshZFnKQSdrWkKj",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 414
+          },
+          "cache_creation_input_tokens" : 414,
+          "cache_read_input_tokens" : 106857,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:40.646Z",
+      "type" : "assistant",
+      "uuid" : "12f186a8-721a-4461-8bbf-8f36ef1da137"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 333,
+      "message" : {
+        "content" : [
+          {
+            "content" : "total 0\ndrwxr-xr-x@   3 brianly  staff    96 Dec 20 20:16 .\ndrwxr-xr-x  171 brianly  staff  5472 Dec 20 20:16 ..\ndrwxr-xr-x@   9 brianly  staff   288 Dec 20 20:16 .git",
+            "is_error" : false,
+            "tool_use_id" : "toolu_01XfPKxpXUCE6ou4BAfXpYhb",
+            "type" : "tool_result"
+          }
+        ],
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:36.300Z",
+      "type" : "user",
+      "uuid" : "ba3e2b6c-7c29-4a0e-8c33-ec7c254088cc"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 332,
+      "message" : {
+        "content" : [
+          {
+            "id" : "toolu_01XfPKxpXUCE6ou4BAfXpYhb",
+            "input" : {
+              "command" : "ls -la \/Users\/brianly\/Projects\/cdev\/ 2>\/dev\/null || echo \"Directory doesn't exist\"",
+              "description" : "Check destination directory"
+            },
+            "name" : "Bash",
+            "type" : "tool_use"
+          }
+        ],
+        "id" : "msg_01LpWartoqzSiaywT7vvygJv",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 91258
+          },
+          "cache_creation_input_tokens" : 91258,
+          "cache_read_input_tokens" : 15599,
+          "input_tokens" : 10,
+          "output_tokens" : 5,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:22.950Z",
+      "type" : "assistant",
+      "uuid" : "80e95b2f-5f47-4203-8390-05d6aaf786d3"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 331,
+      "message" : {
+        "content" : [
+          {
+            "signature" : "EoQECkYIChgCKkDv5IJdPHGkjEMljItTALKnmN1yVeoroNTuypRP0bv9E4rXffd2WhX03hmKNcKnmocZIUQ3kx73530XixFBsLQeEgxeHQNNjISHl8G5iTcaDCU0a8GoKmrzyuAT6iIwdGGix9fJ4\/uzO4cxf\/pKDhdlfOs7Andrw7hkBG1U1ZPMvP+c4\/B3xGAkyDjTrHk\/KusCZPvzbjVxokG7ihZZxU2DJl0NRZM3CtP58IgF49ztYUFhNesECQordC+m+y9wRTF7S7\/FjbhlUM553vZhGTaQASZzu54u\/oEfywz3IbTh+OLnKQmg4xLA9Y3rKI8CGQ8FVHDIvxqLO75i9QwbNmhvRHgcfMOLoL2MphdfdaYc0VAqEqviBPphWFITBOblyXSBDTSVPgAJZXX+gfoXGcVtlhmyi4Nq\/zODZEHOG4ybEZSHN1NIZwZOkA8fu4kYhhoylNkXkly7tH62874FWlAOxE1IWXRmXXO3cG373rUmWf6BkXYGEF2lYSogNpCjtW\/nufhtlpFV5guVK5vXe40IW68doH6MW7\/5nzl8ozZPf5dYjtvMNhzMWbmcT\/oXnGbobBOkIJGcxbRNB2T3MEX9jkeDZwnvoH+OMWznrJc5rZY\/Kz9y2RsMZpBVPxAiJ0vry\/ul\/3TcKl+bcE3fbUZeaQPXttEjM5rDdiyUGAE=",
+            "thinking" : "The user wants to move all files from \/Users\/brianly\/Projects\/cdev-agent to \/Users\/brianly\/Projects\/cdev, but exclude the .git directory because they're different git repositories.\n\nLet me do this carefully:\n1. First check what's in the destination directory\n2. Copy all files except .git from source to destination\n3. Verify the copy was successful",
+            "type" : "thinking"
+          }
+        ],
+        "id" : "msg_01LpWartoqzSiaywT7vvygJv",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 91258
+          },
+          "cache_creation_input_tokens" : 91258,
+          "cache_read_input_tokens" : 15599,
+          "input_tokens" : 10,
+          "output_tokens" : 5,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:21.768Z",
+      "type" : "assistant",
+      "uuid" : "a558a47c-cfa3-4bf1-b23b-a87e989e7147"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 330,
+      "message" : {
+        "content" : "then now I want you to move all files in this project to the \/Users\/brianly\/Projects\/cdev except the .git bro, because different git repo",
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:29:13.370Z",
+      "type" : "user",
+      "uuid" : "58efa20b-be4a-4fa8-b4a4-c457c00e4658"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 329,
+      "message" : {
+        "content" : [
+          {
+            "text" : "[Request interrupted by user]",
+            "type" : "text"
+          }
+        ],
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:28:50.791Z",
+      "type" : "user",
+      "uuid" : "f6adb6df-574f-490a-83d8-83985a6b549b"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 328,
+      "message" : {
+        "content" : "then now I want you to move all files in this project to the \/Users\/brianly\/Projects\/cdev",
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:28:47.173Z",
+      "type" : "user",
+      "uuid" : "b04e187a-416e-4117-a873-953397d5d90d"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 327,
+      "message" : {
+        "content" : [
+          {
+            "text" : "Done! Changes committed and pushed to GitHub.\n\n```\ncommit c313a55\nrefactor: reorganize .cdev-logs to .cdev directory structure\n\n- Rename .cdev-logs\/ to .cdev\/logs\/ for better organization\n- Add .cdev\/images\/ directory for future screenshot storage\n- Update .gitignore to ignore .cdev\/ directory\n- Update documentation to reflect new log path\n- Create directory structure on app startup\n\n8 files changed, 24 insertions(+), 9 deletions(-)\n```",
+            "type" : "text"
+          }
+        ],
+        "id" : "msg_01CBRFrkmT1DcmuHCihJyJYm",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 158
+          },
+          "cache_creation_input_tokens" : 158,
+          "cache_read_input_tokens" : 106346,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:28:02.722Z",
+      "type" : "assistant",
+      "uuid" : "3af531a8-74fd-49c3-b389-723902576996"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 326,
+      "message" : {
+        "content" : [
+          {
+            "signature" : "EsYBCkYIChgCKkD6jhhyLhtxkcH5liWCJ16nkAr9Ca161o3DpIZEcUFob76b3EJuQAVIUJ4TsWpLnJ3AeSA+x5h9LIsHCMrqmHJoEgwBIrTkNAG2lpr+OtYaDOWDuOiRieaC1gwuiyIwIYD3DEYw8sONI+leEzcTvy1u7Uvd8db2\/T+0PWbdEXS7CibSd52VrekXYFSNym65Ki4CxqQ80Mq6X6xqJ3WNKZ4yZoC6pln+XssgJqR0bIHtOJcFnVkuJ90Sq1TBwQNBGAE=",
+            "thinking" : "Successfully pushed to GitHub.",
+            "type" : "thinking"
+          }
+        ],
+        "id" : "msg_01CBRFrkmT1DcmuHCihJyJYm",
+        "model" : "claude-opus-4-5-20251101",
+        "role" : "assistant",
+        "stop_reason" : null,
+        "stop_sequence" : null,
+        "type" : "message",
+        "usage" : {
+          "cache_creation" : {
+            "ephemeral_1h_input_tokens" : 0,
+            "ephemeral_5m_input_tokens" : 158
+          },
+          "cache_creation_input_tokens" : 158,
+          "cache_read_input_tokens" : 106346,
+          "input_tokens" : 8,
+          "output_tokens" : 1,
+          "service_tier" : "standard"
+        }
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:28:01.189Z",
+      "type" : "assistant",
+      "uuid" : "df1b3e55-0fb4-4261-9015-04753b65ed93"
+    },
+    {
+      "git_branch" : "main",
+      "id" : 325,
+      "message" : {
+        "content" : [
+          {
+            "content" : "To github.com:brianly1003\/cdev-agent.git\n   2ee3097..c313a55  main -> main",
+            "is_error" : false,
+            "tool_use_id" : "toolu_01QEjDYBkirGXsXmZo3sqwnx",
+            "type" : "tool_result"
+          }
+        ],
+        "role" : "user"
+      },
+      "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+      "timestamp" : "2025-12-20T13:27:58.617Z",
+      "type" : "user",
+      "uuid" : "4700aa36-9181-4b85-a450-6aa7960561b4"
+    }
+  ],
+  "offset" : 0,
+  "query_time_ms" : 2.3050000000000002,
+  "session_id" : "f850a397-da79-41e3-a84f-697f331646f6",
+  "total" : 344
+}

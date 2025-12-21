@@ -41,16 +41,24 @@ type GitProvider interface {
 	Checkout(ctx context.Context, branch string) error
 }
 
-// GitStatusInfo represents git status information.
+// GitFileStatus represents a file in git status.
+type GitFileStatus struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+}
+
+// GitStatusInfo represents git status information matching HTTP API format.
 type GitStatusInfo struct {
-	Branch         string   `json:"branch"`
-	Ahead          int      `json:"ahead"`
-	Behind         int      `json:"behind"`
-	StagedCount    int      `json:"staged_count"`
-	UnstagedCount  int      `json:"unstaged_count"`
-	UntrackedCount int      `json:"untracked_count"`
-	HasConflicts   bool     `json:"has_conflicts"`
-	ChangedFiles   []string `json:"changed_files,omitempty"`
+	Branch     string          `json:"branch"`
+	Upstream   string          `json:"upstream,omitempty"`
+	Ahead      int             `json:"ahead"`
+	Behind     int             `json:"behind"`
+	Staged     []GitFileStatus `json:"staged"`
+	Unstaged   []GitFileStatus `json:"unstaged"`
+	Untracked  []GitFileStatus `json:"untracked"`
+	Conflicted []GitFileStatus `json:"conflicted"`
+	RepoName   string          `json:"repo_name"`
+	RepoRoot   string          `json:"repo_root"`
 }
 
 // BranchInfo represents information about a git branch.
