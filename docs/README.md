@@ -24,8 +24,9 @@ This directory contains all project documentation organized by category.
 docs/
 ├── README.md                  # This index file
 ├── api/                       # API & Integration docs
+│   ├── PROTOCOL.md            # Protocol specification (JSON-RPC 2.0 + legacy)
+│   ├── UNIFIED-API-SPEC.md    # JSON-RPC 2.0 method reference
 │   ├── API-REFERENCE.md       # Complete HTTP and WebSocket API
-│   ├── PROTOCOL.md            # Protocol specification
 │   ├── ELEMENTS-API.md        # Pre-parsed UI elements for mobile
 │   ├── WEBSOCKET-STABILITY.md # WebSocket connection stability guide
 │   └── REALTIME-CHAT-INTEGRATION.md
@@ -67,17 +68,19 @@ docs/
 
 | Document | Description |
 |----------|-------------|
-| [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - Events, commands, message formats |
+| [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - JSON-RPC 2.0 + legacy formats |
+| [api/UNIFIED-API-SPEC.md](./api/UNIFIED-API-SPEC.md) | **JSON-RPC 2.0 API** - Complete method reference with examples |
 | [api/API-REFERENCE.md](./api/API-REFERENCE.md) | Complete HTTP and WebSocket API documentation |
 | [api/ELEMENTS-API.md](./api/ELEMENTS-API.md) | Pre-parsed UI elements for rich mobile rendering |
 | [api/WEBSOCKET-STABILITY.md](./api/WEBSOCKET-STABILITY.md) | WebSocket connection stability and heartbeat |
 | [api/REALTIME-CHAT-INTEGRATION.md](./api/REALTIME-CHAT-INTEGRATION.md) | Real-time chat integration guide |
 | [Swagger UI](http://localhost:8766/swagger/) | Interactive API explorer (when agent is running) |
+| [OpenRPC Discovery](http://localhost:8766/api/rpc/discover) | JSON-RPC 2.0 method discovery (when agent is running) |
 
 **Key Topics:**
-- Protocol specification and versioning
+- JSON-RPC 2.0 protocol (recommended) and legacy command format
 - HTTP endpoints (`/api/claude/*`, `/api/git/*`, `/api/repository/*`, `/api/images/*`)
-- WebSocket events and commands
+- WebSocket events and commands (`ws://localhost:8766/ws`)
 - Session management (new/continue)
 - Permission and interactive prompt handling
 - Image upload API
@@ -165,8 +168,9 @@ docs/
 
 | Document | Category | Version | Status |
 |----------|----------|---------|--------|
+| PROTOCOL.md | api | 2.0.0 | Current |
+| UNIFIED-API-SPEC.md | api | 1.0 | Current |
 | API-REFERENCE.md | api | 1.1 | Current |
-| PROTOCOL.md | api | 1.0.0-draft | Draft |
 | ELEMENTS-API.md | api | 1.0 | Current |
 | WEBSOCKET-STABILITY.md | api | 1.0 | Current |
 | ARCHITECTURE.md | architecture | 1.0 | Current |

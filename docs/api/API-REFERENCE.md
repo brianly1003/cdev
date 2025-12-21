@@ -4,9 +4,15 @@ This document provides a complete API reference for mobile app developers and in
 
 ## Overview
 
-cdev exposes two communication channels:
+cdev exposes a unified server on a single port:
 - **HTTP API** (`http://127.0.0.1:8766`) - Request/response operations
-- **WebSocket** (`ws://127.0.0.1:8765`) - Real-time event streaming and commands
+- **WebSocket** (`ws://127.0.0.1:8766/ws`) - Real-time event streaming and commands
+
+### Protocol Support
+
+The WebSocket endpoint supports two protocols:
+- **JSON-RPC 2.0** (recommended) - Standard protocol with request/response correlation. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md) for complete method reference.
+- **Legacy commands** (deprecated) - Original command format, will be removed in v3.0
 
 ## Authentication
 
@@ -1027,12 +1033,14 @@ Triggers a full re-index of the repository (runs in background).
 
 ## WebSocket API
 
-Connect to `ws://127.0.0.1:8765` for real-time events and commands.
+Connect to `ws://127.0.0.1:8766/ws` for real-time events and commands.
+
+> **Note:** For JSON-RPC 2.0 protocol examples, see [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md). The legacy command format documented below is deprecated and will be removed in v3.0.
 
 ### Connection
 
 ```javascript
-const ws = new WebSocket('ws://127.0.0.1:8765');
+const ws = new WebSocket('ws://127.0.0.1:8766/ws');
 
 ws.onopen = () => {
   console.log('Connected to cdev');
@@ -1044,7 +1052,9 @@ ws.onmessage = (event) => {
 };
 ```
 
-### Sending Commands
+### Sending Commands (Legacy Format)
+
+> **Deprecated:** Use JSON-RPC 2.0 format instead. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md).
 
 Commands are sent as JSON objects:
 
@@ -2048,7 +2058,7 @@ heartbeatTimer = setInterval(() => {
   }
 }, 5000);
 
-await client.connect('ws://127.0.0.1:8765');
+await client.connect('ws://127.0.0.1:8766/ws');
 client.startClaude('Create a hello world function');
 ```
 

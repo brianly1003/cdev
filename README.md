@@ -65,8 +65,8 @@ cdev start
 # Start with specific repository
 cdev start --repo /path/to/project
 
-# Start with custom ports
-cdev start --ws-port 8765 --http-port 8766
+# Start with custom port
+cdev start --port 8766
 
 # Start with verbose logging
 cdev start -v
@@ -78,8 +78,7 @@ Create a `config.yaml` file (see `configs/config.example.yaml`):
 
 ```yaml
 server:
-  websocket_port: 8765
-  http_port: 8766
+  port: 8766           # Single unified port (HTTP + WebSocket)
   host: "127.0.0.1"
 
 repository:
@@ -102,7 +101,7 @@ Configuration is loaded from:
 
 Environment variables override config file values (prefix: `CDEV_`):
 ```bash
-export CDEV_SERVER_WEBSOCKET_PORT=9000
+export CDEV_SERVER_PORT=8766
 ```
 
 ## API
@@ -120,7 +119,11 @@ The OpenAPI 3.0 spec is also available at:
 
 ### WebSocket API
 
-Connect to `ws://localhost:8765` for real-time events.
+Connect to `ws://localhost:8766/ws` for real-time events and commands.
+
+**Protocol Support:**
+- **JSON-RPC 2.0** (recommended) - Standard protocol with request/response correlation
+- **Legacy commands** (deprecated) - Original command format, will be removed in v3.0
 
 **Events received:**
 - `session_start` - When connected
@@ -130,8 +133,28 @@ Connect to `ws://localhost:8765` for real-time events.
 - `claude_permission` - Claude is requesting permission for a tool (Write, Edit, Bash, etc.)
 - `file_changed` - File modifications
 - `git_diff` - Git diff content
+- `heartbeat` - Server health check (every 30s)
 
-**Commands to send:**
+**JSON-RPC 2.0 Commands (Recommended):**
+```json
+// Start new conversation
+{"jsonrpc": "2.0", "id": 1, "method": "agent/run", "params": {"prompt": "Your prompt here"}}
+
+// Continue a specific session
+{"jsonrpc": "2.0", "id": 2, "method": "agent/run", "params": {"prompt": "Continue with...", "mode": "continue", "session_id": "550e8400-..."}}
+
+// Stop agent
+{"jsonrpc": "2.0", "id": 3, "method": "agent/stop"}
+
+// Get status
+{"jsonrpc": "2.0", "id": 4, "method": "status/get"}
+
+// Git operations
+{"jsonrpc": "2.0", "id": 5, "method": "git/status"}
+{"jsonrpc": "2.0", "id": 6, "method": "git/stage", "params": {"paths": ["src/main.ts"]}}
+```
+
+**Legacy Commands (Deprecated):**
 ```json
 // Start new conversation (default)
 {"command": "run_claude", "payload": {"prompt": "Your prompt here"}}
@@ -274,7 +297,7 @@ make build-all
 
 ```
 cdev/
-├── cmd/cdev/          # CLI entry point
+├── cmd/cdev/                # CLI entry point
 ├── internal/
 │   ├── app/                 # Application orchestration
 │   ├── config/              # Configuration management
@@ -285,9 +308,17 @@ cdev/
 │   ├── adapters/            # External system adapters
 │   │   ├── claude/          # Claude CLI adapter
 │   │   ├── watcher/         # File system watcher
-│   │   └── git/             # Git tracker
+│   │   ├── git/             # Git tracker
+│   │   └── sessioncache/    # Session message cache (SQLite)
 │   ├── hub/                 # Event hub
-│   └── server/              # WebSocket & HTTP servers
+│   ├── rpc/                 # JSON-RPC 2.0 layer
+│   │   ├── transport/       # WebSocket & stdio transports
+│   │   ├── message/         # JSON-RPC message types
+│   │   └── handler/         # Method registry & dispatcher
+│   │       └── methods/     # RPC method implementations
+│   └── server/
+│       ├── unified/         # Unified server (HTTP + WebSocket on single port)
+│       └── http/            # HTTP-only endpoints
 ├── pkg/protocol/            # Public protocol types
 ├── configs/                 # Configuration examples
 └── test/                    # Integration tests
@@ -305,16 +336,21 @@ cdev/
 | Claude Manager | ✅ Done | Process spawning, bidirectional streaming, interactive prompt handling |
 | Session Continuity | ✅ Done | Continue conversations with `new`/`continue` modes |
 | File Watcher | ✅ Done | fsnotify integration with debouncing |
-| Git Tracker | ✅ Done | Git CLI wrapper for status/diff |
+| Git Tracker | ✅ Done | Git CLI wrapper for status/diff/stage/commit/push/pull |
 | WebSocket Server | ✅ Done | Real-time event streaming with Hub pattern |
 | QR Code Generator | ✅ Done | Terminal QR code display for mobile pairing |
+| **JSON-RPC 2.0** | ✅ Done | Unified protocol with agent-agnostic methods |
+| **Unified Server** | ✅ Done | Single port (8766) serving HTTP + WebSocket |
+| **OpenRPC Discovery** | ✅ Done | Auto-generated API spec at `/api/rpc/discover` |
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
+| [docs/api/PROTOCOL.md](./docs/api/PROTOCOL.md) | Protocol specification (JSON-RPC 2.0 + legacy) |
+| [docs/api/UNIFIED-API-SPEC.md](./docs/api/UNIFIED-API-SPEC.md) | JSON-RPC 2.0 API specification with examples |
+| [docs/api/API-REFERENCE.md](./docs/api/API-REFERENCE.md) | Complete HTTP/WebSocket API for mobile integration |
 | [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Detailed architecture and technical specification |
-| [docs/api/API-REFERENCE.md](./docs/api/API-REFERENCE.md) | Complete API documentation for mobile integration |
 | [docs/architecture/DESIGN-SPEC.md](./docs/architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
 | [docs/security/TECHNICAL-REVIEW.md](./docs/security/TECHNICAL-REVIEW.md) | Security & performance analysis with roadmap |
 | [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) | Product backlog with prioritized work items |
