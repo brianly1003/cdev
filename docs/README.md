@@ -8,11 +8,46 @@ This directory contains all project documentation organized by category.
 
 | I need to... | Read this |
 |--------------|-----------|
-| Integrate with the API | [API-REFERENCE.md](./API-REFERENCE.md) |
-| Understand the protocol | [PROTOCOL.md](./PROTOCOL.md) |
-| Understand the architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Review security concerns | [SECURITY.md](./SECURITY.md) |
-| See planned work | [BACKLOG.md](./BACKLOG.md) |
+| Integrate with the API | [api/API-REFERENCE.md](./api/API-REFERENCE.md) |
+| Understand the protocol | [api/PROTOCOL.md](./api/PROTOCOL.md) |
+| Understand the architecture | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) |
+| Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
+| See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
+| **Integrate with VS Code** | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) |
+| **Acquisition strategy** | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) |
+
+---
+
+## Directory Structure
+
+```
+docs/
+├── README.md                  # This index file
+├── api/                       # API & Integration docs
+│   ├── API-REFERENCE.md       # Complete HTTP and WebSocket API
+│   ├── PROTOCOL.md            # Protocol specification
+│   ├── ELEMENTS-API.md        # Pre-parsed UI elements for mobile
+│   ├── WEBSOCKET-STABILITY.md # WebSocket connection stability guide
+│   └── REALTIME-CHAT-INTEGRATION.md
+├── architecture/              # Architecture & Design docs
+│   ├── ARCHITECTURE.md        # Technical architecture
+│   ├── DESIGN-SPEC.md         # Design specification with status
+│   ├── REPOSITORY-INDEXER.md  # File search/browsing API
+│   ├── DESKTOP-APP-DESIGN.md  # Desktop app design spec
+│   ├── ACQUISITION-READY-ARCHITECTURE.md  # Acquisition strategy
+│   ├── VSCODE-INTEGRATION-STRATEGY.md     # VS Code integration guide
+│   └── TRANSPORT-ARCHITECTURE-ANALYSIS.md # WebSocket vs HTTP analysis
+├── security/                  # Security docs
+│   ├── SECURITY.md            # Security guidelines & threat model
+│   ├── TECHNICAL-REVIEW.md    # Security analysis
+│   └── IMAGE-UPLOAD-SECURITY-ANALYSIS.md
+├── guides/                    # Guides & Testing docs
+│   ├── POC-TESTING-GUIDE.md   # POC testing guide
+│   └── CLAUDE-CLI.md          # Claude CLI reference
+└── planning/                  # Project Management docs
+    ├── BACKLOG.md             # Product backlog
+    └── STRATEGIC-ROADMAP.md   # Strategic roadmap
+```
 
 ---
 
@@ -32,19 +67,20 @@ This directory contains all project documentation organized by category.
 
 | Document | Description |
 |----------|-------------|
-| [PROTOCOL.md](./PROTOCOL.md) | **Protocol specification** - Events, commands, message formats |
-| [API-REFERENCE.md](./API-REFERENCE.md) | Complete HTTP and WebSocket API documentation |
-| [REPOSITORY-INDEXER.md](./REPOSITORY-INDEXER.md) | File search and browsing API with iOS examples |
-| [ELEMENTS-API.md](./ELEMENTS-API.md) | Pre-parsed UI elements for rich mobile rendering |
+| [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - Events, commands, message formats |
+| [api/API-REFERENCE.md](./api/API-REFERENCE.md) | Complete HTTP and WebSocket API documentation |
+| [api/ELEMENTS-API.md](./api/ELEMENTS-API.md) | Pre-parsed UI elements for rich mobile rendering |
+| [api/WEBSOCKET-STABILITY.md](./api/WEBSOCKET-STABILITY.md) | WebSocket connection stability and heartbeat |
+| [api/REALTIME-CHAT-INTEGRATION.md](./api/REALTIME-CHAT-INTEGRATION.md) | Real-time chat integration guide |
 | [Swagger UI](http://localhost:8766/swagger/) | Interactive API explorer (when agent is running) |
 
 **Key Topics:**
 - Protocol specification and versioning
-- HTTP endpoints (`/api/claude/*`, `/api/git/*`, `/api/repository/*`)
+- HTTP endpoints (`/api/claude/*`, `/api/git/*`, `/api/repository/*`, `/api/images/*`)
 - WebSocket events and commands
-- Session management (new/continue/resume)
+- Session management (new/continue)
 - Permission and interactive prompt handling
-- Repository file search and browsing
+- Image upload API
 
 ---
 
@@ -53,15 +89,22 @@ This directory contains all project documentation organized by category.
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical architecture and component design |
-| [DESIGN-SPEC.md](./DESIGN-SPEC.md) | Original design specification with implementation status |
+| [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) | Technical architecture and component design |
+| [architecture/DESIGN-SPEC.md](./architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
+| [architecture/REPOSITORY-INDEXER.md](./architecture/REPOSITORY-INDEXER.md) | File search and browsing API with iOS examples |
+| [architecture/DESKTOP-APP-DESIGN.md](./architecture/DESKTOP-APP-DESIGN.md) | Desktop app design specification |
+| [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) | **Strategy** - Making cdev acquisition-ready for VS Code/Microsoft |
+| [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) | **Strategy** - Detailed VS Code integration and JSON-RPC 2.0 migration |
+| [architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md](./architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md) | **Analysis** - WebSocket vs HTTP dual-protocol evaluation |
 
 **Key Topics:**
 - Hexagonal architecture (ports & adapters)
 - Event hub pattern
 - Component interactions
 - Cross-platform considerations
-- Protocol specification
+- JSON-RPC 2.0 protocol alignment (LSP-compatible)
+- VS Code extension architecture
+- Acquisition readiness and multi-IDE support
 
 ---
 
@@ -70,37 +113,44 @@ This directory contains all project documentation organized by category.
 
 | Document | Description |
 |----------|-------------|
-| [SECURITY.md](./SECURITY.md) | Security guidelines, threat model, and best practices |
-| [TECHNICAL-REVIEW.md](./TECHNICAL-REVIEW.md) | Security analysis with specific vulnerabilities |
+| [security/SECURITY.md](./security/SECURITY.md) | Security guidelines, threat model, and best practices |
+| [security/TECHNICAL-REVIEW.md](./security/TECHNICAL-REVIEW.md) | Security analysis with specific vulnerabilities |
+| [security/IMAGE-UPLOAD-SECURITY-ANALYSIS.md](./security/IMAGE-UPLOAD-SECURITY-ANALYSIS.md) | Image upload security analysis and fixes |
 
 **Key Topics:**
 - Current security posture
 - Known vulnerabilities and fixes
 - Configuration best practices
-- Incident response
+- Image upload security
 
 ---
 
-### 5. Project Management & Strategy
+### 5. Guides & Testing
+*For testing and development*
+
+| Document | Description |
+|----------|-------------|
+| [guides/POC-TESTING-GUIDE.md](./guides/POC-TESTING-GUIDE.md) | POC testing guide with examples |
+| [guides/CLAUDE-CLI.md](./guides/CLAUDE-CLI.md) | Claude CLI reference and flags |
+
+---
+
+### 6. Project Management & Strategy
 *For planning, tracking, and strategic direction*
 
 | Document | Description |
 |----------|-------------|
-| [STRATEGIC-ROADMAP.md](./STRATEGIC-ROADMAP.md) | Strategic technology roadmap and scaling plan |
-| [BACKLOG.md](./BACKLOG.md) | Product backlog with prioritized work items |
-| [TECHNICAL-REVIEW.md](./TECHNICAL-REVIEW.md) | Technical review with roadmap |
+| [planning/STRATEGIC-ROADMAP.md](./planning/STRATEGIC-ROADMAP.md) | Strategic technology roadmap and scaling plan |
+| [planning/BACKLOG.md](./planning/BACKLOG.md) | Product backlog with prioritized work items |
 
 **Key Topics:**
-- Strategic roadmap (Production → Protocol → Cloud → Enterprise)
+- Strategic roadmap (Production -> Protocol -> Cloud -> Enterprise)
 - Core technology assets and ownership
-- Competitive analysis and moat building
-- Monetization strategy
-- Phased roadmap (Security → Testing → Performance → Production)
 - Prioritized backlog items
 
 ---
 
-### 6. Operations & Deployment
+### 7. Operations & Deployment
 *For production deployment* (Planned)
 
 | Document | Status |
@@ -113,19 +163,26 @@ This directory contains all project documentation organized by category.
 
 ## Document Status
 
-| Document | Version | Status | Last Updated |
-|----------|---------|--------|--------------|
-| README.md | 1.0 | Current | Dec 2025 |
-| PROTOCOL.md | 1.0.0-draft | Draft | Dec 2025 |
-| API-REFERENCE.md | 1.1 | Current | Dec 2025 |
-| REPOSITORY-INDEXER.md | 1.0 | Current | Dec 2025 |
-| ELEMENTS-API.md | 1.0 | Current | Dec 2025 |
-| ARCHITECTURE.md | 1.0 | Current | Dec 2025 |
-| DESIGN-SPEC.md | 1.0 | Current | Dec 2025 |
-| SECURITY.md | 1.0 | Draft | Dec 2025 |
-| STRATEGIC-ROADMAP.md | 1.0 | Active | Dec 2025 |
-| BACKLOG.md | 1.0 | Active | Dec 2025 |
-| TECHNICAL-REVIEW.md | 1.0 | Current | Dec 2025 |
+| Document | Category | Version | Status |
+|----------|----------|---------|--------|
+| API-REFERENCE.md | api | 1.1 | Current |
+| PROTOCOL.md | api | 1.0.0-draft | Draft |
+| ELEMENTS-API.md | api | 1.0 | Current |
+| WEBSOCKET-STABILITY.md | api | 1.0 | Current |
+| ARCHITECTURE.md | architecture | 1.0 | Current |
+| DESIGN-SPEC.md | architecture | 1.0 | Current |
+| REPOSITORY-INDEXER.md | architecture | 1.0 | Current |
+| DESKTOP-APP-DESIGN.md | architecture | 1.0 | Current |
+| ACQUISITION-READY-ARCHITECTURE.md | architecture | 1.0 | Active |
+| VSCODE-INTEGRATION-STRATEGY.md | architecture | 1.0 | Active |
+| TRANSPORT-ARCHITECTURE-ANALYSIS.md | architecture | 1.0 | Active |
+| SECURITY.md | security | 1.0 | Draft |
+| TECHNICAL-REVIEW.md | security | 1.0 | Current |
+| IMAGE-UPLOAD-SECURITY-ANALYSIS.md | security | 1.0 | Current |
+| POC-TESTING-GUIDE.md | guides | 1.0 | Current |
+| CLAUDE-CLI.md | guides | 1.0 | Current |
+| STRATEGIC-ROADMAP.md | planning | 1.0 | Active |
+| BACKLOG.md | planning | 1.0 | Active |
 
 ---
 
@@ -135,23 +192,13 @@ This directory contains all project documentation organized by category.
 - Use `UPPERCASE-KEBAB-CASE.md` for documentation files
 - Use lowercase for code-related files
 
-### Content Structure
-1. Title and metadata (version, date, status)
-2. Executive summary or overview
-3. Main content with clear sections
-4. References and links
+### Folder Structure
+- `api/` - API documentation for integrators
+- `architecture/` - Technical architecture for contributors
+- `security/` - Security documentation
+- `guides/` - How-to guides and tutorials
+- `planning/` - Project management docs
 
 ### Updates
-- Update "Last Updated" when making changes
-- Increment version for significant changes
+- Update document status when making changes
 - Keep BACKLOG.md synchronized with actual work
-
----
-
-## Contributing to Documentation
-
-1. Follow existing document structure
-2. Keep language concise and technical
-3. Include code examples where helpful
-4. Update the index when adding new documents
-5. Mark document status (Draft, Current, Deprecated)

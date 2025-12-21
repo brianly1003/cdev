@@ -48,7 +48,7 @@ This is the **crown jewel** - a production-grade remote control system for Claud
 | Stream-JSON Protocol | Real-time parsing of Claude's streaming output |
 | Permission Interception | Catch tool use requests before execution |
 | Interactive Prompts | Handle AskUserQuestion tool via mobile |
-| Session Continuity | Support `new`, `continue`, `resume` modes |
+| Session Continuity | Support `new`, `continue` modes |
 | Cross-Platform | Unix SIGTERM/SIGKILL vs Windows taskkill |
 
 **Why It Matters:** No one else has published a production-grade remote control system for Claude Code. This is genuinely novel.

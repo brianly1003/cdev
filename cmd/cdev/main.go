@@ -25,6 +25,10 @@
 //	@tag.description	Git operations endpoints
 //	@tag.name			file
 //	@tag.description	File operations endpoints
+//	@tag.name			images
+//	@tag.description	Image upload and management for Claude vision analysis
+//	@tag.name			repository
+//	@tag.description	Repository file browsing, search, and indexing
 package main
 
 import (

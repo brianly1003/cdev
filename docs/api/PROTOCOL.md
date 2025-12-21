@@ -485,8 +485,8 @@ Start Claude with a prompt.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | The prompt to send to Claude |
-| `mode` | string | No | `new`, `continue`, or `resume` (default: `new`) |
-| `session_id` | string | No | Required for `continue` and `resume` modes |
+| `mode` | string | No | `new` or `continue` (default: `new`) |
+| `session_id` | string | No | Required when mode is `continue` |
 
 ### `stop_claude`
 

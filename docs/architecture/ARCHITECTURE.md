@@ -790,13 +790,12 @@ Claude Code CLI stores conversation sessions in a directory structure organized 
 
 ### 6.2 Session Modes
 
-cdev supports three session modes when starting Claude:
+cdev supports two session modes when starting Claude:
 
 | Mode | CLI Flag | Description | Use Case |
 |------|----------|-------------|----------|
 | `new` | (none) | Start a fresh conversation | New tasks, clean context |
-| `continue` | `--continue` | Continue the most recent conversation | Follow-up questions |
-| `resume` | `--resume <id>` | Resume a specific session by UUID | Return to specific conversation |
+| `continue` | `--resume <id>` | Continue a specific session by UUID | Return to specific conversation |
 
 ### 6.3 Session Flow Diagram
 
@@ -815,7 +814,7 @@ cdev supports three session modes when starting Claude:
        │◄────────────────────────────────│                                 │
        │                                 │                                 │
        │ POST /api/claude/run            │                                 │
-       │ { mode: "resume",               │                                 │
+       │ { mode: "continue",             │                                 │
        │   session_id: "bd2d..." }       │                                 │
        │────────────────────────────────►│                                 │
        │                                 │                                 │
@@ -850,7 +849,7 @@ Claude CLI takes several seconds to initialize before outputting any JSON. Block
 3. Response returned immediately (session_id may be empty)
 4. Claude outputs initial JSON with session_id
 5. cdev parses and broadcasts `claude_session_info` event via WebSocket
-6. Mobile app receives session_id for future resume operations
+6. Mobile app receives session_id for future continue operations
 
 ### 6.5 Session Listing API
 

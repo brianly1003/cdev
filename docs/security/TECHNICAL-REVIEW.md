@@ -336,7 +336,7 @@ func NewRotatingLogger(filename string) *RotatingLogger {
 ```go
 type RunClaudeRequest struct {
     Prompt    string `json:"prompt" validate:"required,min=1,max=5000"`
-    Mode      string `json:"mode" validate:"omitempty,oneof=new continue resume"`
+    Mode      string `json:"mode" validate:"omitempty,oneof=new continue"`
     SessionID string `json:"session_id" validate:"omitempty,uuid4"`
 }
 

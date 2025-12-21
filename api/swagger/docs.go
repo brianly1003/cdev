@@ -878,6 +878,194 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/images": {
+            "get": {
+                "description": "Returns list of all stored images or details of a specific image by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "List images",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Image ID to get specific image details",
+                        "name": "id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.ImageListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Image not found",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Image storage not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Upload an image for Claude to analyze (JPEG, PNG, GIF, WebP, max 10MB)",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Upload image",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Image file (JPEG, PNG, GIF, WebP, max 10MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.ImageUploadResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or missing file",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Image too large",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported media type",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Image storage not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/images/all": {
+            "delete": {
+                "description": "Removes all stored images",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Clear all images",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "503": {
+                        "description": "Image storage not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/images/stats": {
+            "get": {
+                "description": "Returns current storage statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Get image storage stats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.ImageStatsResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Image storage not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/images/validate": {
+            "get": {
+                "description": "Validates that an image path is safe and accessible",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Validate image path",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Image path to validate",
+                        "name": "path",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.ImageValidateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid path",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/repository/files/list": {
             "get": {
                 "description": "Returns a paginated list of files in a directory with filtering and sorting options",
@@ -1699,6 +1887,141 @@ const docTemplate = `{
                 }
             }
         },
+        "http.ImageInfoResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "example": 1705317000
+                },
+                "expires_at": {
+                    "type": "integer",
+                    "example": 1705320600
+                },
+                "id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "local_path": {
+                    "type": "string",
+                    "example": ".cdev/images/img_abc123def456.jpg"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "example": "image/jpeg"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 102400
+                }
+            }
+        },
+        "http.ImageListResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/http.ImageInfoResponse"
+                    }
+                },
+                "max_images": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "max_total_size_mb": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "total_size_bytes": {
+                    "type": "integer",
+                    "example": 512000
+                }
+            }
+        },
+        "http.ImageStatsResponse": {
+            "type": "object",
+            "properties": {
+                "can_accept_upload": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "image_count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "max_images": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "max_single_size_mb": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "max_total_size_mb": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "reason": {
+                    "type": "string",
+                    "example": ""
+                },
+                "total_size_bytes": {
+                    "type": "integer",
+                    "example": 512000
+                }
+            }
+        },
+        "http.ImageUploadResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "integer",
+                    "example": 1705320600
+                },
+                "id": {
+                    "type": "string",
+                    "example": "abc123def456"
+                },
+                "local_path": {
+                    "type": "string",
+                    "example": ".cdev/images/img_abc123def456.jpg"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "example": "image/jpeg"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 102400
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "http.ImageValidateResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "invalid path: path traversal not allowed"
+                },
+                "path": {
+                    "type": "string",
+                    "example": ".cdev/images/img_abc123.jpg"
+                },
+                "valid": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "http.RespondToClaudeRequest": {
             "type": "object",
             "required": [
@@ -2288,6 +2611,14 @@ const docTemplate = `{
         {
             "description": "File operations endpoints",
             "name": "file"
+        },
+        {
+            "description": "Image upload and management for Claude vision analysis",
+            "name": "images"
+        },
+        {
+            "description": "Repository file browsing, search, and indexing",
+            "name": "repository"
         }
     ]
 }`

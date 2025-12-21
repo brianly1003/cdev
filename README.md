@@ -136,11 +136,8 @@ Connect to `ws://localhost:8765` for real-time events.
 // Start new conversation (default)
 {"command": "run_claude", "payload": {"prompt": "Your prompt here"}}
 
-// Continue the most recent conversation
-{"command": "run_claude", "payload": {"prompt": "Continue with...", "mode": "continue"}}
-
-// Resume a specific session by ID
-{"command": "run_claude", "payload": {"prompt": "Resume task", "mode": "resume", "session_id": "550e8400-..."}}
+// Continue a specific session by ID
+{"command": "run_claude", "payload": {"prompt": "Continue with...", "mode": "continue", "session_id": "550e8400-..."}}
 
 // Other commands
 {"command": "stop_claude"}
@@ -170,26 +167,18 @@ curl -X POST http://127.0.0.1:8766/api/claude/run \
   -d '{"prompt": "Create a hello world function"}'
 ```
 
-**Example - Continue Last Conversation:**
+**Example - Continue a Session by ID:**
 ```bash
 curl -X POST http://127.0.0.1:8766/api/claude/run \
   -H 'Content-Type: application/json' \
-  -d '{"prompt": "Now add error handling", "mode": "continue"}'
-```
-
-**Example - Resume Specific Session:**
-```bash
-curl -X POST http://127.0.0.1:8766/api/claude/run \
-  -H 'Content-Type: application/json' \
-  -d '{"prompt": "Continue the task", "mode": "resume", "session_id": "550e8400-e29b-41d4-a716-446655440000"}'
+  -d '{"prompt": "Continue the task", "mode": "continue", "session_id": "550e8400-e29b-41d4-a716-446655440000"}'
 ```
 
 **Session Modes:**
 | Mode | Description |
 |------|-------------|
 | `new` | Start a new conversation (default) |
-| `continue` | Continue the most recent conversation in the repository |
-| `resume` | Resume a specific session by ID (requires `session_id`) |
+| `continue` | Continue a specific session by ID (requires `session_id`) |
 
 **Example - List Available Sessions:**
 ```bash
@@ -314,7 +303,7 @@ cdev/
 | Event Hub | ✅ Done | Central dispatcher with fan-out |
 | HTTP Server | ✅ Done | `/health`, `/api/status`, `/api/claude/*`, `/api/git/*`, `/api/file` |
 | Claude Manager | ✅ Done | Process spawning, bidirectional streaming, interactive prompt handling |
-| Session Continuity | ✅ Done | Continue/resume conversations with session modes |
+| Session Continuity | ✅ Done | Continue conversations with `new`/`continue` modes |
 | File Watcher | ✅ Done | fsnotify integration with debouncing |
 | Git Tracker | ✅ Done | Git CLI wrapper for status/diff |
 | WebSocket Server | ✅ Done | Real-time event streaming with Hub pattern |
@@ -324,12 +313,12 @@ cdev/
 
 | Document | Description |
 |----------|-------------|
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Detailed architecture and technical specification |
-| [docs/API-REFERENCE.md](./docs/API-REFERENCE.md) | Complete API documentation for mobile integration |
-| [docs/DESIGN-SPEC.md](./docs/DESIGN-SPEC.md) | Original design specification with implementation status |
-| [docs/TECHNICAL-REVIEW.md](./docs/TECHNICAL-REVIEW.md) | Security & performance analysis with roadmap |
-| [docs/BACKLOG.md](./docs/BACKLOG.md) | Product backlog with prioritized work items |
-| [docs/SECURITY.md](./docs/SECURITY.md) | Security guidelines and best practices |
+| [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Detailed architecture and technical specification |
+| [docs/api/API-REFERENCE.md](./docs/api/API-REFERENCE.md) | Complete API documentation for mobile integration |
+| [docs/architecture/DESIGN-SPEC.md](./docs/architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
+| [docs/security/TECHNICAL-REVIEW.md](./docs/security/TECHNICAL-REVIEW.md) | Security & performance analysis with roadmap |
+| [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) | Product backlog with prioritized work items |
+| [docs/security/SECURITY.md](./docs/security/SECURITY.md) | Security guidelines and best practices |
 
 ## Security Notice
 
@@ -338,7 +327,7 @@ cdev/
 - CORS allows all origins
 - Binds to localhost only (intentional security measure)
 
-See [docs/SECURITY.md](./docs/SECURITY.md) for details and [docs/BACKLOG.md](./docs/BACKLOG.md) for planned fixes.
+See [docs/security/SECURITY.md](./docs/security/SECURITY.md) for details and [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) for planned fixes.
 
 ## License
 

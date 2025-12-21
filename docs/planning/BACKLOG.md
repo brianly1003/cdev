@@ -30,7 +30,7 @@
 - Bidirectional streaming via stdin/stdout/stderr pipes
 - Permission request detection and approval/denial handling
 - Interactive prompt detection (AskUserQuestion tool)
-- Session continuity: `new`, `continue`, `resume` modes
+- Session continuity: `new`, `continue` modes
 - Session ID capture from stream-json output
 
 ---

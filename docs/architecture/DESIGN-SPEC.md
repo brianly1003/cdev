@@ -97,7 +97,7 @@ claude -p --verbose --output-format stream-json --input-format stream-json
 | **Additional Features** | | |
 | Permission request handling | ✅ | Detects tool permission requests |
 | Interactive prompt handling | ✅ | AskUserQuestion tool support |
-| Session management | ✅ | new/continue/resume modes |
+| Session management | ✅ | new/continue modes |
 | Session ID tracking | ✅ | Captures from stream-json output |
 | Session listing | ✅ | Reads ~/.claude/projects history |
 | File logging | ✅ | Logs to .cdev/logs/claude_<pid>.jsonl |
@@ -165,7 +165,7 @@ All events are JSON with consistent structure:
 
 | Command | Status | Notes |
 |---------|--------|-------|
-| run_claude | ✅ | Supports new/continue/resume modes |
+| run_claude | ✅ | Supports new/continue modes |
 | stop_claude | ✅ | Graceful + force stop |
 | get_status | ✅ | Returns agent state |
 | get_file | ✅ | With path validation |
