@@ -520,7 +520,8 @@
       "result": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" }
+          "status": { "type": "string" },
+          "watching": { "type": "boolean" }
         }
       }
     },

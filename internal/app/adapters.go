@@ -459,6 +459,7 @@ func (a *ClaudeSessionAdapter) GetSessionMessages(ctx context.Context, sessionID
 			GitBranch:           m.GitBranch,
 			Message:             m.Message,
 			IsContextCompaction: m.IsContextCompaction,
+			IsMeta:              m.IsMeta,
 		}
 	}
 

@@ -348,6 +348,12 @@ func (c *UnifiedClient) Close() error {
 	c.mu.Unlock()
 
 	close(c.done)
+
+	// Close the websocket connection to unblock readPump
+	if c.conn != nil {
+		c.conn.Close()
+	}
+
 	return nil
 }
 

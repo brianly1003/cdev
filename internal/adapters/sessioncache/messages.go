@@ -32,6 +32,7 @@ type CachedMessage struct {
 	GitBranch           string          `json:"git_branch,omitempty"`
 	Message             json.RawMessage `json:"message"`
 	IsContextCompaction bool            `json:"is_context_compaction,omitempty"`
+	IsMeta              bool            `json:"is_meta,omitempty"`
 	LineNum             int             `json:"-"` // Line number in source file
 }
 
@@ -48,7 +49,7 @@ type MessagesPage struct {
 
 // messageSchemaVersion tracks message cache schema changes.
 // Bump this when schema changes to force re-indexing.
-const messageSchemaVersion = 2
+const messageSchemaVersion = 3 // Added is_meta column
 
 // contextCompactionPrefix is the prefix for context compaction messages.
 const contextCompactionPrefix = "This session is being continued from a previous conversation"
@@ -133,6 +134,7 @@ func createMessageSchema(db *sql.DB) error {
 			git_branch TEXT,
 			message_json TEXT NOT NULL,
 			is_context_compaction INTEGER DEFAULT 0,
+			is_meta INTEGER DEFAULT 0,
 			UNIQUE(session_id, line_num)
 		);
 
@@ -202,7 +204,7 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction
+		SELECT id, session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta
 		FROM messages
 		WHERE session_id = ?
 		ORDER BY line_num %s
@@ -220,9 +222,9 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 		var m CachedMessage
 		var messageJSON string
 		var uuid, timestamp, gitBranch sql.NullString
-		var isContextCompaction int
+		var isContextCompaction, isMeta int
 
-		err := rows.Scan(&m.ID, &m.SessionID, &m.LineNum, &m.Type, &uuid, &timestamp, &gitBranch, &messageJSON, &isContextCompaction)
+		err := rows.Scan(&m.ID, &m.SessionID, &m.LineNum, &m.Type, &uuid, &timestamp, &gitBranch, &messageJSON, &isContextCompaction, &isMeta)
 		if err != nil {
 			continue
 		}
@@ -232,6 +234,7 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 		m.GitBranch = gitBranch.String
 		m.Message = json.RawMessage(messageJSON)
 		m.IsContextCompaction = isContextCompaction == 1
+		m.IsMeta = isMeta == 1
 
 		messages = append(messages, m)
 	}
@@ -304,8 +307,8 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 
 	// Prepare insert statement
 	stmt, err := tx.Prepare(`
-		INSERT INTO messages (session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -336,6 +339,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			Timestamp string          `json:"timestamp,omitempty"`
 			GitBranch string          `json:"gitBranch,omitempty"`
 			Content   string          `json:"content,omitempty"`   // For system messages
+			IsMeta    bool            `json:"isMeta,omitempty"`    // True for system-generated metadata messages
 			Message   json.RawMessage `json:"message"`
 		}
 
@@ -384,6 +388,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			nullString(raw.GitBranch),
 			messageJSON,
 			isContextCompaction,
+			raw.IsMeta,
 		)
 		if err != nil {
 			log.Debug().Err(err).Int("line", lineNum).Msg("failed to insert message")

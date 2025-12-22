@@ -225,6 +225,7 @@ func TestSessionMessageJSON(t *testing.T) {
 		GitBranch:           "main",
 		Message:             json.RawMessage(`{"role":"assistant","content":"Hello"}`),
 		IsContextCompaction: true,
+		IsMeta:              true,
 	}
 
 	data, err := json.Marshal(msg)
@@ -235,8 +236,8 @@ func TestSessionMessageJSON(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify snake_case field names
-	expectedFields := []string{"session_id", "git_branch", "is_context_compaction"}
-	unexpectedFields := []string{"sessionId", "gitBranch", "isContextCompaction"}
+	expectedFields := []string{"session_id", "git_branch", "is_context_compaction", "is_meta"}
+	unexpectedFields := []string{"sessionId", "gitBranch", "isContextCompaction", "isMeta"}
 
 	for _, field := range expectedFields {
 		if !containsField(jsonStr, field) {
@@ -247,6 +248,19 @@ func TestSessionMessageJSON(t *testing.T) {
 		if containsField(jsonStr, field) {
 			t.Errorf("unexpected camelCase '%s' found: %s", field, jsonStr)
 		}
+	}
+
+	// Test omitempty - IsMeta=false should not appear in output
+	msgNoMeta := SessionMessage{
+		ID:        2,
+		SessionID: "session-abc",
+		Type:      "user",
+		Message:   json.RawMessage(`{"role":"user","content":"Hi"}`),
+		IsMeta:    false,
+	}
+	dataNoMeta, _ := json.Marshal(msgNoMeta)
+	if containsField(string(dataNoMeta), "is_meta") {
+		t.Errorf("is_meta should be omitted when false, got: %s", string(dataNoMeta))
 	}
 }
 

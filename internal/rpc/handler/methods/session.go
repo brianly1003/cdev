@@ -64,6 +64,9 @@ type SessionMessage struct {
 	// IsContextCompaction is true when this is an auto-generated message
 	// created by Claude Code when the context window was maxed out.
 	IsContextCompaction bool `json:"is_context_compaction,omitempty"`
+
+	// IsMeta is true for system-generated metadata messages (e.g., command caveats).
+	IsMeta bool `json:"is_meta,omitempty"`
 }
 
 // ToolCall represents a tool invocation.

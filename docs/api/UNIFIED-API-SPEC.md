@@ -628,7 +628,8 @@ Stop watching the current session.
 **Result:**
 ```json
 {
-  "status": "unwatched"
+  "status": "unwatched",
+  "watching": false
 }
 ```
 

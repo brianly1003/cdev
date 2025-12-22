@@ -3,7 +3,9 @@ package claude
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -103,6 +105,23 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	if prompt == "" {
 		m.mu.Unlock()
 		return domain.ErrInvalidPrompt
+	}
+
+	// Check for bash-only mode prefix - execute locally instead of calling Claude
+	if strings.HasPrefix(prompt, "!") {
+		// Strip the "!" prefix to get the actual bash command
+		command := strings.TrimPrefix(prompt, "!")
+		command = strings.TrimSpace(command)
+
+		log.Info().
+			Str("command", truncatePrompt(command, 50)).
+			Str("mode", string(mode)).
+			Str("session_id", sessionID).
+			Msg("detected bash-only mode, executing locally")
+		m.mu.Unlock() // Release lock before executing bash
+
+		// Execute bash command locally and log in Claude Code format
+		return m.executeBashLocally(ctx, command, mode, sessionID)
 	}
 
 	// Create cancellable context with timeout
@@ -867,4 +886,262 @@ func (m *Manager) parseClaudeJSON(line string) *events.ParsedClaudeMessage {
 	}
 
 	return parsed
+}
+
+// executeBashLocally executes a bash command locally without calling Claude AI.
+// It logs the execution in Claude Code's format for session compatibility.
+func (m *Manager) executeBashLocally(ctx context.Context, command string, mode SessionMode, sessionID string) error {
+	// Generate session ID if not provided (for "new" mode)
+	if sessionID == "" {
+		sessionID = generateUUID()
+		log.Info().Str("generated_session_id", sessionID).Msg("generated new session ID for bash execution")
+	}
+
+	m.mu.Lock()
+
+	// Set up working directory
+	workDir := m.workDir
+	if workDir == "" {
+		var err error
+		workDir, err = os.Getwd()
+		if err != nil {
+			m.mu.Unlock()
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+	}
+
+	// Construct Claude Code session file path
+	// Transform: /Users/brianly/Projects/cdev -> -Users-brianly-Projects-cdev
+	projectDirName := strings.TrimPrefix(workDir, "/")
+	projectDirName = strings.ReplaceAll(projectDirName, "/", "-")
+	projectDirName = "-" + projectDirName
+
+	// Claude Code session file path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	claudeProjectsDir := filepath.Join(homeDir, ".claude", "projects", projectDirName)
+	sessionFilePath := filepath.Join(claudeProjectsDir, fmt.Sprintf("%s.jsonl", sessionID))
+
+	// Ensure the Claude projects directory exists
+	if err := os.MkdirAll(claudeProjectsDir, 0700); err != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("failed to create Claude projects directory: %w", err)
+	}
+
+	// Open or create the session file for appending
+	logFile, err := os.OpenFile(sessionFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("failed to open Claude session file: %w", err)
+	}
+	defer logFile.Close()
+
+	log.Info().
+		Str("session_file", sessionFilePath).
+		Str("session_id", sessionID).
+		Msg("appending to Claude Code session file")
+
+	m.mu.Unlock()
+
+	log.Info().
+		Str("command", truncatePrompt(command, 50)).
+		Str("work_dir", workDir).
+		Msg("executing bash command locally")
+
+	// Execute bash command
+	cmd := exec.CommandContext(ctx, "bash", "-c", command)
+	cmd.Dir = workDir
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	startTime := time.Now()
+	err = cmd.Run()
+	duration := time.Since(startTime)
+
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+
+	log.Info().
+		Int("exit_code", exitCode).
+		Dur("duration", duration).
+		Msg("bash command completed")
+
+	// Get git branch for logging
+	gitBranch := "main" // Default
+	branchCmd := exec.Command("git", "branch", "--show-current")
+	branchCmd.Dir = workDir
+	if branchOutput, err := branchCmd.Output(); err == nil {
+		gitBranch = strings.TrimSpace(string(branchOutput))
+	}
+
+	// Generate UUIDs for message chain
+	caveatUUID := generateUUID()
+	inputUUID := generateUUID()
+	outputUUID := generateUUID()
+
+	// Get parent UUID (use sessionID as parent for now)
+	parentUUID := sessionID
+
+	// Current timestamp
+	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
+
+	// Helper function to marshal JSON without HTML escaping
+	marshalWithoutEscape := func(v interface{}) ([]byte, error) {
+		var buf bytes.Buffer
+		encoder := json.NewEncoder(&buf)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(v); err != nil {
+			return nil, err
+		}
+		// Encoder.Encode adds a newline, so trim it
+		return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+	}
+
+	// Write 3 JSONL messages in Claude Code format
+	// Message 1: Caveat
+	caveatMsg := map[string]interface{}{
+		"parentUuid":  parentUUID,
+		"isSidechain": false,
+		"userType":    "external",
+		"cwd":         workDir,
+		"sessionId":   sessionID,
+		"version":     "2.0.71", // Claude Code version
+		"gitBranch":   gitBranch,
+		"type":        "user",
+		"message": map[string]interface{}{
+			"role":    "user",
+			"content": "Caveat: The messages below were generated by the user while running local commands. DO NOT respond to these messages or otherwise consider them in your response unless the user explicitly asks you to.",
+		},
+		"isMeta":    true,
+		"uuid":      caveatUUID,
+		"timestamp": timestamp,
+	}
+	if data, err := marshalWithoutEscape(caveatMsg); err == nil {
+		logFile.WriteString(string(data) + "\n")
+	}
+
+	// Message 2: Bash Input
+	inputMsg := map[string]interface{}{
+		"parentUuid":  caveatUUID,
+		"isSidechain": false,
+		"userType":    "external",
+		"cwd":         workDir,
+		"sessionId":   sessionID,
+		"version":     "2.0.71",
+		"gitBranch":   gitBranch,
+		"type":        "user",
+		"message": map[string]interface{}{
+			"role":    "user",
+			"content": fmt.Sprintf("<bash-input>%s</bash-input>", command),
+		},
+		"uuid":      inputUUID,
+		"timestamp": timestamp,
+	}
+	if data, err := marshalWithoutEscape(inputMsg); err == nil {
+		logFile.WriteString(string(data) + "\n")
+	}
+
+	// Message 3: Bash Output
+	outputMsg := map[string]interface{}{
+		"parentUuid":  inputUUID,
+		"isSidechain": false,
+		"userType":    "external",
+		"cwd":         workDir,
+		"sessionId":   sessionID,
+		"version":     "2.0.71",
+		"gitBranch":   gitBranch,
+		"type":        "user",
+		"message": map[string]interface{}{
+			"role":    "user",
+			"content": fmt.Sprintf("<bash-stdout>%s</bash-stdout><bash-stderr>%s</bash-stderr>", stdout.String(), stderr.String()),
+		},
+		"uuid":      outputUUID,
+		"timestamp": timestamp,
+	}
+	if data, err := marshalWithoutEscape(outputMsg); err == nil {
+		logFile.WriteString(string(data) + "\n")
+	}
+
+	// Emit claude_message events for bash input and output
+	log.Info().
+		Str("session_id", sessionID).
+		Str("command", truncatePrompt(command, 50)).
+		Msg("emitting bash input claude_message event")
+
+	// Event 1: Bash input
+	inputPayload := events.ClaudeMessagePayload{
+		SessionID: sessionID,
+		Type:      "user",
+		Role:      "user",
+		Content: []events.ClaudeMessageContent{
+			{
+				Type: "text",
+				Text: fmt.Sprintf("<bash-input>%s</bash-input>", command),
+			},
+		},
+	}
+	m.hub.Publish(events.NewClaudeMessageEventFull(inputPayload))
+	log.Debug().Msg("bash input event published to hub")
+
+	// Event 2: Bash output
+	log.Info().
+		Str("session_id", sessionID).
+		Int("stdout_len", stdout.Len()).
+		Int("stderr_len", stderr.Len()).
+		Msg("emitting bash output claude_message event")
+
+	outputPayload := events.ClaudeMessagePayload{
+		SessionID: sessionID,
+		Type:      "user",
+		Role:      "user",
+		Content: []events.ClaudeMessageContent{
+			{
+				Type: "text",
+				Text: fmt.Sprintf("<bash-stdout>%s</bash-stdout><bash-stderr>%s</bash-stderr>", stdout.String(), stderr.String()),
+			},
+		},
+	}
+	m.hub.Publish(events.NewClaudeMessageEventFull(outputPayload))
+	log.Debug().Msg("bash output event published to hub")
+
+	// Emit completion event
+	m.hub.Publish(events.NewClaudeIdleEvent())
+	log.Info().Msg("bash execution completed, events emitted")
+
+	if exitCode != 0 {
+		return fmt.Errorf("bash command exited with code %d", exitCode)
+	}
+
+	return nil
+}
+
+// generateUUID generates a UUID v4 string.
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		// Fallback to timestamp-based UUID
+		now := time.Now().UnixNano()
+		return fmt.Sprintf("%x-%x-%x-%x-%x",
+			now&0xFFFFFFFF,
+			now>>32&0xFFFF,
+			now>>48&0xFFFF,
+			now>>56&0xFFFF,
+			now>>60&0xFFFFFFFFFFFF)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // Version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // Variant bits
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
