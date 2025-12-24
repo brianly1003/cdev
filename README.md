@@ -1,3 +1,6 @@
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="assets/icon.png">
+
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
