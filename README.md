@@ -2,10 +2,10 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/logo.png">
-    <img alt="cdev Logo" src="assets/logo.png" width="280" />
+    <img alt="Cdev Logo" src="assets/logo.png" width="140" height="140" />
   </picture>
 
-  <h1>cdev</h1>
+  <h1>Cdev</h1>
 
   **Mobile AI Coding Monitor & Controller Agent**
 
