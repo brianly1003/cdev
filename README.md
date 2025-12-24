@@ -1,6 +1,23 @@
-# cdev
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo.png">
+    <img alt="cdev Logo" src="assets/logo.png" width="280" />
+  </picture>
 
-Mobile AI Coding Monitor & Controller Agent - the laptop/desktop component of the cdev system.
+  <h1>cdev</h1>
+
+  **Mobile AI Coding Monitor & Controller Agent**
+
+  The laptop/desktop component of the cdev system
+
+  [![Go Version](https://img.shields.io/github/go-mod/go-version/brianly1003/cdev?style=flat-square)](https://golang.org/)
+  [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+  [![GitHub Issues](https://img.shields.io/github/issues/brianly1003/cdev?style=flat-square)](https://github.com/brianly1003/cdev/issues)
+  [![Discord](https://img.shields.io/badge/chat-discord-blue.svg?style=flat-square)](https://discord.gg/cdev)
+</div>
+
+---
 
 ## Overview
 
@@ -9,13 +26,18 @@ Mobile AI Coding Monitor & Controller Agent - the laptop/desktop component of th
 ## Features
 
 - **Claude CLI Management**: Spawn, monitor, and control Claude Code CLI processes
+- **Multi-Workspace Support**: Manage multiple repositories simultaneously with workspace manager
 - **Real-time Streaming**: Stream stdout/stderr output in real-time via WebSocket
 - **File Watching**: Monitor repository for file changes with debouncing
 - **Git Integration**: Generate and stream git diffs automatically
+- **Process Monitoring**: Auto-restart crashed workspaces with exponential backoff
+- **Workspace Discovery**: Scan directories for Git repositories
 - **Cross-Platform**: Runs on macOS, Windows, and Linux
 - **QR Code Pairing**: Easy mobile device pairing via QR code scan
 
 ## Quick Start
+
+### Single Workspace Mode
 
 ```bash
 # Build
@@ -27,6 +49,42 @@ make build
 # Or specify a repository path
 ./bin/cdev start --repo /path/to/your/project
 ```
+
+### Multi-Workspace Mode (IDE Integration Ready!)
+
+**cdev-agent is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
+
+**Standard Protocol: JSON-RPC 2.0** - Industry standard used by LSP, MCP, and all major IDEs.
+
+Manage multiple repositories from a single workspace manager:
+
+```bash
+# Start the workspace manager
+./bin/cdev workspace-manager start
+
+# Add workspaces
+./bin/cdev workspace add /path/to/backend --name "Backend API" --auto-start
+./bin/cdev workspace add /path/to/frontend --name "React App"
+
+# List workspaces
+./bin/cdev workspace list
+
+# Start/stop workspaces
+./bin/cdev workspace start backend-id
+./bin/cdev workspace stop backend-id
+
+# Discover Git repositories
+./bin/cdev workspace discover
+```
+
+**Manager runs on:** `http://127.0.0.1:8765`
+- **WebSocket JSON-RPC 2.0**: `/ws` - **PRIMARY (recommended for IDE integration)**
+- REST API: `/api/workspaces` - Also available (will be deprecated)
+- Health check: `/health`
+
+**For IDE Extensions & 3rd Party Tools:** Use JSON-RPC 2.0 protocol (LSP-compatible)
+
+**See full guide:** [Multi-Workspace Usage Guide](docs/architecture/MULTI-WORKSPACE-USAGE.md)
 
 ## Installation
 

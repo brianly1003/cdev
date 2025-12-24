@@ -220,7 +220,7 @@ func (s *SessionStreamer) checkForNewContent() {
 
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 2*1024*1024)
+	scanner.Buffer(buf, 10*1024*1024) // 10MB max to handle extended thinking
 
 	newOffset := lastOffset
 	messagesEmitted := 0

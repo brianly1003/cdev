@@ -594,7 +594,7 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024) // 10MB max to handle extended thinking
 
 	messageCount := 0
 	foundSummary := false

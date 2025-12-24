@@ -49,14 +49,38 @@ type Event interface {
 
 	// ToJSON serializes the event to JSON.
 	ToJSON() ([]byte, error)
+
+	// GetWorkspaceID returns the workspace ID (may be empty).
+	GetWorkspaceID() string
+
+	// GetSessionID returns the session ID (may be empty).
+	GetSessionID() string
 }
 
 // BaseEvent contains common fields for all events.
 type BaseEvent struct {
-	EventType  EventType   `json:"event"`
-	EventTime  time.Time   `json:"timestamp"`
-	Payload    interface{} `json:"payload"`
-	RequestID  string      `json:"request_id,omitempty"`
+	EventType   EventType   `json:"event"`
+	EventTime   time.Time   `json:"timestamp"`
+	WorkspaceID string      `json:"workspace_id,omitempty"`
+	SessionID   string      `json:"session_id,omitempty"`
+	Payload     interface{} `json:"payload"`
+	RequestID   string      `json:"request_id,omitempty"`
+}
+
+// SetContext sets the workspace and session context for an event.
+func (e *BaseEvent) SetContext(workspaceID, sessionID string) {
+	e.WorkspaceID = workspaceID
+	e.SessionID = sessionID
+}
+
+// GetWorkspaceID returns the workspace ID.
+func (e *BaseEvent) GetWorkspaceID() string {
+	return e.WorkspaceID
+}
+
+// GetSessionID returns the session ID.
+func (e *BaseEvent) GetSessionID() string {
+	return e.SessionID
 }
 
 // Type returns the event type.
@@ -90,6 +114,17 @@ func NewEventWithRequestID(eventType EventType, payload interface{}, requestID s
 		EventTime: time.Now().UTC(),
 		Payload:   payload,
 		RequestID: requestID,
+	}
+}
+
+// NewEventWithContext creates a new event with workspace and session context.
+func NewEventWithContext(eventType EventType, payload interface{}, workspaceID, sessionID string) *BaseEvent {
+	return &BaseEvent{
+		EventType:   eventType,
+		EventTime:   time.Now().UTC(),
+		WorkspaceID: workspaceID,
+		SessionID:   sessionID,
+		Payload:     payload,
 	}
 }
 

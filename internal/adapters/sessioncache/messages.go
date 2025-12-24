@@ -317,7 +317,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 2*1024*1024) // 2MB max line
+	scanner.Buffer(buf, 10*1024*1024) // 10MB max to handle extended thinking
 
 	lineNum := 0
 	messageCount := 0

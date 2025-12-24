@@ -17,6 +17,10 @@ const (
 
 	// Default maximum message size (512KB).
 	DefaultMaxMessageSize = 512 * 1024
+
+	// Ping interval for keepalive
+	DefaultPingInterval = 30 * time.Second
+	DefaultPongTimeout  = 60 * time.Second
 )
 
 // WebSocketTransport implements Transport over a WebSocket connection.
@@ -73,7 +77,41 @@ func NewWebSocketTransport(conn *websocket.Conn, opts ...WebSocketOption) *WebSo
 	// Set max message size
 	conn.SetReadLimit(DefaultMaxMessageSize)
 
+	// Setup ping/pong handlers for keepalive
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(DefaultPongTimeout))
+		return nil
+	})
+
+	// Start ping ticker
+	go t.pingLoop()
+
 	return t
+}
+
+// pingLoop sends periodic pings to keep the connection alive.
+func (t *WebSocketTransport) pingLoop() {
+	ticker := time.NewTicker(DefaultPingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-t.done:
+			return
+		case <-ticker.C:
+			t.mu.Lock()
+			if t.closed {
+				t.mu.Unlock()
+				return
+			}
+			t.conn.SetWriteDeadline(time.Now().Add(DefaultWriteTimeout))
+			if err := t.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				t.mu.Unlock()
+				return
+			}
+			t.mu.Unlock()
+		}
+	}
 }
 
 // ID returns the unique identifier for this transport.

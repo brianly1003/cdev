@@ -25,7 +25,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) 
 SWAG := $(shell go env GOPATH)/bin/swag
 
 # Targets
-.PHONY: all build build-all clean test test-race fmt vet lint tidy run help swagger openrpc openrpc-start
+.PHONY: all build build-all clean test test-race fmt vet lint tidy run run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
 
 # Default target
 all: build
@@ -63,10 +63,45 @@ build-linux-amd64:
 REPO ?=
 run: build
 ifneq ($(REPO),)
-	./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
 else
-	./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
 endif
+
+# Run server in background
+run-bg: build
+	@echo "Starting cdev server in background..."
+ifneq ($(REPO),)
+	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO) > ~/.cdev/server.log 2>&1 &
+else
+	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml > ~/.cdev/server.log 2>&1 &
+endif
+	@sleep 1
+	@echo "Server started on port 8766. Logs: ~/.cdev/server.log"
+	@echo "  HTTP API:   http://127.0.0.1:8766/api/"
+	@echo "  WebSocket:  ws://127.0.0.1:8766/ws"
+	@echo "  Swagger:    http://127.0.0.1:8766/swagger/"
+	@echo "To stop: make stop"
+
+# Stop the server
+stop:
+	@echo "Stopping cdev server..."
+	@pkill -f "$(BINARY_NAME) start" 2>/dev/null || echo "No server running"
+
+# DEPRECATED: Old workspace-manager commands (will be removed in v3.0)
+run-manager: build
+	@echo "WARNING: workspace-manager is deprecated. Use 'make run' instead."
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) workspace-manager start --config configs/config.yaml
+
+run-manager-bg: build
+	@echo "WARNING: workspace-manager is deprecated. Use 'make run-bg' instead."
+	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) workspace-manager start --config configs/config.yaml > ~/.cdev/manager.log 2>&1 &
+	@sleep 1
+	@echo "Workspace manager started. Logs: ~/.cdev/manager.log"
+
+stop-manager:
+	@echo "WARNING: workspace-manager is deprecated. Use 'make stop' instead."
+	@pkill -f "cdev workspace-manager" 2>/dev/null || echo "No workspace manager running"
 
 # Run tests
 test:
@@ -226,7 +261,12 @@ help:
 	@echo "  make              Build for current platform"
 	@echo "  make build        Build for current platform"
 	@echo "  make build-all    Build for all platforms (macOS, Windows, Linux)"
-	@echo "  make run REPO=/path  Build and run with --repo flag (default: .)"
+	@echo ""
+	@echo "Run Server (port 8766):"
+	@echo "  make run             Run server (debug mode, foreground)"
+	@echo "  make run REPO=/path  Run with specific repo"
+	@echo "  make run-bg          Run server in background"
+	@echo "  make stop            Stop the server"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test                  Run tests"

@@ -14,6 +14,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain/commands"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/hub"
 	"github.com/brianly1003/cdev/internal/rpc"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
@@ -64,8 +65,9 @@ type Server struct {
 	httpServer *http.Server
 
 	// Client management
-	mu      sync.RWMutex
-	clients map[string]*UnifiedClient
+	mu              sync.RWMutex
+	clients         map[string]*UnifiedClient
+	filteredClients map[string]*hub.FilteredSubscriber // Workspace-filtered subscribers
 
 	// Heartbeat
 	heartbeatDone chan struct{}
@@ -74,19 +76,20 @@ type Server struct {
 }
 
 // NewServer creates a new unified server.
-func NewServer(host string, port int, dispatcher *handler.Dispatcher, hub ports.EventHub) *Server {
+func NewServer(host string, port int, dispatcher *handler.Dispatcher, eventHub ports.EventHub) *Server {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	s := &Server{
-		addr:          addr,
-		dispatcher:    dispatcher,
-		hub:           hub,
-		clients:       make(map[string]*UnifiedClient),
-		heartbeatDone: make(chan struct{}),
-		startTime:     time.Now(),
+		addr:            addr,
+		dispatcher:      dispatcher,
+		hub:             eventHub,
+		clients:         make(map[string]*UnifiedClient),
+		filteredClients: make(map[string]*hub.FilteredSubscriber),
+		heartbeatDone:   make(chan struct{}),
+		startTime:       time.Now(),
 	}
 
 	// Create RPC server
-	s.rpcServer = rpc.NewServer(dispatcher, hub)
+	s.rpcServer = rpc.NewServer(dispatcher, eventHub)
 
 	return s
 }
@@ -182,13 +185,17 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		s.removeClient(id)
 	})
 
+	// Wrap in FilteredSubscriber for workspace filtering support
+	filtered := hub.NewFilteredSubscriber(client)
+
 	s.mu.Lock()
 	s.clients[client.ID()] = client
+	s.filteredClients[client.ID()] = filtered
 	s.mu.Unlock()
 
-	// Subscribe to events
+	// Subscribe the filtered subscriber to events
 	if s.hub != nil {
-		s.hub.Subscribe(client)
+		s.hub.Subscribe(filtered)
 	}
 
 	log.Info().
@@ -203,8 +210,17 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) removeClient(id string) {
 	s.mu.Lock()
 	delete(s.clients, id)
+	delete(s.filteredClients, id)
 	s.mu.Unlock()
 	log.Info().Str("client_id", id).Msg("client disconnected")
+}
+
+// GetFilteredSubscriber returns the filtered subscriber for a client ID.
+// Returns nil if the client doesn't exist.
+func (s *Server) GetFilteredSubscriber(clientID string) *hub.FilteredSubscriber {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.filteredClients[clientID]
 }
 
 // Broadcast sends a message to all connected clients.
@@ -482,7 +498,8 @@ func (c *UnifiedClient) handleJSONRPC(data []byte) {
 		return
 	}
 
-	ctx := context.Background()
+	// Add client ID to context for methods that need it
+	ctx := context.WithValue(context.Background(), handler.ClientIDKey, c.id)
 	response, err := c.dispatcher.HandleMessage(ctx, data)
 	if err != nil {
 		log.Warn().Err(err).Str("client_id", c.id).Msg("JSON-RPC dispatch error")

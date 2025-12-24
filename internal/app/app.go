@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,6 +25,8 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
 	"github.com/brianly1003/cdev/internal/server/unified"
+	"github.com/brianly1003/cdev/internal/session"
+	"github.com/brianly1003/cdev/internal/workspace"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -46,6 +49,11 @@ type App struct {
 	unifiedServer   *unified.Server
 	rpcDispatcher   *handler.Dispatcher
 	qrGenerator     *pairing.QRGenerator
+
+	// Multi-workspace support
+	sessionManager         *session.Manager
+	workspaceConfigManager *workspace.ConfigManager
+	gitTrackerManager      *workspace.GitTrackerManager
 
 	// Session info
 	sessionID string
@@ -181,6 +189,49 @@ func (a *App) Start(ctx context.Context) error {
 	a.sessionStreamer = sessioncache.NewSessionStreamer(sessionsDir, a.hub)
 	log.Info().Msg("session streamer initialized for real-time watching")
 
+	// Initialize Multi-Workspace Support
+	// Workspace config manager handles workspace CRUD
+	workspacesPath := config.DefaultWorkspacesPath()
+	workspacesCfg, err := config.LoadWorkspaces(workspacesPath)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to load workspaces config, using defaults")
+		workspacesCfg = &config.WorkspacesConfig{}
+	}
+	a.workspaceConfigManager = workspace.NewConfigManager(workspacesCfg, workspacesPath)
+
+	// Initialize GitTrackerManager for cached git operations
+	// This provides lazy-init, cached git trackers for all workspaces
+	gitTrackerLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	gitTrackerConfig := workspace.GitTrackerManagerConfig{
+		GitCommand:          a.cfg.Git.Command,
+		HealthCheckInterval: 5 * time.Minute,
+		OperationTimeout:    30 * time.Second,
+		Logger:              gitTrackerLogger,
+	}
+	a.gitTrackerManager = workspace.NewGitTrackerManager(gitTrackerConfig)
+
+	// Connect workspace config manager to git tracker manager
+	a.workspaceConfigManager.SetGitTrackerManager(a.gitTrackerManager)
+	log.Info().Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).Msg("git tracker manager initialized")
+
+	// Session manager orchestrates Claude sessions across workspaces
+	// Create slog logger that wraps zerolog
+	slogLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	a.sessionManager = session.NewManager(a.hub, a.cfg, slogLogger)
+
+	// Connect session manager to git tracker manager
+	a.sessionManager.SetGitTrackerManager(a.gitTrackerManager)
+
+	if err := a.sessionManager.Start(); err != nil {
+		log.Warn().Err(err).Msg("failed to start session manager")
+	}
+
+	// Register existing workspaces with session manager
+	for _, ws := range a.workspaceConfigManager.ListWorkspaces() {
+		a.sessionManager.RegisterWorkspace(ws)
+	}
+	log.Info().Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).Msg("multi-workspace support initialized")
+
 	// Initialize Repository Indexer
 	if a.cfg.Indexer.Enabled {
 		repoIndexer, err := repository.NewIndexer(a.cfg.Repository.Path, a.cfg.Indexer.SkipDirectories)
@@ -260,6 +311,14 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	sessionService.RegisterMethods(rpcRegistry)
 
+	// Workspace config service (workspace/list, workspace/add, etc.)
+	workspaceConfigService := methods.NewWorkspaceConfigService(a.sessionManager, a.workspaceConfigManager)
+	workspaceConfigService.RegisterMethods(rpcRegistry)
+
+	// Session manager service (session/start, session/stop, session/send, etc.)
+	sessionManagerService := methods.NewSessionManagerService(a.sessionManager)
+	sessionManagerService.RegisterMethods(rpcRegistry)
+
 	// Lifecycle service with capabilities
 	caps := methods.ServerCapabilities{
 		Agent: &methods.AgentCapabilities{
@@ -295,6 +354,10 @@ func (a *App) Start(ctx context.Context) error {
 	lifecycleService := methods.NewLifecycleService(a.version, caps)
 	lifecycleService.RegisterMethods(rpcRegistry)
 
+	// Subscription service (for workspace event filtering)
+	subscriptionService := methods.NewSubscriptionService()
+	subscriptionService.RegisterMethods(rpcRegistry)
+
 	a.rpcDispatcher = handler.NewDispatcher(rpcRegistry)
 
 	// Create unified server for dual-protocol WebSocket support
@@ -309,6 +372,8 @@ func (a *App) Start(ctx context.Context) error {
 	a.unifiedServer.SetLegacyHandler(a.handleLegacyCommand)
 	// Set status provider for heartbeats
 	a.unifiedServer.SetStatusProvider(a)
+	// Set subscription provider (unified server manages filtered subscribers)
+	subscriptionService.SetProvider(a.unifiedServer)
 	// Start background tasks (heartbeat)
 	a.unifiedServer.StartBackgroundTasks()
 
@@ -409,6 +474,18 @@ func (a *App) shutdown() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		a.claudeManager.Stop(ctx)
 		cancel()
+	}
+
+	// Stop session manager (stops all active sessions)
+	if a.sessionManager != nil {
+		if err := a.sessionManager.Stop(); err != nil {
+			log.Error().Err(err).Msg("error stopping session manager")
+		}
+	}
+
+	// Stop git tracker manager (cleans up cached trackers)
+	if a.gitTrackerManager != nil {
+		a.gitTrackerManager.Stop()
 	}
 
 	// Stop unified server

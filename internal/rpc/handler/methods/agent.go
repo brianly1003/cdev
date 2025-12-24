@@ -57,6 +57,13 @@ type AgentManager interface {
 
 // AgentService provides agent-related RPC methods.
 // This is CLI-agnostic and works with any AI agent that implements AgentManager.
+//
+// DEPRECATED: This service operates on a single repository path from config.yaml.
+// For multi-workspace support, use SessionManagerService instead:
+//   - agent/run    → session/start + session/send
+//   - agent/stop   → session/stop
+//   - agent/respond → session/respond
+//   - agent/status → session/state
 type AgentService struct {
 	manager AgentManager
 }

@@ -9,6 +9,14 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/message"
 )
 
+// ContextKey is a type for context keys to avoid collisions.
+type ContextKey string
+
+const (
+	// ClientIDKey is the context key for the client ID.
+	ClientIDKey ContextKey = "client_id"
+)
+
 // HandlerFunc is the signature for RPC method handlers.
 // It receives the context and raw params, and returns either a result or an error.
 // If the result is nil and error is nil, an empty successful response is sent.

@@ -13,6 +13,8 @@ This directory contains all project documentation organized by category.
 | Understand the architecture | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) |
 | Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
+| **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
+| **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
 | **Integrate with VS Code** | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) |
 | **Acquisition strategy** | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) |
 | **Multi-agent (Claude/Gemini/Codex)** | [architecture/MULTI-AGENT-ARCHITECTURE.md](./architecture/MULTI-AGENT-ARCHITECTURE.md) |
@@ -45,8 +47,10 @@ docs/
 │   ├── TECHNICAL-REVIEW.md    # Security analysis
 │   └── IMAGE-UPLOAD-SECURITY-ANALYSIS.md
 ├── guides/                    # Guides & Testing docs
+│   ├── WORKSPACE-MANAGER-SETUP.md  # Workspace manager setup with VS Code tunnels
 │   ├── POC-TESTING-GUIDE.md   # POC testing guide
-│   └── CLAUDE-CLI.md          # Claude CLI reference
+│   ├── CLAUDE-CLI.md          # Claude CLI reference
+│   └── TROUBLESHOOTING.md     # Common issues and solutions
 └── planning/                  # Project Management docs
     ├── BACKLOG.md             # Product backlog
     └── STRATEGIC-ROADMAP.md   # Strategic roadmap
@@ -137,8 +141,10 @@ docs/
 
 | Document | Description |
 |----------|-------------|
+| [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) | **Step-by-step workspace manager setup with VS Code tunnels** |
 | [guides/POC-TESTING-GUIDE.md](./guides/POC-TESTING-GUIDE.md) | POC testing guide with examples |
 | [guides/CLAUDE-CLI.md](./guides/CLAUDE-CLI.md) | Claude CLI reference and flags |
+| [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) | Common issues and solutions |
 
 ---
 
@@ -158,13 +164,13 @@ docs/
 ---
 
 ### 7. Operations & Deployment
-*For production deployment* (Planned)
+*For production deployment*
 
-| Document | Status |
-|----------|--------|
+| Document | Description |
+|----------|-------------|
+| [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) | Common issues and solutions |
 | DEPLOYMENT.md | Planned |
 | MONITORING.md | Planned |
-| TROUBLESHOOTING.md | Planned |
 
 ---
 
@@ -188,8 +194,10 @@ docs/
 | SECURITY.md | security | 1.0 | Draft |
 | TECHNICAL-REVIEW.md | security | 1.0 | Current |
 | IMAGE-UPLOAD-SECURITY-ANALYSIS.md | security | 1.0 | Current |
+| WORKSPACE-MANAGER-SETUP.md | guides | 1.0 | Current |
 | POC-TESTING-GUIDE.md | guides | 1.0 | Current |
 | CLAUDE-CLI.md | guides | 1.0 | Current |
+| TROUBLESHOOTING.md | guides | 1.0 | Current |
 | STRATEGIC-ROADMAP.md | planning | 1.0 | Active |
 | BACKLOG.md | planning | 1.0 | Active |
 

@@ -54,6 +54,8 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(workspaceCmd)
+	rootCmd.AddCommand(workspaceManagerCmd)
 }
 
 func initConfig() {

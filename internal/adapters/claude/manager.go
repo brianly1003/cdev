@@ -43,6 +43,10 @@ type Manager struct {
 	workDir         string
 	skipPermissions bool
 
+	// Workspace/Session context for multi-workspace support
+	workspaceID string
+	sessionID   string
+
 	mu            sync.RWMutex
 	state         events.ClaudeState
 	currentPrompt string
@@ -61,7 +65,7 @@ type Manager struct {
 	pendingToolName  string
 }
 
-// NewManager creates a new Claude CLI manager.
+// NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
 func NewManager(command string, args []string, timeoutMinutes int, hub ports.EventHub, skipPermissions bool) *Manager {
 	return &Manager{
 		command:         command,
@@ -73,6 +77,53 @@ func NewManager(command string, args []string, timeoutMinutes int, hub ports.Eve
 		workDir:         "", // Empty means use current directory
 		skipPermissions: skipPermissions,
 	}
+}
+
+// NewManagerWithContext creates a new Claude CLI manager with workspace/session context.
+// This is the preferred constructor for multi-workspace support.
+func NewManagerWithContext(hub ports.EventHub, command string, args []string, timeoutMinutes int, skipPermissions bool, workDir, workspaceID, sessionID string) *Manager {
+	m := &Manager{
+		command:         command,
+		args:            args,
+		timeout:         time.Duration(timeoutMinutes) * time.Minute,
+		hub:             hub,
+		state:           events.ClaudeStateIdle,
+		workDir:         workDir,
+		skipPermissions: skipPermissions,
+		workspaceID:     workspaceID,
+		sessionID:       sessionID,
+	}
+
+	// Setup log directory in workspace
+	if workDir != "" {
+		logDir := filepath.Join(workDir, ".cdev", "logs")
+		if err := os.MkdirAll(logDir, 0755); err == nil {
+			m.logDir = logDir
+		}
+	}
+
+	return m
+}
+
+// WorkspaceID returns the workspace ID for this manager.
+func (m *Manager) WorkspaceID() string {
+	return m.workspaceID
+}
+
+// SessionID returns the session ID for this manager.
+func (m *Manager) SessionID() string {
+	return m.sessionID
+}
+
+// publishEvent publishes an event with workspace/session context.
+// This ensures all events from this manager include proper context for multi-device support.
+func (m *Manager) publishEvent(event *events.BaseEvent) {
+	if m.hub == nil {
+		return
+	}
+	// Set context on the event before publishing
+	event.SetContext(m.workspaceID, m.sessionID)
+	m.hub.Publish(event)
 }
 
 // SetLogDir enables file logging to the specified directory.
@@ -241,7 +292,7 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 		Msg("claude started")
 
 	// Publish status event
-	m.hub.Publish(events.NewClaudeStatusEvent(events.ClaudeStateRunning, prompt, m.pid))
+	m.publishEvent(events.NewClaudeStatusEvent(events.ClaudeStateRunning, prompt, m.pid))
 
 	// Stream output in goroutines
 	// Session ID will be captured from first message and broadcast via event
@@ -279,19 +330,19 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 		// Check if context was cancelled (stopped by user)
 		if runCtx.Err() == context.Canceled {
 			m.state = events.ClaudeStateStopped
-			m.hub.Publish(events.NewClaudeStoppedEvent(exitCode))
+			m.publishEvent(events.NewClaudeStoppedEvent(exitCode))
 			log.Info().Int("exit_code", exitCode).Msg("claude stopped by user")
 		} else if runCtx.Err() == context.DeadlineExceeded {
 			m.state = events.ClaudeStateError
-			m.hub.Publish(events.NewClaudeErrorEvent("timeout exceeded", exitCode))
+			m.publishEvent(events.NewClaudeErrorEvent("timeout exceeded", exitCode))
 			log.Warn().Msg("claude timed out")
 		} else if exitCode != 0 {
 			m.state = events.ClaudeStateError
-			m.hub.Publish(events.NewClaudeErrorEvent(fmt.Sprintf("exit code %d", exitCode), exitCode))
+			m.publishEvent(events.NewClaudeErrorEvent(fmt.Sprintf("exit code %d", exitCode), exitCode))
 			log.Warn().Int("exit_code", exitCode).Msg("claude exited with error")
 		} else {
 			m.state = events.ClaudeStateIdle
-			m.hub.Publish(events.NewClaudeIdleEvent())
+			m.publishEvent(events.NewClaudeIdleEvent())
 			log.Info().Msg("claude completed successfully")
 		}
 
@@ -404,7 +455,7 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 
 		// Publish event with optional parsed data
 		if parsed != nil {
-			m.hub.Publish(events.NewClaudeLogEventWithParsed(line, stream, parsed))
+			m.publishEvent(events.NewClaudeLogEventWithParsed(line, stream, parsed))
 
 			// Also emit claude_message event for structured UI rendering
 			if msgPayload := m.convertToClaudeMessagePayload(parsed); msgPayload != nil {
@@ -413,10 +464,10 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 					Str("session_id", msgPayload.SessionID).
 					Int("content_blocks", len(msgPayload.Content)).
 					Msg("emitting claude_message event")
-				m.hub.Publish(events.NewClaudeMessageEventFull(*msgPayload))
+				m.publishEvent(events.NewClaudeMessageEventFull(*msgPayload))
 			}
 		} else {
-			m.hub.Publish(events.NewClaudeLogEvent(line, stream))
+			m.publishEvent(events.NewClaudeLogEvent(line, stream))
 		}
 
 		// Parse stdout for interactive tool use detection
@@ -588,7 +639,7 @@ func (m *Manager) parseAndDetectToolUse(line string) {
 
 			// Broadcast session info event to WebSocket clients
 			m.mu.Unlock()
-			m.hub.Publish(events.NewClaudeSessionInfoEvent(msg.SessionID, "", ""))
+			m.publishEvent(events.NewClaudeSessionInfoEvent(msg.SessionID, "", ""))
 		} else {
 			m.mu.Unlock()
 		}
@@ -630,7 +681,7 @@ func (m *Manager) parseAndDetectToolUse(line string) {
 						Msg("claude waiting for user input")
 
 					// Publish event to notify clients
-					m.hub.Publish(events.NewClaudeWaitingEvent(content.ID, content.Name, string(content.Input)))
+					m.publishEvent(events.NewClaudeWaitingEvent(content.ID, content.Name, string(content.Input)))
 					return
 				}
 
@@ -650,7 +701,7 @@ func (m *Manager) parseAndDetectToolUse(line string) {
 						Msg("claude requesting permission")
 
 					// Publish permission event to notify clients
-					m.hub.Publish(events.NewClaudePermissionEvent(content.ID, content.Name, string(content.Input), description))
+					m.publishEvent(events.NewClaudePermissionEvent(content.ID, content.Name, string(content.Input), description))
 					return
 				}
 			}
@@ -1092,7 +1143,7 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 			},
 		},
 	}
-	m.hub.Publish(events.NewClaudeMessageEventFull(inputPayload))
+	m.publishEvent(events.NewClaudeMessageEventFull(inputPayload))
 	log.Debug().Msg("bash input event published to hub")
 
 	// Event 2: Bash output
@@ -1113,11 +1164,11 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 			},
 		},
 	}
-	m.hub.Publish(events.NewClaudeMessageEventFull(outputPayload))
+	m.publishEvent(events.NewClaudeMessageEventFull(outputPayload))
 	log.Debug().Msg("bash output event published to hub")
 
 	// Emit completion event
-	m.hub.Publish(events.NewClaudeIdleEvent())
+	m.publishEvent(events.NewClaudeIdleEvent())
 	log.Info().Msg("bash execution completed, events emitted")
 
 	if exitCode != 0 {
