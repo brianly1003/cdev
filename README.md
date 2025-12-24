@@ -17,7 +17,6 @@
   [![Go Version](https://img.shields.io/github/go-mod/go-version/brianly1003/cdev?style=flat-square)](https://golang.org/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
   [![GitHub Issues](https://img.shields.io/github/issues/brianly1003/cdev?style=flat-square)](https://github.com/brianly1003/cdev/issues)
-  [![Discord](https://img.shields.io/badge/chat-discord-blue.svg?style=flat-square)](https://discord.gg/cdev)
 </div>
 
 ---
