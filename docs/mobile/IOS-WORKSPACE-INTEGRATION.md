@@ -217,6 +217,8 @@ Stop a workspace server.
 
 Scan for Git repositories (for workspace setup from mobile).
 
+Uses **cache-first strategy**: returns cached results immediately if available, triggers background refresh if cache is stale. This ensures fast response times (<100ms for cached results).
+
 **Request:**
 ```json
 {
@@ -224,10 +226,15 @@ Scan for Git repositories (for workspace setup from mobile).
   "id": 4,
   "method": "workspace/discover",
   "params": {
-    "paths": ["/Users/dev/Projects"]
+    "paths": ["/Users/dev/Projects"],
+    "fresh": false
   }
 }
 ```
+
+**Parameters:**
+- `paths` (optional): Custom paths to scan. If not provided, scans default paths.
+- `fresh` (optional): Set to `true` to force a fresh scan, ignoring cache.
 
 **Response:**
 ```json
@@ -244,10 +251,24 @@ Scan for Git repositories (for workspace setup from mobile).
         "is_configured": false
       }
     ],
-    "count": 1
+    "count": 1,
+    "cached": true,
+    "cache_age_seconds": 1800,
+    "refresh_in_progress": true,
+    "elapsed_ms": 5,
+    "scanned_paths": 0,
+    "skipped_paths": 0
   }
 }
 ```
+
+**Response Fields:**
+- `cached`: Whether results came from cache
+- `cache_age_seconds`: Age of cached results in seconds
+- `refresh_in_progress`: Whether a background refresh is running
+- `elapsed_ms`: Time taken for this request
+
+See [REPOSITORY-DISCOVERY.md](../architecture/REPOSITORY-DISCOVERY.md) for full architecture details.
 
 ---
 
@@ -297,6 +318,27 @@ struct DiscoveredRepo: Codable {
         case remoteUrl = "remote_url"
         case lastModified = "last_modified"
         case isConfigured = "is_configured"
+    }
+}
+
+// Discovery result with cache metadata
+struct DiscoveryResult: Codable {
+    let repositories: [DiscoveredRepo]
+    let count: Int
+    let cached: Bool
+    let cacheAgeSeconds: Int64?
+    let refreshInProgress: Bool?
+    let elapsedMs: Int64
+    let scannedPaths: Int?
+    let skippedPaths: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case repositories, count, cached
+        case cacheAgeSeconds = "cache_age_seconds"
+        case refreshInProgress = "refresh_in_progress"
+        case elapsedMs = "elapsed_ms"
+        case scannedPaths = "scanned_paths"
+        case skippedPaths = "skipped_paths"
     }
 }
 ```
@@ -362,10 +404,13 @@ class WorkspaceManagerService {
         )
     }
 
-    func discoverRepositories(paths: [String]? = nil) async throws -> [DiscoveredRepo] {
+    func discoverRepositories(paths: [String]? = nil, fresh: Bool = false) async throws -> DiscoveryResult {
         var params: [String: Any] = [:]
         if let paths = paths {
             params["paths"] = paths
+        }
+        if fresh {
+            params["fresh"] = true
         }
 
         let response = try await webSocketService.sendRequest(
@@ -373,12 +418,11 @@ class WorkspaceManagerService {
             params: params
         )
 
-        let result = response["repositories"] as! [[String: Any]]
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
-        let data = try JSONSerialization.data(withJSONObject: result)
-        return try decoder.decode([DiscoveredRepo].self, from: data)
+        let data = try JSONSerialization.data(withJSONObject: response)
+        return try decoder.decode(DiscoveryResult.self, from: data)
     }
 }
 ```
@@ -486,9 +530,15 @@ struct WorkspaceRow: View {
 try await managerService.connect()
 
 // 3. Discover repositories on user's laptop
-let repos = try await managerService.discoverRepositories()
+// Results may come from cache for instant display
+let result = try await managerService.discoverRepositories()
 
 // 4. Show list of discovered repos
+// Check if a background refresh is happening
+if result.cached && result.refreshInProgress == true {
+    showRefreshingIndicator()
+}
+
 // 5. User selects repos to add
 
 // 6. Add workspace via REST API (or future JSON-RPC method)

@@ -67,9 +67,12 @@ type FileCapabilities struct {
 
 // RepositoryCapabilities describes repository indexer capabilities.
 type RepositoryCapabilities struct {
-	Index  bool `json:"index"`
-	Search bool `json:"search"`
-	Tree   bool `json:"tree"`
+	Index   bool `json:"index"`   // repository/index/status, repository/index/rebuild
+	Search  bool `json:"search"`  // repository/search
+	List    bool `json:"list"`    // repository/files/list
+	Tree    bool `json:"tree"`    // repository/files/tree
+	Stats   bool `json:"stats"`   // repository/stats
+	Rebuild bool `json:"rebuild"` // repository/index/rebuild
 }
 
 // LifecycleService handles initialization and shutdown.
@@ -163,6 +166,10 @@ type InitializeResult struct {
 
 	// Capabilities describes what the server can do.
 	Capabilities ServerCapabilities `json:"capabilities"`
+
+	// ClientID is the unique identifier assigned to this client connection.
+	// Use this to identify yourself in session events (e.g., session_joined, session_left).
+	ClientID string `json:"clientId"`
 }
 
 // ServerInfo describes the server.
@@ -186,6 +193,9 @@ func (s *LifecycleService) Initialize(ctx context.Context, params json.RawMessag
 		// We could validate client version here if needed
 	}
 
+	// Get client ID from context (assigned by WebSocket handler on connection)
+	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+
 	return InitializeResult{
 		ProtocolVersion: "1.0",
 		ServerInfo: ServerInfo{
@@ -193,6 +203,7 @@ func (s *LifecycleService) Initialize(ctx context.Context, params json.RawMessag
 			Version: s.version,
 		},
 		Capabilities: s.capabilities,
+		ClientID:     clientID,
 	}, nil
 }
 

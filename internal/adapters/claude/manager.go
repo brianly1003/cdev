@@ -188,6 +188,8 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	case SessionModeContinue:
 		// Continue requires session_id, uses --resume flag
 		if sessionID == "" {
+			m.mu.Unlock()
+			cancel()
 			return fmt.Errorf("session_id is required for continue mode")
 		}
 		cmdArgs = append(cmdArgs, "--resume", sessionID)
@@ -197,6 +199,11 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	// Add skip permissions flag if enabled
 	if m.skipPermissions {
 		cmdArgs = append(cmdArgs, "--dangerously-skip-permissions")
+	} else {
+		// When permissions are not skipped, we need stream-json input format
+		// for sending permission responses via stdin
+		// The prompt is still passed as CLI argument, but responses are JSON
+		cmdArgs = append(cmdArgs, "--input-format", "stream-json")
 	}
 
 	// Add the prompt as the last argument

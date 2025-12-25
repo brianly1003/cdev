@@ -29,12 +29,19 @@ type SQLiteIndexer struct {
 	status  IndexStatus
 
 	// Prepared statements
-	stmtInsertFile    *sql.Stmt
-	stmtUpdateFile    *sql.Stmt
-	stmtDeleteFile    *sql.Stmt
-	stmtGetFile       *sql.Stmt
-	stmtSearchFuzzy   *sql.Stmt
-	stmtFindByFileID  *sql.Stmt // For rename detection
+	stmtInsertFile   *sql.Stmt
+	stmtUpdateFile   *sql.Stmt
+	stmtDeleteFile   *sql.Stmt
+	stmtGetFile      *sql.Stmt
+	stmtSearchFuzzy  *sql.Stmt
+	stmtFindByFileID *sql.Stmt // For rename detection
+
+	// Stats cache - invalidated on file changes
+	statsMu         sync.RWMutex
+	statsCache      *RepositoryStats
+	statsCacheTime  time.Time
+	statsCacheTTL   time.Duration // Fallback TTL (default: 5 minutes)
+	statsCacheValid bool
 
 	// Background tasks
 	done chan struct{}
@@ -67,13 +74,14 @@ func NewIndexer(repoPath string, skipDirs []string) (*SQLiteIndexer, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Configure SQLite for performance
+	// Configure SQLite for performance and concurrency
 	pragmas := []string{
 		"PRAGMA journal_mode=WAL",
 		"PRAGMA synchronous=NORMAL",
-		"PRAGMA cache_size=-64000", // 64MB cache
+		"PRAGMA cache_size=-64000",    // 64MB cache
 		"PRAGMA temp_store=MEMORY",
-		"PRAGMA mmap_size=268435456", // 256MB mmap
+		"PRAGMA mmap_size=268435456",  // 256MB mmap
+		"PRAGMA busy_timeout=5000",    // Wait up to 5 seconds if database is locked
 	}
 	for _, pragma := range pragmas {
 		if _, err := db.Exec(pragma); err != nil {
@@ -89,12 +97,13 @@ func NewIndexer(repoPath string, skipDirs []string) (*SQLiteIndexer, error) {
 	}
 
 	indexer := &SQLiteIndexer{
-		db:       db,
-		dbPath:   dbPath,
-		scanner:  scanner,
-		repoPath: absPath,
-		skipDirs: skipDirs,
-		done:     make(chan struct{}),
+		db:            db,
+		dbPath:        dbPath,
+		scanner:       scanner,
+		repoPath:      absPath,
+		skipDirs:      skipDirs,
+		done:          make(chan struct{}),
+		statsCacheTTL: 5 * time.Minute, // Fallback TTL for stats cache
 		status: IndexStatus{
 			Status:    "initializing",
 			IsGitRepo: scanner.IsGitRepo(),
@@ -472,6 +481,9 @@ func (idx *SQLiteIndexer) FullScan(ctx context.Context) error {
 	// Update directory statistics
 	idx.updateDirectoryStats()
 
+	// Invalidate stats cache since we just rebuilt everything
+	idx.InvalidateStatsCache()
+
 	// Update final status
 	idx.mu.Lock()
 	idx.status.TotalFiles = len(files)
@@ -557,6 +569,9 @@ func (idx *SQLiteIndexer) IndexFile(ctx context.Context, relPath string) error {
 	idx.status.LastUpdate = time.Now()
 	idx.mu.Unlock()
 
+	// Invalidate stats cache since file data changed
+	idx.InvalidateStatsCache()
+
 	return nil
 }
 
@@ -580,6 +595,11 @@ func (idx *SQLiteIndexer) RemoveFile(ctx context.Context, relPath string) error 
 	}
 	idx.mu.Unlock()
 
+	// Invalidate stats cache since file was removed
+	if rowsAffected > 0 {
+		idx.InvalidateStatsCache()
+	}
+
 	return nil
 }
 
@@ -590,90 +610,139 @@ func (idx *SQLiteIndexer) GetStatus() IndexStatus {
 	return idx.status
 }
 
+// InvalidateStatsCache invalidates the cached repository statistics.
+// This should be called when files are added, modified, or removed.
+func (idx *SQLiteIndexer) InvalidateStatsCache() {
+	idx.statsMu.Lock()
+	defer idx.statsMu.Unlock()
+	idx.statsCacheValid = false
+	idx.statsCache = nil
+	log.Debug().Msg("repository stats cache invalidated")
+}
+
+// isStatsCacheValid checks if the stats cache is valid.
+func (idx *SQLiteIndexer) isStatsCacheValid() bool {
+	idx.statsMu.RLock()
+	defer idx.statsMu.RUnlock()
+
+	if !idx.statsCacheValid || idx.statsCache == nil {
+		return false
+	}
+
+	// Also check TTL as a safety net
+	if time.Since(idx.statsCacheTime) > idx.statsCacheTTL {
+		return false
+	}
+
+	return true
+}
+
 // updateDirectoryStats updates the directory statistics table.
 // This includes parent directories that may not have direct files.
+// Optimized to use a single query instead of O(N×2) queries per directory.
 func (idx *SQLiteIndexer) updateDirectoryStats() {
-	// First, get all unique directories from files
-	rows, err := idx.db.Query("SELECT DISTINCT directory FROM repository_files WHERE directory != ''")
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to query directories")
+	start := time.Now()
+	now := start.Unix()
+
+	// Clear existing directory stats
+	if _, err := idx.db.Exec("DELETE FROM repository_directories"); err != nil {
+		log.Warn().Err(err).Msg("failed to clear directory stats")
 		return
 	}
 
-	// Collect all directories including parents
-	allDirs := make(map[string]bool)
-	for rows.Next() {
-		var dir string
-		if err := rows.Scan(&dir); err != nil {
-			continue
-		}
-		// Add this directory and all its parents
-		for dir != "" {
-			allDirs[dir] = true
-			lastSlash := strings.LastIndex(dir, "/")
-			if lastSlash == -1 {
-				break
-			}
-			dir = dir[:lastSlash]
-		}
+	// Single optimized query that:
+	// 1. Gets all unique directories (including parent paths)
+	// 2. Calculates file counts and sizes for each directory (including subdirectories)
+	// 3. Inserts all results in one batch
+	//
+	// This replaces O(N×2) individual queries with a single aggregated query.
+	query := `
+		WITH RECURSIVE
+		-- Extract all unique directories from files
+		file_dirs AS (
+			SELECT DISTINCT directory FROM repository_files WHERE directory != ''
+		),
+		-- Recursively generate all parent directories
+		all_dirs AS (
+			SELECT directory FROM file_dirs
+			UNION
+			SELECT
+				CASE
+					WHEN INSTR(directory, '/') > 0
+					THEN SUBSTR(directory, 1, LENGTH(directory) - LENGTH(SUBSTR(directory, INSTR(directory, '/') + 1)) - 1)
+					ELSE ''
+				END as directory
+			FROM all_dirs
+			WHERE directory != '' AND INSTR(directory, '/') > 0
+		),
+		-- Get unique non-empty directories
+		unique_dirs AS (
+			SELECT DISTINCT directory FROM all_dirs WHERE directory != ''
+		),
+		-- Calculate stats for each directory (including subdirectories)
+		dir_stats AS (
+			SELECT
+				ud.directory,
+				(SELECT COUNT(*) FROM repository_files rf
+				 WHERE rf.directory = ud.directory
+				    OR rf.directory LIKE ud.directory || '/%') as file_count,
+				(SELECT COALESCE(SUM(size_bytes), 0) FROM repository_files rf
+				 WHERE rf.directory = ud.directory
+				    OR rf.directory LIKE ud.directory || '/%') as total_size,
+				(SELECT COALESCE(MAX(modified_at), 0) FROM repository_files rf
+				 WHERE rf.directory = ud.directory
+				    OR rf.directory LIKE ud.directory || '/%') as last_modified
+			FROM unique_dirs ud
+		)
+		INSERT INTO repository_directories (path, file_count, total_size_bytes, last_modified, indexed_at)
+		SELECT directory, file_count, total_size, last_modified, ?
+		FROM dir_stats
+		WHERE file_count > 0
+	`
+
+	result, err := idx.db.Exec(query, now)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to update directory stats with optimized query")
+		// Fall back to simple root-only stats
+		idx.updateRootDirectoryStats(now)
+		return
 	}
-	rows.Close()
 
-	// Clear existing directory stats
-	idx.db.Exec("DELETE FROM repository_directories")
-
-	// Insert stats for each directory
-	now := time.Now().Unix()
-	for dir := range allDirs {
-		// Calculate stats for files in this directory and all subdirectories
-		var fileCount int
-		var totalSize int64
-		var lastModified int64
-
-		// Count files directly in this directory
-		idx.db.QueryRow(`
-			SELECT COUNT(*), COALESCE(SUM(size_bytes), 0), COALESCE(MAX(modified_at), 0)
-			FROM repository_files WHERE directory = ?
-		`, dir).Scan(&fileCount, &totalSize, &lastModified)
-
-		// Also include files in subdirectories for total counts
-		var subFileCount int
-		var subTotalSize int64
-		var subLastModified int64
-		idx.db.QueryRow(`
-			SELECT COUNT(*), COALESCE(SUM(size_bytes), 0), COALESCE(MAX(modified_at), 0)
-			FROM repository_files WHERE directory LIKE ?
-		`, dir+"/%").Scan(&subFileCount, &subTotalSize, &subLastModified)
-
-		fileCount += subFileCount
-		totalSize += subTotalSize
-		if subLastModified > lastModified {
-			lastModified = subLastModified
-		}
-
-		_, err := idx.db.Exec(`
-			INSERT INTO repository_directories (path, file_count, total_size_bytes, last_modified, indexed_at)
-			VALUES (?, ?, ?, ?, ?)
-		`, dir, fileCount, totalSize, lastModified, now)
-		if err != nil {
-			log.Warn().Err(err).Str("dir", dir).Msg("failed to insert directory stats")
-		}
-	}
+	rowsAffected, _ := result.RowsAffected()
 
 	// Also add entry for root (files with empty directory)
+	idx.updateRootDirectoryStats(now)
+
+	log.Debug().
+		Int64("directories", rowsAffected).
+		Dur("elapsed", time.Since(start)).
+		Msg("updated directory stats")
+}
+
+// updateRootDirectoryStats adds stats for files in the root directory.
+func (idx *SQLiteIndexer) updateRootDirectoryStats(now int64) {
 	var rootCount int
 	var rootSize int64
 	var rootModified int64
-	idx.db.QueryRow(`
+
+	err := idx.db.QueryRow(`
 		SELECT COUNT(*), COALESCE(SUM(size_bytes), 0), COALESCE(MAX(modified_at), 0)
 		FROM repository_files WHERE directory = ''
 	`).Scan(&rootCount, &rootSize, &rootModified)
 
+	if err != nil {
+		log.Debug().Err(err).Msg("failed to query root directory stats")
+		return
+	}
+
 	if rootCount > 0 {
-		idx.db.Exec(`
-			INSERT INTO repository_directories (path, file_count, total_size_bytes, last_modified, indexed_at)
+		_, err = idx.db.Exec(`
+			INSERT OR REPLACE INTO repository_directories (path, file_count, total_size_bytes, last_modified, indexed_at)
 			VALUES ('', ?, ?, ?, ?)
 		`, rootCount, rootSize, rootModified, now)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to insert root directory stats")
+		}
 	}
 }
 

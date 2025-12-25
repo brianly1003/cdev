@@ -1,9 +1,17 @@
 # iOS Integration Guide
 
-> **Version:** 2.0 (Single-Port Architecture)
+> **Version:** 2.3 (Session Status & Event Context)
 > **Last Updated:** December 2024
 
 This guide helps the iOS team integrate with the new cdev server architecture.
+
+## Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| [IOS-WORKSPACE-INTEGRATION.md](./IOS-WORKSPACE-INTEGRATION.md) | Multi-workspace support |
+| [LIVE-SESSION-INTEGRATION.md](./LIVE-SESSION-INTEGRATION.md) | **NEW: LIVE session support** |
+| [../guides/WORKSPACE-MANAGER-SETUP.md](../guides/WORKSPACE-MANAGER-SETUP.md) | Backend setup guide |
 
 ---
 
@@ -124,6 +132,71 @@ let localString = displayFormatter.string(from: date!)
 
 ---
 
+## Connection Lifecycle
+
+### Initialize Connection
+
+When connecting to the WebSocket, the first call must be `initialize`. The response includes your unique `clientId` which is used for multi-device awareness.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "1.0",
+    "clientInfo": {
+      "name": "cdev-ios",
+      "version": "1.0.0"
+    }
+  }
+}
+
+// Response
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "1.0",
+    "serverInfo": {
+      "name": "cdev",
+      "version": "1.0.0"
+    },
+    "capabilities": {
+      "agent": {"run": true, "stop": true, "respond": true, "sessions": true, "sessionWatch": true},
+      "git": {"status": true, "diff": true, "stage": true, "commit": true, "push": true, "pull": true},
+      "file": {"get": true, "list": true}
+    },
+    "clientId": "40c1e40b-5b25-4991-84a7-3a763133e6c7"
+  }
+}
+```
+
+**Important:** Store the `clientId` from the response. You'll need it to:
+- Identify yourself in `session_joined`/`session_left` events
+- Recognize your own entries in the `viewers` array of sessions
+- Track which events are about you vs other devices
+
+### Swift Implementation
+
+```swift
+class WebSocketManager {
+    var myClientId: String?
+
+    func handleInitializeResponse(_ result: InitializeResult) {
+        myClientId = result.clientId
+        print("Connected as client: \(myClientId ?? "unknown")")
+    }
+
+    func isMe(_ clientId: String) -> Bool {
+        return clientId == myClientId
+    }
+}
+```
+
+---
+
 ## API Reference
 
 ### Workspace Methods
@@ -152,16 +225,55 @@ let localString = displayFormatter.string(from: date!)
             "workspace_id": "ws-abc123",
             "status": "running",
             "started_at": "2024-12-24T10:30:00Z",
-            "last_active": "2024-12-24T10:35:00Z"
+            "last_active": "2024-12-24T10:35:00Z",
+            "viewers": ["client-id-1", "client-id-2"]
+          },
+          {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "workspace_id": "ws-abc123",
+            "status": "historical",
+            "summary": "Refactored authentication module",
+            "message_count": 42,
+            "last_updated": "2024-12-23T14:20:00Z"
           }
         ],
         "active_session_count": 1,
-        "has_active_session": true
+        "has_active_session": true,
+        "active_session_id": "sess-xyz789"
       }
     ]
   }
 }
 ```
+
+**Session Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique session identifier (Claude CLI session UUID) |
+| `workspace_id` | string | Parent workspace ID |
+| `status` | string | `running` or `historical` (see below) |
+| `started_at` | string | RFC3339 timestamp (running sessions only) |
+| `last_active` | string | RFC3339 timestamp (running sessions only) |
+| `viewers` | string[] | List of client IDs currently viewing this session |
+| `summary` | string | Session summary (historical sessions only) |
+| `message_count` | int | Number of messages (historical sessions only) |
+| `last_updated` | string | RFC3339 timestamp (historical sessions only) |
+
+**Session Status Types:**
+
+| Status | Description | Can Use `session/send`? |
+|--------|-------------|-------------------------|
+| `running` | Active Claude CLI process, ready for prompts | Yes |
+| `historical` | Past session from `~/.claude/projects/`, not currently running | No - must resume first |
+
+**Important:** The `sessions` array includes both running sessions AND historical sessions from Claude's storage. To send prompts to a historical session, you must first resume it using `session/start` with `resume_session_id`.
+
+**Multi-Device Awareness:**
+- Each connected iOS device has a unique `clientId` (returned in `initialize` response)
+- When a device calls `client/session/focus`, it registers as a viewer of that session
+- The `viewers` array shows which devices are currently viewing each session
+- Use your own `clientId` to identify yourself in the viewers list
 
 #### `workspace/get` - Get workspace details
 
@@ -253,14 +365,116 @@ let localString = displayFormatter.string(from: date!)
 
 ---
 
+### File Methods
+
+#### `workspace/files/list` - List files in a workspace directory
+
+**Returns a paginated list of files and directories. Matches the format of `/api/repository/files/list`.**
+
+```json
+// Request
+{"jsonrpc": "2.0", "id": 6, "method": "workspace/files/list", "params": {
+  "workspace_id": "ws-abc123",
+  "directory": "",
+  "limit": 500,
+  "offset": 0
+}}
+
+// Response
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "result": {
+    "directory": "",
+    "directories": [
+      {
+        "path": "src",
+        "name": "src",
+        "file_count": 42,
+        "total_size_bytes": 156000,
+        "last_modified": "2024-12-24T10:30:00Z"
+      },
+      {
+        "path": "docs",
+        "name": "docs",
+        "file_count": 10,
+        "total_size_bytes": 45000,
+        "last_modified": "2024-12-23T14:00:00Z"
+      }
+    ],
+    "files": [
+      {
+        "path": "README.md",
+        "name": "README.md",
+        "directory": "",
+        "extension": "md",
+        "size_bytes": 1595,
+        "modified_at": "2024-12-24T10:00:00Z",
+        "is_binary": false,
+        "is_symlink": false,
+        "is_sensitive": false,
+        "git_tracked": false,
+        "git_ignored": false
+      },
+      {
+        "path": "package.json",
+        "name": "package.json",
+        "directory": "",
+        "extension": "json",
+        "size_bytes": 2456,
+        "modified_at": "2024-12-24T09:00:00Z",
+        "is_binary": false,
+        "is_symlink": false,
+        "is_sensitive": false,
+        "git_tracked": false,
+        "git_ignored": false
+      }
+    ],
+    "total_files": 5,
+    "total_directories": 3,
+    "pagination": {
+      "limit": 500,
+      "offset": 0,
+      "has_more": false
+    }
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter | Required | Type | Default | Description |
+|-----------|----------|------|---------|-------------|
+| `workspace_id` | Yes | string | - | Workspace ID |
+| `directory` | No | string | `""` | Relative path from workspace root |
+| `limit` | No | int | 100 | Max entries to return (max 500) |
+| `offset` | No | int | 0 | Pagination offset |
+
+---
+
 ### Session Methods
 
 #### `session/start` - Start a Claude session
 
+Starts a new Claude CLI session for the specified workspace. Use `resume_session_id` to continue a historical session.
+
+**Parameters:**
+
+| Parameter | Required | Type | Description |
+|-----------|----------|------|-------------|
+| `workspace_id` | Yes | string | Workspace ID to start session in |
+| `resume_session_id` | No | string | Historical session ID to resume (from `workspace/session/history`) |
+
 ```json
-// Request
+// Request (new session)
 {"jsonrpc": "2.0", "id": 10, "method": "session/start", "params": {
   "workspace_id": "ws-abc123"
+}}
+
+// Request (resume historical session)
+{"jsonrpc": "2.0", "id": 10, "method": "session/start", "params": {
+  "workspace_id": "ws-abc123",
+  "resume_session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }}
 
 // Response
@@ -277,6 +491,13 @@ let localString = displayFormatter.string(from: date!)
 }
 ```
 
+**Resuming Historical Sessions:**
+
+When a user selects a historical session (status: `historical`) and wants to continue the conversation:
+1. Call `session/start` with `resume_session_id` set to the historical session's ID
+2. The new session will continue where the historical session left off
+3. The session will have a new cdev session ID but the same Claude CLI session ID
+
 #### `session/stop` - Stop a session
 
 ```json
@@ -288,6 +509,8 @@ let localString = displayFormatter.string(from: date!)
 
 #### `session/send` - Send a prompt to Claude
 
+**Important:** This method only works on sessions with `status: "running"`. For historical sessions, you must first resume them using `session/start` with `resume_session_id`.
+
 ```json
 // Request
 {"jsonrpc": "2.0", "id": 12, "method": "session/send", "params": {
@@ -296,8 +519,18 @@ let localString = displayFormatter.string(from: date!)
   "mode": "new"  // or "continue"
 }}
 
-// Response
+// Response (success)
 {"jsonrpc": "2.0", "id": 12, "result": {"status": "sent"}}
+
+// Response (error - session not running)
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "error": {
+    "code": -32602,
+    "message": "session not running: sess-xyz789 (use session/start with resume_session_id to resume historical sessions)"
+  }
+}
 ```
 
 #### `session/respond` - Respond to permission/question
@@ -361,13 +594,13 @@ let localString = displayFormatter.string(from: date!)
 }}
 ```
 
-#### `session/history` - Get historical sessions for a workspace
+#### `workspace/session/history` - Get historical sessions for a workspace
 
 **Returns Claude session history from `~/.claude/projects/<encoded-path>`.**
 
 ```json
 // Request
-{"jsonrpc": "2.0", "id": 18, "method": "session/history", "params": {
+{"jsonrpc": "2.0", "id": 18, "method": "workspace/session/history", "params": {
   "workspace_id": "ws-abc123",
   "limit": 20
 }}
@@ -513,6 +746,41 @@ let localString = displayFormatter.string(from: date!)
 }
 ```
 
+#### `workspace/session/activate` - Set active session for a workspace
+
+**Sets the active session that this device is viewing.** This is tracked server-side and reflected in `workspace/list` responses.
+
+**Note:** This is automatically called when you:
+- Start a new session with `session/start`
+- Start watching a session with `workspace/session/watch`
+
+Use this method when you want to explicitly switch active sessions without starting a watch.
+
+```json
+// Request
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "method": "workspace/session/activate",
+  "params": {
+    "workspace_id": "ws-abc123",
+    "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+
+// Response
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "result": {
+    "success": true,
+    "workspace_id": "ws-abc123",
+    "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "message": "Session activated"
+  }
+}
+```
+
 ---
 
 ### Session History & Live Streaming Flow
@@ -521,7 +789,7 @@ let localString = displayFormatter.string(from: date!)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  1. Get session list with session/history                    │
+│  1. Get session list with workspace/session/history          │
 │     → Returns list of historical sessions for workspace      │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -582,6 +850,180 @@ func viewSession(workspaceId: String, sessionId: String) async throws {
 // When user leaves the session view
 func leaveSessionView() async throws {
     try await client.rpc("workspace/session/unwatch", params: [:])
+}
+```
+
+---
+
+### Multi-Device Session Awareness Methods
+
+When multiple iOS devices are viewing the same Claude session, each device can notify the server about which session they're focused on, enabling real-time notifications when other devices join or leave.
+
+#### `client/session/focus` - Notify server of session focus
+
+Notify the server which session this device is currently viewing. Other devices viewing the same session will be notified.
+
+**Request:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 25,
+  "method": "client/session/focus",
+  "params": {
+    "workspace_id": "ws-abc123",
+    "session_id": "session-456"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 25,
+  "result": {
+    "workspace_id": "ws-abc123",
+    "session_id": "session-456",
+    "other_viewers": ["device-uuid-2"],
+    "viewer_count": 2,
+    "success": true
+  }
+}
+```
+
+**Parameters:**
+- `workspace_id` (string, required): The workspace ID containing the session
+- `session_id` (string, required): The session ID to focus on
+
+**Response Fields:**
+- `workspace_id`: The workspace ID
+- `session_id`: The session ID being focused on
+- `other_viewers`: Array of client UUIDs currently viewing the same session
+- `viewer_count`: Total number of devices viewing this session (including caller)
+- `success`: Whether the operation succeeded
+
+**Typical Flow:**
+```swift
+// When user taps on a session in the list
+func selectSession(workspaceId: String, sessionId: String) async throws {
+    // Notify server about focus change
+    let result: FocusChangeResult = try await client.rpc(
+        "client/session/focus",
+        params: [
+            "workspace_id": workspaceId,
+            "session_id": sessionId
+        ]
+    )
+
+    // Update UI with viewer count
+    updateViewerCount(result.viewerCount)
+
+    // Show who else is viewing
+    if !result.otherViewers.isEmpty {
+        showNotification("Other devices are viewing this session")
+    }
+}
+
+struct FocusChangeResult: Codable {
+    let workspaceId: String
+    let sessionId: String
+    let otherViewers: [String]
+    let viewerCount: Int
+    let success: Bool
+}
+```
+
+#### Event: `session_joined` - Device joined session
+
+**Emitted when:** Another device joins a session you're currently viewing
+
+**Event:**
+```json
+{
+  "event": "session_joined",
+  "timestamp": "2025-12-25T10:30:00Z",
+  "workspace_id": "ws-abc123",
+  "session_id": "session-456",
+  "payload": {
+    "joining_client_id": "device-uuid-1",
+    "other_viewers": ["device-uuid-2"],
+    "viewer_count": 2
+  }
+}
+```
+
+**Handling in Swift:**
+```swift
+func handleSessionJoined(_ event: Event) {
+    guard event.event == "session_joined",
+          let payload = event.payload as? SessionJoinedPayload else {
+        return
+    }
+
+    // Only notify if this is for the session user is viewing
+    guard payload.sessionId == currentSessionId else { return }
+
+    // Show notification
+    showNotification(
+        title: "Collaborator Joined",
+        message: "Another device is now viewing this session"
+    )
+
+    // Update viewer count badge
+    updateViewerCount(payload.viewerCount)
+}
+
+struct SessionJoinedPayload: Codable {
+    let joiningClientId: String
+    let otherViewers: [String]
+    let viewerCount: Int
+}
+```
+
+#### Event: `session_left` - Device left session
+
+**Emitted when:** A device leaves a session other devices are viewing
+
+**Event:**
+```json
+{
+  "event": "session_left",
+  "timestamp": "2025-12-25T10:31:00Z",
+  "workspace_id": "ws-abc123",
+  "session_id": "session-456",
+  "payload": {
+    "leaving_client_id": "device-uuid-1",
+    "remaining_viewers": ["device-uuid-3"],
+    "viewer_count": 1
+  }
+}
+```
+
+**Handling in Swift:**
+```swift
+func handleSessionLeft(_ event: Event) {
+    guard event.event == "session_left",
+          let payload = event.payload as? SessionLeftPayload else {
+        return
+    }
+
+    // Only handle if this is for the session user is viewing
+    guard payload.sessionId == currentSessionId else { return }
+
+    // Update viewer count
+    updateViewerCount(payload.viewerCount)
+
+    // Optionally show notification
+    if payload.viewerCount <= 1 {
+        // Last viewer left, hide collaborator UI
+        hideCollaboratorUI()
+    }
+}
+
+struct SessionLeftPayload: Codable {
+    let leavingClientId: String
+    let remainingViewers: [String]
+    let viewerCount: Int
 }
 ```
 
@@ -841,8 +1283,62 @@ All events now include `workspace_id` and `session_id` for filtering.
 | `claude_waiting` | Waiting for user input (question) |
 | `claude_permission` | Permission request |
 | `claude_session_info` | Session ID captured |
-| `claude_log` | Raw Claude output |
+| `claude_log` | Raw Claude CLI output (stream-json format) |
 | `heartbeat` | Connection keepalive |
+
+### `claude_log` Event
+
+**Raw Claude CLI output in stream-json format.** This event contains the raw output from Claude CLI, useful for debugging or advanced processing. All events include `workspace_id` and `session_id` for filtering.
+
+```json
+{
+  "event": "claude_log",
+  "timestamp": "2024-12-24T10:35:00Z",
+  "workspace_id": "ws-abc123",
+  "session_id": "sess-xyz789",
+  "payload": {
+    "session_id": "claude-session-abc",
+    "type": "assistant",
+    "message": {
+      "id": "msg_01...",
+      "type": "message",
+      "role": "assistant",
+      "content": [...],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": null,
+      "usage": {"input_tokens": 100, "output_tokens": 50}
+    }
+  }
+}
+```
+
+**Key Fields:**
+| Field | Description |
+|-------|-------------|
+| `workspace_id` | The workspace this event belongs to |
+| `session_id` | The cdev session ID (from `session/start`) |
+| `payload.session_id` | The Claude CLI session ID (used for `--resume`) |
+| `payload.type` | Message type: `user`, `assistant`, `result` |
+| `payload.message` | Raw Claude API message structure |
+
+**Filtering Events by Session:**
+
+```swift
+func handleEvent(_ event: Event) {
+    // Filter events by session
+    guard event.sessionId == currentSessionId else {
+        return // Ignore events from other sessions
+    }
+
+    switch event.event {
+    case "claude_log":
+        handleClaudeLog(event.payload)
+    case "claude_message":
+        handleClaudeMessage(event.payload)
+    // ... other events
+    }
+}
+```
 
 ### `claude_message` Event
 

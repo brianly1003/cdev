@@ -490,7 +490,17 @@ func (idx *SQLiteIndexer) buildTree(ctx context.Context, path string, remainingD
 }
 
 // GetStats returns aggregate statistics about the repository.
+// Uses caching with event-driven invalidation for better performance.
 func (idx *SQLiteIndexer) GetStats(ctx context.Context) (*RepositoryStats, error) {
+	// Check if cached stats are valid
+	if idx.isStatsCacheValid() {
+		idx.statsMu.RLock()
+		stats := idx.statsCache
+		idx.statsMu.RUnlock()
+		return stats, nil
+	}
+
+	// Compute fresh stats
 	stats := &RepositoryStats{
 		FilesByExtension: make(map[string]int),
 	}
@@ -536,6 +546,13 @@ func (idx *SQLiteIndexer) GetStats(ctx context.Context) (*RepositoryStats, error
 		defer rows.Close()
 		stats.LargestFiles = idx.scanFileRows(rows)
 	}
+
+	// Cache the stats
+	idx.statsMu.Lock()
+	idx.statsCache = stats
+	idx.statsCacheTime = time.Now()
+	idx.statsCacheValid = true
+	idx.statsMu.Unlock()
 
 	return stats, nil
 }

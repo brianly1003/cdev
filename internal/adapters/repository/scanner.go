@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -199,16 +200,11 @@ func (s *Scanner) scanFile(absPath, relPath string, info os.FileInfo) (FileInfo,
 		}
 	}
 
-	// Calculate content hash for change detection (only for small text files)
+	// Calculate content hash and count lines in a single pass (only for small text files)
+	// This avoids opening the file twice, significantly improving I/O performance
 	if !fileInfo.IsBinary && info.Size() < 1024*1024 { // < 1MB
-		if hash, err := s.calculateHash(absPath); err == nil {
+		if hash, lines, err := s.hashAndCountLines(absPath); err == nil {
 			fileInfo.ContentHash = hash
-		}
-	}
-
-	// Count lines for text files
-	if !fileInfo.IsBinary && info.Size() < 1024*1024 {
-		if lines, err := s.countLines(absPath); err == nil {
 			fileInfo.LineCount = lines
 		}
 	}
@@ -316,55 +312,38 @@ func (s *Scanner) isSensitiveFile(name, path string) bool {
 	return false
 }
 
-// calculateHash calculates SHA256 hash of file content.
-func (s *Scanner) calculateHash(path string) (string, error) {
+// hashAndCountLines calculates SHA256 hash and counts lines in a single file read.
+// This is more efficient than separate calculateHash and countLines calls as it
+// only opens the file once and reads through it once.
+func (s *Scanner) hashAndCountLines(path string) (hash string, lines int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer f.Close()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// countLines counts the number of lines in a text file.
-func (s *Scanner) countLines(path string) (int, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-
+	lineCount := 0
 	buf := make([]byte, 32*1024)
-	count := 0
-	lineSep := []byte{'\n'}
+	newline := []byte{'\n'}
 
 	for {
-		n, err := f.Read(buf)
-		count += countByte(buf[:n], lineSep[0])
-		if err != nil {
+		n, readErr := f.Read(buf)
+		if n > 0 {
+			h.Write(buf[:n])
+			lineCount += bytes.Count(buf[:n], newline)
+		}
+		if readErr == io.EOF {
 			break
 		}
-	}
-
-	return count, nil
-}
-
-// countByte counts occurrences of a byte in a slice.
-func countByte(data []byte, b byte) int {
-	count := 0
-	for _, v := range data {
-		if v == b {
-			count++
+		if readErr != nil {
+			return "", 0, readErr
 		}
 	}
-	return count
+
+	return hex.EncodeToString(h.Sum(nil)), lineCount, nil
 }
+
 
 // IsGitRepo checks if the repository path is a git repository.
 func (s *Scanner) IsGitRepo() bool {

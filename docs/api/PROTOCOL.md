@@ -131,6 +131,12 @@ The preferred format for new clients. Follows the JSON-RPC 2.0 specification.
 | `session/messages` | Get session messages |
 | `session/watch` | Watch session for updates |
 | `session/unwatch` | Stop watching |
+| `repository/index/status` | Get repository index status |
+| `repository/search` | Search files in repository |
+| `repository/files/list` | List files in directory |
+| `repository/files/tree` | Get directory tree |
+| `repository/stats` | Get repository statistics |
+| `repository/index/rebuild` | Trigger index rebuild |
 
 ---
 

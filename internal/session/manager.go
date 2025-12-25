@@ -25,6 +25,7 @@ import (
 type Manager struct {
 	sessions          map[string]*Session             // keyed by session ID
 	workspaces        map[string]*workspace.Workspace // keyed by workspace ID
+	activeSessions    map[string]string               // workspace ID -> active session ID
 	gitTrackerManager *workspace.GitTrackerManager
 	hub               ports.EventHub
 	cfg               *config.Config
@@ -53,14 +54,15 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 	// TODO: Read from config when available
 
 	return &Manager{
-		sessions:    make(map[string]*Session),
-		workspaces:  make(map[string]*workspace.Workspace),
-		hub:         hub,
-		cfg:         cfg,
-		logger:      logger,
-		idleTimeout: idleTimeout,
-		ctx:         ctx,
-		cancel:      cancel,
+		sessions:       make(map[string]*Session),
+		workspaces:     make(map[string]*workspace.Workspace),
+		activeSessions: make(map[string]string),
+		hub:            hub,
+		cfg:            cfg,
+		logger:         logger,
+		idleTimeout:    idleTimeout,
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 }
 
@@ -84,18 +86,47 @@ func (m *Manager) Start() error {
 // Stop stops all sessions and the manager.
 func (m *Manager) Stop() error {
 	m.logger.Info("Stopping session manager")
+
+	// Close the session streamer first (has its own goroutine)
+	m.streamerMu.Lock()
+	if m.streamer != nil {
+		m.streamer.Close()
+		m.streamer = nil
+		m.logger.Debug("Session streamer closed")
+	}
+	m.streamerMu.Unlock()
+
+	// Cancel the manager context
 	m.cancel()
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Try to acquire lock with timeout to prevent hanging
+	lockAcquired := make(chan struct{})
+	go func() {
+		m.mu.Lock()
+		close(lockAcquired)
+	}()
+
+	select {
+	case <-lockAcquired:
+		// Got the lock, proceed with cleanup
+		defer m.mu.Unlock()
+	case <-time.After(5 * time.Second):
+		m.logger.Warn("Timeout waiting for session manager lock, forcing shutdown")
+		return fmt.Errorf("timeout waiting for lock")
+	}
+
+	// Create a fresh context for stopping sessions (since m.ctx is cancelled)
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
 
 	// Stop all active sessions
 	for _, session := range m.sessions {
-		if session.GetStatus() == StatusRunning {
-			m.stopSessionInternal(session)
+		if session.GetStatus() == StatusRunning || session.GetStatus() == StatusStarting {
+			m.stopSessionInternalWithContext(stopCtx, session)
 		}
 	}
 
+	m.logger.Info("Session manager stopped")
 	return nil
 }
 
@@ -148,7 +179,8 @@ func (m *Manager) ListWorkspaces() []*workspace.Workspace {
 }
 
 // StartSession starts a new Claude session for a workspace.
-// Multiple sessions can run concurrently for the same workspace.
+// It automatically uses the most recent historical session ID from ~/.claude/projects/
+// so that session/send with mode "continue" will properly resume the conversation.
 func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -159,8 +191,23 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
 	}
 
-	// Create new session
-	sessionID := uuid.New().String()
+	// Get the most recent historical session ID for this workspace
+	// This allows session/send with mode "continue" to resume the conversation
+	sessionID := m.getMostRecentHistoricalSessionID(ws.Definition.Path)
+	if sessionID == "" {
+		// No historical session found, generate a new UUID
+		sessionID = uuid.New().String()
+		m.logger.Info("No historical session found, using new session ID",
+			"session_id", sessionID,
+			"workspace_id", workspaceID,
+		)
+	} else {
+		m.logger.Info("Using most recent historical session ID",
+			"session_id", sessionID,
+			"workspace_id", workspaceID,
+		)
+	}
+
 	session := NewSession(sessionID, workspaceID)
 	session.SetStatus(StatusStarting)
 
@@ -201,6 +248,9 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	m.sessions[sessionID] = session
 	session.SetStatus(StatusRunning)
 
+	// Auto-activate this session for the workspace
+	m.activeSessions[workspaceID] = sessionID
+
 	m.logger.Info("Started session",
 		"session_id", sessionID,
 		"workspace_id", workspaceID,
@@ -209,6 +259,40 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	)
 
 	return session, nil
+}
+
+// getMostRecentHistoricalSessionID returns the most recent Claude session ID
+// from the historical sessions stored in ~/.claude/projects/<encoded-path>.
+// Returns empty string if no historical session is found.
+// Note: This method does NOT acquire the manager lock - caller must handle locking.
+func (m *Manager) getMostRecentHistoricalSessionID(workspacePath string) string {
+	// Create session cache for this workspace path
+	cache, err := sessioncache.New(workspacePath)
+	if err != nil {
+		m.logger.Debug("Failed to create session cache for historical lookup",
+			"path", workspacePath,
+			"error", err,
+		)
+		return ""
+	}
+	defer cache.Stop()
+
+	// Get session list (already sorted by last_updated, most recent first)
+	sessions, err := cache.ListSessions()
+	if err != nil {
+		m.logger.Debug("Failed to list sessions from cache",
+			"path", workspacePath,
+			"error", err,
+		)
+		return ""
+	}
+
+	if len(sessions) == 0 {
+		return ""
+	}
+
+	// Return the most recent session ID
+	return sessions[0].SessionID
 }
 
 // StopSession stops a running session.
@@ -226,15 +310,20 @@ func (m *Manager) StopSession(sessionID string) error {
 
 // stopSessionInternal stops a session (must hold lock).
 func (m *Manager) stopSessionInternal(session *Session) error {
+	return m.stopSessionInternalWithContext(m.ctx, session)
+}
+
+// stopSessionInternalWithContext stops a session with a specific context (must hold lock).
+func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *Session) error {
 	if session.GetStatus() != StatusRunning && session.GetStatus() != StatusStarting {
 		return nil // Already stopped
 	}
 
 	session.SetStatus(StatusStopping)
 
-	// Stop Claude manager
+	// Stop Claude manager with the provided context
 	if cm := session.ClaudeManager(); cm != nil {
-		if err := cm.Stop(m.ctx); err != nil {
+		if err := cm.Stop(ctx); err != nil {
 			m.logger.Warn("Error stopping Claude manager", "error", err, "session_id", session.ID)
 		}
 	}
@@ -291,6 +380,40 @@ func (m *Manager) GetSessionsForWorkspace(workspaceID string) []*Session {
 	return result
 }
 
+// ActivateSession sets the active session for a workspace.
+// This allows iOS clients to switch which session they are viewing/interacting with.
+// Multiple clients can have different active sessions for the same workspace.
+func (m *Manager) ActivateSession(workspaceID, sessionID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Verify workspace exists
+	if _, ok := m.workspaces[workspaceID]; !ok {
+		return fmt.Errorf("workspace not found: %s", workspaceID)
+	}
+
+	// Store the active session for this workspace
+	// Note: This is a simple implementation that tracks one active session per workspace.
+	// In the future, this could be extended to track per-client active sessions.
+	m.activeSessions[workspaceID] = sessionID
+
+	m.logger.Info("Activated session",
+		"workspace_id", workspaceID,
+		"session_id", sessionID,
+	)
+
+	return nil
+}
+
+// GetActiveSession returns the active session ID for a workspace.
+// Returns empty string if no session is explicitly activated.
+func (m *Manager) GetActiveSession(workspaceID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.activeSessions[workspaceID]
+}
+
 // CountActiveSessionsForWorkspace returns the count of active sessions for a workspace.
 func (m *Manager) CountActiveSessionsForWorkspace(workspaceID string) int {
 	m.mu.RLock()
@@ -320,6 +443,8 @@ func (m *Manager) ListSessions(workspaceID string) []*Info {
 }
 
 // SendPrompt sends a prompt to a session's Claude instance.
+// Only works on running sessions. To resume a historical session,
+// first call StartSessionWithResume, then SendPrompt.
 func (m *Manager) SendPrompt(sessionID string, prompt string, mode string) error {
 	session, err := m.GetSession(sessionID)
 	if err != nil {
@@ -327,7 +452,7 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string) error
 	}
 
 	if session.GetStatus() != StatusRunning {
-		return fmt.Errorf("session not running: %s", sessionID)
+		return fmt.Errorf("session not running: %s (use session/start with resume_session_id to resume historical sessions)", sessionID)
 	}
 
 	cm := session.ClaudeManager()
@@ -339,8 +464,9 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string) error
 
 	// Determine session mode and call appropriate method
 	if mode == "continue" {
-		claudeSessionID := cm.ClaudeSessionID()
-		return cm.StartWithSession(m.ctx, prompt, claude.SessionModeContinue, claudeSessionID)
+		// Use the cdev session ID which now equals the historical Claude session ID
+		// (set in StartSession from getMostRecentHistoricalSessionID)
+		return cm.StartWithSession(m.ctx, prompt, claude.SessionModeContinue, sessionID)
 	}
 
 	return cm.Start(m.ctx, prompt)
@@ -824,6 +950,11 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 
 	m.streamerWorkspaceID = workspaceID
 	m.streamerSessionID = sessionID
+
+	// Auto-activate the watched session (uses separate mutex, no deadlock)
+	m.mu.Lock()
+	m.activeSessions[workspaceID] = sessionID
+	m.mu.Unlock()
 
 	m.logger.Info("Started watching session for live updates",
 		"workspace_id", workspaceID,

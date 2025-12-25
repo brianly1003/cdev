@@ -237,7 +237,9 @@ Find Git repositories on your machine:
 ./bin/cdev workspace discover
 ```
 
-This scans `~/Projects`, `~/Code`, `~/Desktop`, and `~/Documents`.
+This scans common development directories like `~/Projects`, `~/Code`, `~/Developer`, `~/Desktop`, etc.
+
+**Note:** `~/Documents` is excluded by default for performance reasons (it typically contains many non-code files). See [REPOSITORY-DISCOVERY.md](../architecture/REPOSITORY-DISCOVERY.md) for the full list of default paths and skip directories.
 
 ### 4.4 Start a Workspace
 

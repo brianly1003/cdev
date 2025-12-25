@@ -28,7 +28,24 @@ The indexer automatically:
 
 ## API Endpoints
 
-### Get Index Status
+The Repository Indexer supports both HTTP REST API and JSON-RPC 2.0 over WebSocket. The JSON-RPC methods provide the same functionality with improved request/response correlation.
+
+### JSON-RPC Methods
+
+| JSON-RPC Method | HTTP Equivalent | Description |
+|-----------------|-----------------|-------------|
+| `repository/index/status` | `GET /api/repository/index/status` | Get index status |
+| `repository/search` | `GET /api/repository/search` | Search files |
+| `repository/files/list` | `GET /api/repository/files/list` | List files in directory |
+| `repository/files/tree` | `GET /api/repository/files/tree` | Get directory tree |
+| `repository/stats` | `GET /api/repository/stats` | Get statistics |
+| `repository/index/rebuild` | `POST /api/repository/index/rebuild` | Rebuild index |
+
+See [UNIFIED-API-SPEC.md](../api/UNIFIED-API-SPEC.md) for complete JSON-RPC documentation.
+
+### HTTP Endpoints
+
+#### Get Index Status
 
 ```
 GET /api/repository/index/status

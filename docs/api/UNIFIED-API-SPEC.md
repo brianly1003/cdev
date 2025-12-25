@@ -635,6 +635,224 @@ Stop watching the current session.
 
 ---
 
+### Repository Methods
+
+#### `repository/index/status`
+Get the current status of the repository index.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "status": "ready",
+  "total_files": 277,
+  "indexed_files": 277,
+  "total_size_bytes": 18940805,
+  "last_full_scan": "2025-12-19T15:14:26Z",
+  "last_update": "2025-12-19T15:14:26Z",
+  "database_size_bytes": 4096,
+  "is_git_repo": true
+}
+```
+
+---
+
+#### `repository/search`
+Search for files using various matching strategies.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| query | string | Yes | Search query string |
+| mode | string | No | `fuzzy` (default), `exact`, `prefix`, `extension` |
+| limit | number | No | Max results (default: 50, max: 500) |
+| offset | number | No | Pagination offset (default: 0) |
+| extensions | string[] | No | Filter by file extensions |
+| exclude_binaries | boolean | No | Exclude binary files (default: true) |
+| git_tracked_only | boolean | No | Only git-tracked files (default: false) |
+| min_size | number | No | Minimum file size in bytes |
+| max_size | number | No | Maximum file size in bytes |
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "repository/search",
+  "params": {
+    "query": "index",
+    "mode": "fuzzy",
+    "limit": 20,
+    "extensions": ["ts", "js"]
+  }
+}
+```
+
+**Result:**
+```json
+{
+  "query": "index",
+  "mode": "fuzzy",
+  "results": [
+    {
+      "path": "src/index.ts",
+      "name": "index.ts",
+      "directory": "src",
+      "extension": "ts",
+      "size_bytes": 8097,
+      "modified_at": "2025-10-21T11:17:45Z",
+      "is_binary": false,
+      "is_sensitive": false,
+      "git_tracked": true,
+      "match_score": 0.95
+    }
+  ],
+  "total": 10,
+  "elapsed_ms": 2
+}
+```
+
+---
+
+#### `repository/files/list`
+List files in a directory with pagination and sorting.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| directory | string | No | Directory path (empty for root) |
+| recursive | boolean | No | Include subdirectories (default: false) |
+| limit | number | No | Max files (default: 100, max: 1000) |
+| offset | number | No | Pagination offset (default: 0) |
+| sort_by | string | No | `name` (default), `size`, `modified`, `path` |
+| sort_order | string | No | `asc` (default), `desc` |
+| extensions | string[] | No | Filter by extensions |
+| min_size | number | No | Minimum file size in bytes |
+| max_size | number | No | Maximum file size in bytes |
+
+**Result:**
+```json
+{
+  "directory": "src",
+  "files": [
+    {
+      "path": "src/index.ts",
+      "name": "index.ts",
+      "directory": "src",
+      "extension": "ts",
+      "size_bytes": 8097,
+      "modified_at": "2025-10-21T11:17:45Z",
+      "is_binary": false,
+      "is_sensitive": false,
+      "git_tracked": true
+    }
+  ],
+  "directories": [
+    {
+      "path": "src/components",
+      "name": "components",
+      "file_count": 15,
+      "total_size_bytes": 45000
+    }
+  ],
+  "total_files": 47,
+  "total_directories": 5,
+  "pagination": {
+    "limit": 100,
+    "offset": 0,
+    "has_more": false
+  }
+}
+```
+
+---
+
+#### `repository/files/tree`
+Get a hierarchical directory tree structure.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| path | string | No | Root path (empty for repository root) |
+| depth | number | No | Max depth (default: 2, max: 10) |
+
+**Result:**
+```json
+{
+  "path": "",
+  "name": "my-project",
+  "type": "directory",
+  "children": [
+    {
+      "path": "src",
+      "name": "src",
+      "type": "directory",
+      "file_count": 47,
+      "total_size_bytes": 324277,
+      "children": [
+        {
+          "path": "src/index.ts",
+          "name": "index.ts",
+          "type": "file",
+          "size_bytes": 8097,
+          "extension": "ts"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+#### `repository/stats`
+Get aggregate statistics about the repository.
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "total_files": 277,
+  "total_directories": 59,
+  "total_size_bytes": 18940805,
+  "files_by_extension": {
+    "ts": 119,
+    "json": 20,
+    "md": 5
+  },
+  "largest_files": [
+    {
+      "path": "package-lock.json",
+      "name": "package-lock.json",
+      "size_bytes": 480928
+    }
+  ],
+  "git_tracked_files": 250,
+  "git_ignored_files": 27,
+  "binary_files": 53,
+  "sensitive_files": 15
+}
+```
+
+---
+
+#### `repository/index/rebuild`
+Trigger a full re-index of the repository (runs in background).
+
+**Params:** None
+
+**Result:**
+```json
+{
+  "status": "started",
+  "message": "Repository index rebuild started in background"
+}
+```
+
+---
+
 ### Lifecycle Methods
 
 #### `initialize`
@@ -683,7 +901,10 @@ Initialize the connection and negotiate capabilities. This follows the LSP-style
     "repository": {
       "index": true,
       "search": true,
-      "tree": true
+      "list": true,
+      "tree": true,
+      "stats": true,
+      "rebuild": true
     },
     "notifications": [
       "event/agent_log",

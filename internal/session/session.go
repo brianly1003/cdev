@@ -154,6 +154,9 @@ type Info struct {
 	StartedAt   time.Time `json:"started_at"`
 	LastActive  time.Time `json:"last_active"`
 	Error       string    `json:"error,omitempty"`
+	// Viewers is the list of client IDs currently viewing this session.
+	// Populated by workspace/list when session focus info is available.
+	Viewers []string `json:"viewers,omitempty"`
 }
 
 // RuntimeState contains the current runtime state of a session for reconnection sync.

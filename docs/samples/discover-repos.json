@@ -1,0 +1,1691 @@
+{
+  "id": "AD3DBF95-C4B9-4A15-A959-CC811CD3CC30",
+  "jsonrpc": "2.0",
+  "result": {
+    "cache_age_seconds": 747,
+    "cached": true,
+    "count": 242,
+    "elapsed_ms": 3,
+    "refresh_in_progress": false,
+    "repositories": [
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-10T08:30:12.674402411+07:00",
+        "name": "AIQA",
+        "path": "/Users/brianly/Projects/AIQA",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/AIQA.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:18.098457468+07:00",
+        "name": "ApkChecksumFix",
+        "path": "/Users/brianly/Projects/ApkChecksumFix",
+        "remote_url": "https://git.disroot.org/mbcp/ApkChecksumFix.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-10T17:08:17.484340184+07:00",
+        "name": "ApkDataMultiplexing",
+        "path": "/Users/brianly/Projects/ApkDataMultiplexing",
+        "remote_url": "git@github.com:L-JINBIN/ApkDataMultiplexing.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-26T09:52:40.150090203+07:00",
+        "name": "CW88Web-v2",
+        "path": "/Users/brianly/Projects/CW88Web-v2",
+        "remote_url": "git@github.com:WinnerSoftAsia/CW88Web-v2.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-23T23:51:54.241903655+07:00",
+        "name": "cleanspace",
+        "path": "/Users/brianly/Projects/CleanerApp",
+        "remote_url": "git@github.com:brianly1003/cleanspace.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:19.998210981+07:00",
+        "name": "DisableFlagSecure",
+        "path": "/Users/brianly/Projects/DisableFlagSecure",
+        "remote_url": "git@github.com:LSPosed/DisableFlagSecure.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-12-04T23:43:36.425899707+07:00",
+        "name": "api",
+        "path": "/Users/brianly/Projects/DisableFlagSecure/libxposed/api",
+        "remote_url": "https://github.com/libxposed/api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-12-04T23:45:17.382023682+07:00",
+        "name": "service",
+        "path": "/Users/brianly/Projects/DisableFlagSecure/libxposed/service",
+        "remote_url": "https://github.com/libxposed/service.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.281599256+07:00",
+        "name": "Discord-Ticketing-Admin-Portal",
+        "path": "/Users/brianly/Projects/Discord-Ticketing-Admin-Portal",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing-Admin-Portal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.290233134+07:00",
+        "name": "Discord-Ticketing-Admin-Portal",
+        "path": "/Users/brianly/Projects/Discord-Ticketing-Admin-Portal-CP",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing-Admin-Portal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.263901041+07:00",
+        "name": "Discord-Ticketing",
+        "path": "/Users/brianly/Projects/Discord-Ticketing-CP",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-26T17:42:03.913044479+07:00",
+        "name": "HBC-Tool",
+        "path": "/Users/brianly/Projects/HBC-Tool",
+        "remote_url": "git@github.com:brianly1003/HBC-Tool.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.620256566+07:00",
+        "name": "HBC-Tool",
+        "path": "/Users/brianly/Projects/HBC-Tool-Original",
+        "remote_url": "git@github.com:Kirlif/HBC-Tool.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-21T17:24:06.726094383+07:00",
+        "name": "Heimdall",
+        "path": "/Users/brianly/Projects/Heimdall",
+        "remote_url": "https://git.sr.ht/~brianly1003/Heimdall"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:56.176885348+07:00",
+        "name": "IAmNotADeveloper",
+        "path": "/Users/brianly/Projects/IAmNotADeveloper",
+        "remote_url": "https://github.com/xfqwdsj/IAmNotADeveloper.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-07T23:26:23.177515745+07:00",
+        "name": "LSPatch",
+        "path": "/Users/brianly/Projects/LSPatch",
+        "remote_url": "git@github.com:JingMatrix/LSPatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-14T00:01:23.176762236+07:00",
+        "name": "api",
+        "path": "/Users/brianly/Projects/LSPatch/libxposed/api",
+        "remote_url": "https://github.com/libxposed/api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-14T00:03:01.671249827+07:00",
+        "name": "service",
+        "path": "/Users/brianly/Projects/LSPatch/libxposed/service",
+        "remote_url": "https://github.com/libxposed/service.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-16T01:53:21.578927117+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/Projects/Lazy",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-19T16:33:36.048508803+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/Projects/LazyAdmin",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-22T18:06:35.245996176+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/Projects/LazyBot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.237611198+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/Projects/LazyLinebot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-23T14:01:57.070205922+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/Projects/LazyTele",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.237073821+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/Micam1",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-25T14:23:24.381860393+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/Micare",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T01:14:10.231515136+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/Midas",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-30T15:22:26.12203656+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/MidasBot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-16T18:16:15.409270499+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/MidasCC",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-01T12:29:55.483625127+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/MidasNewCC",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-15T21:49:50.341591113+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/MidasServer",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-31T16:24:23.868588833+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/Projects/MidasWeb",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-02T19:24:37.220725693+07:00",
+        "name": "NPatch",
+        "path": "/Users/brianly/Projects/NPatch",
+        "remote_url": "git@github.com:vaginessa/NPatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:27:35.390053942+07:00",
+        "name": "OpenCut",
+        "path": "/Users/brianly/Projects/OpenCut",
+        "remote_url": "git@github.com:OpenCut-app/OpenCut.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:58.504739376+07:00",
+        "name": "RMS-Runtime-Mobile-Security",
+        "path": "/Users/brianly/Projects/RMS-Runtime-Mobile-Security",
+        "remote_url": "git@github.com:m0bilesecurity/RMS-Runtime-Mobile-Security.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2022-10-17T10:59:36.548207661+07:00",
+        "name": "SanJose",
+        "path": "/Users/brianly/Projects/SanJose",
+        "remote_url": "git@github.com:WinnerSoftAsia/SanJose.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:40.868249617+07:00",
+        "name": "Shizuku",
+        "path": "/Users/brianly/Projects/Shizuku",
+        "remote_url": "git@github.com:RikkaApps/Shizuku.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-04T20:18:41.843180264+07:00",
+        "name": "StepBuddy",
+        "path": "/Users/brianly/Projects/StepBuddy"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-03-24T19:44:05.878852267+07:00",
+        "name": "Stream88",
+        "path": "/Users/brianly/Projects/Stream88",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Stream88.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:25.596200641+07:00",
+        "name": "SuuCat",
+        "path": "/Users/brianly/Projects/SuuCat",
+        "remote_url": "git@github.com:ebubekirdinc/SuuCat.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-21T16:40:01.523344823+07:00",
+        "name": "acb3381",
+        "path": "/Users/brianly/Projects/acb3381"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-18T19:46:08.563837595+07:00",
+        "name": "base",
+        "path": "/Users/brianly/Projects/acb3410/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-21T03:23:14.829647748+07:00",
+        "name": "agent-api-gateway",
+        "path": "/Users/brianly/Projects/agent-api-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/agent-api-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-28T11:01:53.035875045+07:00",
+        "name": "algorithm-practice",
+        "path": "/Users/brianly/Projects/algorithm-practice",
+        "remote_url": "git@github.com:brianly1003/algorithm-practice.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-09-10T14:27:57.322481845+07:00",
+        "name": "apk-source",
+        "path": "/Users/brianly/Projects/apk-source",
+        "remote_url": "git@github.com:brianly1003/apk-source.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-11T15:21:10.256999592+07:00",
+        "name": "apksig",
+        "path": "/Users/brianly/Projects/apksig",
+        "remote_url": "https://android.googlesource.com/platform/tools/apksig"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-02T17:03:16.71320216+07:00",
+        "name": "autogen",
+        "path": "/Users/brianly/Projects/autogen",
+        "remote_url": "git@github.com:microsoft/autogen.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-28T19:23:44.437268317+07:00",
+        "name": "awesome-claude-agents",
+        "path": "/Users/brianly/Projects/awesome-claude-agents",
+        "remote_url": "git@github.com:vijaythecoder/awesome-claude-agents.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-29T11:13:03.833950236+07:00",
+        "name": "backoffice-api-v3",
+        "path": "/Users/brianly/Projects/backoffice-api-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/backoffice-api-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-12T17:25:01.169811149+07:00",
+        "name": "backoffice-ui-v3",
+        "path": "/Users/brianly/Projects/backoffice-ui-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/backoffice-ui-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-02-11T21:07:50.408543129+07:00",
+        "name": "banking-api",
+        "path": "/Users/brianly/Projects/banking-api",
+        "remote_url": "git@github.com:brianly1003/banking-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-20T15:50:18.667317395+07:00",
+        "name": "blutter",
+        "path": "/Users/brianly/Projects/blutter",
+        "remote_url": "git@github.com:worawit/blutter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-01T12:12:03.921683487+07:00",
+        "name": "camera-samples",
+        "path": "/Users/brianly/Projects/camera-samples",
+        "remote_url": "git@github.com:android/camera-samples.git"
+      },
+      {
+        "is_configured": true,
+        "last_modified": "2025-12-25T01:11:59.235934871+07:00",
+        "name": "cdev",
+        "path": "/Users/brianly/Projects/cdev",
+        "remote_url": "git@github.com:brianly1003/cdev.git"
+      },
+      {
+        "is_configured": true,
+        "last_modified": "2025-12-20T20:26:58.832941683+07:00",
+        "name": "cdev-agent",
+        "path": "/Users/brianly/Projects/cdev-agent",
+        "remote_url": "git@github.com:brianly1003/cdev-agent.git"
+      },
+      {
+        "is_configured": true,
+        "last_modified": "2025-12-23T20:52:02.589299069+07:00",
+        "name": "cdev-ios",
+        "path": "/Users/brianly/Projects/cdev-ios",
+        "remote_url": "git@github.com:brianly1003/cdev-ios.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-17T17:51:15.770305682+07:00",
+        "name": "cdot",
+        "path": "/Users/brianly/Projects/cdot",
+        "remote_url": "git@github.com:brianly1003/cdot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-06T01:03:12.773989849+07:00",
+        "name": "centralized-robot-api",
+        "path": "/Users/brianly/Projects/centralized-robot-api",
+        "remote_url": "git@bitbucket.org:intexcashmarket/centralized-robot-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-03-24T19:44:13.998146104+07:00",
+        "name": "chatgpt_telegram_bot",
+        "path": "/Users/brianly/Projects/chatgpt_telegram_bot",
+        "remote_url": "https://github.com/karfly/chatgpt_telegram_bot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-13T13:06:58.106445518+07:00",
+        "name": "chatwoot-docker",
+        "path": "/Users/brianly/Projects/chatwoot-docker"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:10:49.891397872+07:00",
+        "name": "claude-code-chat",
+        "path": "/Users/brianly/Projects/claude-code-chat",
+        "remote_url": "git@github.com:brianly1003/claude-code-chat.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-24T20:22:01.090037405+07:00",
+        "name": "claude-dev",
+        "path": "/Users/brianly/Projects/claude-dev",
+        "remote_url": "git@github.com:brianly1003/claude-dev.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-01T02:13:06.387019367+07:00",
+        "name": "cleanspace-support",
+        "path": "/Users/brianly/Projects/cleanspace-support",
+        "remote_url": "git@github.com:brianly1003/cleanspace-support.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-29T11:20:28.349841034+07:00",
+        "name": "codelab-android-accessibility",
+        "path": "/Users/brianly/Projects/codelab-android-accessibility",
+        "remote_url": "https://github.com/android/codelab-android-accessibility.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-28T17:08:17.176924641+07:00",
+        "name": "com.example.vcam",
+        "path": "/Users/brianly/Projects/com.example.vcam 2",
+        "remote_url": "git@github.com:Xposed-Modules-Repo/com.example.vcam.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:10:38.565787052+07:00",
+        "name": "cw88v2",
+        "path": "/Users/brianly/Projects/cw88v2"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-23T00:33:10.491525125+07:00",
+        "name": "dotnet-llm-eval-samples",
+        "path": "/Users/brianly/Projects/dotnet-llm-eval-samples",
+        "remote_url": "git@github.com:microsoft/dotnet-llm-eval-samples.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:40.895648206+07:00",
+        "name": "eShop",
+        "path": "/Users/brianly/Projects/eShop.git",
+        "remote_url": "git@github.com:dotnet/eShop.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-05T23:40:46.859736956+07:00",
+        "name": "egcp-v3",
+        "path": "/Users/brianly/Projects/egcp-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/egcp-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-02T14:31:48.106799342+07:00",
+        "name": "tun2socks",
+        "path": "/Users/brianly/Projects/fork-tun2socks",
+        "remote_url": "git@github.com:brianly1003/tun2socks.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.572235321+07:00",
+        "name": "frida-agent-example",
+        "path": "/Users/brianly/Projects/frida-agent-example",
+        "remote_url": "https://github.com/oleavr/frida-agent-example.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-30T10:55:27.131047941+07:00",
+        "name": "frontend-v3",
+        "path": "/Users/brianly/Projects/frontend-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/frontend-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:25:03.238707767+07:00",
+        "name": "funsite",
+        "path": "/Users/brianly/Projects/funsite",
+        "remote_url": "git@github.com:vanhuynhl/funsite.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-06-11T20:26:11.07284604+07:00",
+        "name": "google-top-ranking",
+        "path": "/Users/brianly/Projects/google-top-ranking",
+        "remote_url": "git@github.com:vanhuynhl/google-top-ranking.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-26T20:51:05.168404494+07:00",
+        "name": "hermes-dec",
+        "path": "/Users/brianly/Projects/hermes-dec",
+        "remote_url": "git@github.com:P1sec/hermes-dec.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-18T17:57:31.751138075+07:00",
+        "name": "karamel",
+        "path": "/Users/brianly/Projects/karamel",
+        "remote_url": "git@github.com:Uberlegen/karamel.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-18T23:08:28.350934687+07:00",
+        "name": "karamel-backoffice",
+        "path": "/Users/brianly/Projects/karamel-backoffice",
+        "remote_url": "git@github.com:Uberlegen/karamel-backoffice.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-21T22:58:34.301845272+07:00",
+        "name": "karamel-playerportal",
+        "path": "/Users/brianly/Projects/karamel-playerportal",
+        "remote_url": "git@github.com:Uberlegen/karamel-playerportal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:18.101632901+07:00",
+        "name": "karamelv2",
+        "path": "/Users/brianly/Projects/karamelv2"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.623709417+07:00",
+        "name": "line-liff-v2-starter",
+        "path": "/Users/brianly/Projects/line-liff-v2-starter",
+        "remote_url": "https://github.com/line/line-liff-v2-starter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-13T20:32:11.548485767+07:00",
+        "name": "lisa",
+        "path": "/Users/brianly/Projects/lisa",
+        "remote_url": "git@github.com:WinnerSoftAsia/lisa.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:11:10.403357949+07:00",
+        "name": "llm_engineering",
+        "path": "/Users/brianly/Projects/llm_engineering",
+        "remote_url": "git@github.com:ed-donner/llm_engineering.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T00:49:05.140422198+07:00",
+        "name": "mbbpatch",
+        "path": "/Users/brianly/Projects/mbbpatch",
+        "remote_url": "https://git.disroot.org/mbcp/mbbpatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-04T09:35:37.398802485+07:00",
+        "name": "mbv4",
+        "path": "/Users/brianly/Projects/mbv4",
+        "remote_url": "git@github.com:WinnerSoftAsia/mbv4.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-05-09T22:30:50.676875181+07:00",
+        "name": "mbv4",
+        "path": "/Users/brianly/Projects/mbv4-1",
+        "remote_url": "git@github.com:brianly1003/mbv4.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-09-01T08:06:54.978881616+07:00",
+        "name": "mbzdefend-fix",
+        "path": "/Users/brianly/Projects/mbzdefend-fix",
+        "remote_url": "git@gitlab.com:cuynu/mbzdefend-fix.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-19T14:05:15.870301069+07:00",
+        "name": "messenger-integrator",
+        "path": "/Users/brianly/Projects/messenger-integrator",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-12T12:41:09.987643448+07:00",
+        "name": "messenger-integrator-gateway",
+        "path": "/Users/brianly/Projects/messenger-integrator-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-10T15:34:39.297945178+07:00",
+        "name": "micam",
+        "path": "/Users/brianly/Projects/micam",
+        "remote_url": "git@github.com:brianly1003/micam.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-30T15:23:00.214326933+07:00",
+        "name": "mihook",
+        "path": "/Users/brianly/Projects/mihook",
+        "remote_url": "git@github.com:brianly1003/mihook.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-23T16:37:32.200211675+07:00",
+        "name": "mini-app",
+        "path": "/Users/brianly/Projects/mini-app",
+        "remote_url": "git@github.com:brianly1003/mini-app.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-29T16:01:00.425397381+07:00",
+        "name": "articles",
+        "path": "/Users/brianly/Projects/multitenants",
+        "remote_url": "git@github.com:Kharlap-Sergey/articles.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-09-15T19:31:24.037225734+07:00",
+        "name": "n8n",
+        "path": "/Users/brianly/Projects/n8n",
+        "remote_url": "git@github.com:n8n-io/n8n.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-20T16:07:22.139857123+07:00",
+        "name": "nestjs-auth-refresh-token-example",
+        "path": "/Users/brianly/Projects/nestjs-auth-refresh-token-example",
+        "remote_url": "git@github.com:zenstok/nestjs-auth-refresh-token-example.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T16:49:36.294401728+07:00",
+        "name": "nuxt3-awesome-starter",
+        "path": "/Users/brianly/Projects/nuxt3-awesome-starter/nuxt3-awesome-starter",
+        "remote_url": "git@github.com:viandwi24/nuxt3-awesome-starter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-23T18:58:12.789736486+07:00",
+        "name": "phimmoi",
+        "path": "/Users/brianly/Projects/phimmoi",
+        "remote_url": "git@github.com:brianly1003/phimmoi.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-22T18:28:48.562226236+07:00",
+        "name": "puppeteer-mcp-server",
+        "path": "/Users/brianly/Projects/puppeteer-mcp-server",
+        "remote_url": "git@github.com:merajmehrabi/puppeteer-mcp-server.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-01T21:48:45.532584744+07:00",
+        "name": "react-native-decompiler",
+        "path": "/Users/brianly/Projects/react-native-decompiler",
+        "remote_url": "git@github.com:brianly1003/react-native-decompiler.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-18T01:58:53.711983946+07:00",
+        "name": "rs-api",
+        "path": "/Users/brianly/Projects/rs-api",
+        "remote_url": "git@github.com:brianly1003/rs-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-27T16:52:27.508495934+07:00",
+        "name": "base",
+        "path": "/Users/brianly/Projects/sacom250/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T02:31:28.546473523+07:00",
+        "name": "base",
+        "path": "/Users/brianly/Projects/sacom261/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-04T18:26:44.673992183+07:00",
+        "name": "screenshot-to-code",
+        "path": "/Users/brianly/Projects/screenshot-to-code",
+        "remote_url": "git@github.com:abi/screenshot-to-code.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-10T20:27:22.443613471+07:00",
+        "name": "base",
+        "path": "/Users/brianly/Projects/shb333/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:33.379109879+07:00",
+        "name": "smolagents",
+        "path": "/Users/brianly/Projects/smolagents",
+        "remote_url": "git@github.com:huggingface/smolagents.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-17T14:23:42.845927703+07:00",
+        "name": "chatwoot",
+        "path": "/Users/brianly/Projects/softzensu/chatwoot",
+        "remote_url": "git@bitbucket.org:softzensu/chatwoot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-02T22:11:03.476795632+07:00",
+        "name": "messenger-integrator",
+        "path": "/Users/brianly/Projects/softzensu/messenger-integrator",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-03T10:46:25.290758737+07:00",
+        "name": "messenger-integrator-gateway",
+        "path": "/Users/brianly/Projects/softzensu/messenger-integrator-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-20T10:31:03.384995042+07:00",
+        "name": "n8n",
+        "path": "/Users/brianly/Projects/softzensu/n8n",
+        "remote_url": "git@bitbucket.org:softzensu/n8n.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-04T00:39:29.475479453+07:00",
+        "name": "telebot88",
+        "path": "/Users/brianly/Projects/telebot88",
+        "remote_url": "git@github.com:brianly1003/telebot88.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T16:50:25.652911987+07:00",
+        "name": "tesseract",
+        "path": "/Users/brianly/Projects/tesseract",
+        "remote_url": "git@github.com:tesseract-ocr/tesseract.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-03T11:13:02.692907821+07:00",
+        "name": "claudekit-engineer",
+        "path": "/Users/brianly/Projects/test/claudekit-engineer",
+        "remote_url": "git@github.com:claudekit/claudekit-engineer.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:30.078781613+07:00",
+        "name": "tpbank",
+        "path": "/Users/brianly/Projects/tpbank/base",
+        "remote_url": "git@github.com:brianly1003/tpbank.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-27T15:18:52.534521376+07:00",
+        "name": "tpsv1-caramel",
+        "path": "/Users/brianly/Projects/tpsv1-caramel",
+        "remote_url": "git@github.com:Uberlegen/tpsv1-caramel.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T18:19:10.126220769+07:00",
+        "name": "tesseract",
+        "path": "/Users/brianly/Projects/train-tesseract/tesseract",
+        "remote_url": "git@github.com:tesseract-ocr/tesseract.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-05T04:50:23.393009549+07:00",
+        "name": "truyenqq",
+        "path": "/Users/brianly/Projects/truyenqq",
+        "remote_url": "git@github.com:brianly1003/truyenqq.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-02T14:06:26.251232976+07:00",
+        "name": "tun2socks",
+        "path": "/Users/brianly/Projects/tun2socks",
+        "remote_url": "https://github.com/xjasonlyu/tun2socks.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:48:41.45772048+07:00",
+        "name": "v4_api_central",
+        "path": "/Users/brianly/Projects/v4_api_central",
+        "remote_url": "git@bitbucket.org:softzensu/v4_api_central.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:52:33.139162358+07:00",
+        "name": "v4_api_product",
+        "path": "/Users/brianly/Projects/v4_api_product",
+        "remote_url": "git@bitbucket.org:softzensu/v4_api_product.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:11:15.553186523+07:00",
+        "name": "v4_bo",
+        "path": "/Users/brianly/Projects/v4_bo",
+        "remote_url": "git@bitbucket.org:softzensu/v4_bo.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-04-22T12:10:22.313050718+07:00",
+        "name": "v4_fe",
+        "path": "/Users/brianly/Projects/v4_fe",
+        "remote_url": "git@bitbucket.org:softzensu/v4_fe.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:53:38.333466639+07:00",
+        "name": "v4_telegram_bot",
+        "path": "/Users/brianly/Projects/v4_telegram_bot",
+        "remote_url": "git@bitbucket.org:softzensu/v4_telegram_bot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-21T20:43:57.466958337+07:00",
+        "name": "yolov5",
+        "path": "/Users/brianly/Projects/yolo/yolov5",
+        "remote_url": "https://github.com/ultralytics/yolov5"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-10T08:30:12.674402411+07:00",
+        "name": "AIQA",
+        "path": "/Users/brianly/projects/AIQA",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/AIQA.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:18.098457468+07:00",
+        "name": "ApkChecksumFix",
+        "path": "/Users/brianly/projects/ApkChecksumFix",
+        "remote_url": "https://git.disroot.org/mbcp/ApkChecksumFix.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-10T17:08:17.484340184+07:00",
+        "name": "ApkDataMultiplexing",
+        "path": "/Users/brianly/projects/ApkDataMultiplexing",
+        "remote_url": "git@github.com:L-JINBIN/ApkDataMultiplexing.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-26T09:52:40.150090203+07:00",
+        "name": "CW88Web-v2",
+        "path": "/Users/brianly/projects/CW88Web-v2",
+        "remote_url": "git@github.com:WinnerSoftAsia/CW88Web-v2.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-23T23:51:54.241903655+07:00",
+        "name": "cleanspace",
+        "path": "/Users/brianly/projects/CleanerApp",
+        "remote_url": "git@github.com:brianly1003/cleanspace.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:19.998210981+07:00",
+        "name": "DisableFlagSecure",
+        "path": "/Users/brianly/projects/DisableFlagSecure",
+        "remote_url": "git@github.com:LSPosed/DisableFlagSecure.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-12-04T23:43:36.425899707+07:00",
+        "name": "api",
+        "path": "/Users/brianly/projects/DisableFlagSecure/libxposed/api",
+        "remote_url": "https://github.com/libxposed/api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-12-04T23:45:17.382023682+07:00",
+        "name": "service",
+        "path": "/Users/brianly/projects/DisableFlagSecure/libxposed/service",
+        "remote_url": "https://github.com/libxposed/service.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.281599256+07:00",
+        "name": "Discord-Ticketing-Admin-Portal",
+        "path": "/Users/brianly/projects/Discord-Ticketing-Admin-Portal",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing-Admin-Portal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.290233134+07:00",
+        "name": "Discord-Ticketing-Admin-Portal",
+        "path": "/Users/brianly/projects/Discord-Ticketing-Admin-Portal-CP",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing-Admin-Portal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.263901041+07:00",
+        "name": "Discord-Ticketing",
+        "path": "/Users/brianly/projects/Discord-Ticketing-CP",
+        "remote_url": "git@github.com:WinnerSoftAsia/Discord-Ticketing.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-26T17:42:03.913044479+07:00",
+        "name": "HBC-Tool",
+        "path": "/Users/brianly/projects/HBC-Tool",
+        "remote_url": "git@github.com:brianly1003/HBC-Tool.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.620256566+07:00",
+        "name": "HBC-Tool",
+        "path": "/Users/brianly/projects/HBC-Tool-Original",
+        "remote_url": "git@github.com:Kirlif/HBC-Tool.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-21T17:24:06.726094383+07:00",
+        "name": "Heimdall",
+        "path": "/Users/brianly/projects/Heimdall",
+        "remote_url": "https://git.sr.ht/~brianly1003/Heimdall"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:56.176885348+07:00",
+        "name": "IAmNotADeveloper",
+        "path": "/Users/brianly/projects/IAmNotADeveloper",
+        "remote_url": "https://github.com/xfqwdsj/IAmNotADeveloper.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-07T23:26:23.177515745+07:00",
+        "name": "LSPatch",
+        "path": "/Users/brianly/projects/LSPatch",
+        "remote_url": "git@github.com:JingMatrix/LSPatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-14T00:01:23.176762236+07:00",
+        "name": "api",
+        "path": "/Users/brianly/projects/LSPatch/libxposed/api",
+        "remote_url": "https://github.com/libxposed/api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-14T00:03:01.671249827+07:00",
+        "name": "service",
+        "path": "/Users/brianly/projects/LSPatch/libxposed/service",
+        "remote_url": "https://github.com/libxposed/service.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-16T01:53:21.578927117+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/projects/Lazy",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-19T16:33:36.048508803+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/projects/LazyAdmin",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-22T18:06:35.245996176+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/projects/LazyBot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.237611198+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/projects/LazyLinebot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-23T14:01:57.070205922+07:00",
+        "name": "Lazy",
+        "path": "/Users/brianly/projects/LazyTele",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Lazy.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:23.237073821+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/Micam1",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-25T14:23:24.381860393+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/Micare",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T01:14:10.231515136+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/Midas",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-30T15:22:26.12203656+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/MidasBot",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-16T18:16:15.409270499+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/MidasCC",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-01T12:29:55.483625127+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/MidasNewCC",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-15T21:49:50.341591113+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/MidasServer",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-31T16:24:23.868588833+07:00",
+        "name": "Midas",
+        "path": "/Users/brianly/projects/MidasWeb",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Midas.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-02T19:24:37.220725693+07:00",
+        "name": "NPatch",
+        "path": "/Users/brianly/projects/NPatch",
+        "remote_url": "git@github.com:vaginessa/NPatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:27:35.390053942+07:00",
+        "name": "OpenCut",
+        "path": "/Users/brianly/projects/OpenCut",
+        "remote_url": "git@github.com:OpenCut-app/OpenCut.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:58.504739376+07:00",
+        "name": "RMS-Runtime-Mobile-Security",
+        "path": "/Users/brianly/projects/RMS-Runtime-Mobile-Security",
+        "remote_url": "git@github.com:m0bilesecurity/RMS-Runtime-Mobile-Security.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2022-10-17T10:59:36.548207661+07:00",
+        "name": "SanJose",
+        "path": "/Users/brianly/projects/SanJose",
+        "remote_url": "git@github.com:WinnerSoftAsia/SanJose.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:40.868249617+07:00",
+        "name": "Shizuku",
+        "path": "/Users/brianly/projects/Shizuku",
+        "remote_url": "git@github.com:RikkaApps/Shizuku.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-04T20:18:41.843180264+07:00",
+        "name": "StepBuddy",
+        "path": "/Users/brianly/projects/StepBuddy"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-03-24T19:44:05.878852267+07:00",
+        "name": "Stream88",
+        "path": "/Users/brianly/projects/Stream88",
+        "remote_url": "git@github.com:ProjectSoftwareDeveloper/Stream88.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:25.596200641+07:00",
+        "name": "SuuCat",
+        "path": "/Users/brianly/projects/SuuCat",
+        "remote_url": "git@github.com:ebubekirdinc/SuuCat.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-21T16:40:01.523344823+07:00",
+        "name": "acb3381",
+        "path": "/Users/brianly/projects/acb3381"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-18T19:46:08.563837595+07:00",
+        "name": "base",
+        "path": "/Users/brianly/projects/acb3410/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-21T03:23:14.829647748+07:00",
+        "name": "agent-api-gateway",
+        "path": "/Users/brianly/projects/agent-api-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/agent-api-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-28T11:01:53.035875045+07:00",
+        "name": "algorithm-practice",
+        "path": "/Users/brianly/projects/algorithm-practice",
+        "remote_url": "git@github.com:brianly1003/algorithm-practice.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-09-10T14:27:57.322481845+07:00",
+        "name": "apk-source",
+        "path": "/Users/brianly/projects/apk-source",
+        "remote_url": "git@github.com:brianly1003/apk-source.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-11T15:21:10.256999592+07:00",
+        "name": "apksig",
+        "path": "/Users/brianly/projects/apksig",
+        "remote_url": "https://android.googlesource.com/platform/tools/apksig"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-02T17:03:16.71320216+07:00",
+        "name": "autogen",
+        "path": "/Users/brianly/projects/autogen",
+        "remote_url": "git@github.com:microsoft/autogen.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-28T19:23:44.437268317+07:00",
+        "name": "awesome-claude-agents",
+        "path": "/Users/brianly/projects/awesome-claude-agents",
+        "remote_url": "git@github.com:vijaythecoder/awesome-claude-agents.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-29T11:13:03.833950236+07:00",
+        "name": "backoffice-api-v3",
+        "path": "/Users/brianly/projects/backoffice-api-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/backoffice-api-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-12T17:25:01.169811149+07:00",
+        "name": "backoffice-ui-v3",
+        "path": "/Users/brianly/projects/backoffice-ui-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/backoffice-ui-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-02-11T21:07:50.408543129+07:00",
+        "name": "banking-api",
+        "path": "/Users/brianly/projects/banking-api",
+        "remote_url": "git@github.com:brianly1003/banking-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-20T15:50:18.667317395+07:00",
+        "name": "blutter",
+        "path": "/Users/brianly/projects/blutter",
+        "remote_url": "git@github.com:worawit/blutter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-01T12:12:03.921683487+07:00",
+        "name": "camera-samples",
+        "path": "/Users/brianly/projects/camera-samples",
+        "remote_url": "git@github.com:android/camera-samples.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-25T01:11:59.235934871+07:00",
+        "name": "cdev",
+        "path": "/Users/brianly/projects/cdev",
+        "remote_url": "git@github.com:brianly1003/cdev.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-20T20:26:58.832941683+07:00",
+        "name": "cdev-agent",
+        "path": "/Users/brianly/projects/cdev-agent",
+        "remote_url": "git@github.com:brianly1003/cdev-agent.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-23T20:52:02.589299069+07:00",
+        "name": "cdev-ios",
+        "path": "/Users/brianly/projects/cdev-ios",
+        "remote_url": "git@github.com:brianly1003/cdev-ios.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-17T17:51:15.770305682+07:00",
+        "name": "cdot",
+        "path": "/Users/brianly/projects/cdot",
+        "remote_url": "git@github.com:brianly1003/cdot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-06T01:03:12.773989849+07:00",
+        "name": "centralized-robot-api",
+        "path": "/Users/brianly/projects/centralized-robot-api",
+        "remote_url": "git@bitbucket.org:intexcashmarket/centralized-robot-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-03-24T19:44:13.998146104+07:00",
+        "name": "chatgpt_telegram_bot",
+        "path": "/Users/brianly/projects/chatgpt_telegram_bot",
+        "remote_url": "https://github.com/karfly/chatgpt_telegram_bot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-13T13:06:58.106445518+07:00",
+        "name": "chatwoot-docker",
+        "path": "/Users/brianly/projects/chatwoot-docker"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:10:49.891397872+07:00",
+        "name": "claude-code-chat",
+        "path": "/Users/brianly/projects/claude-code-chat",
+        "remote_url": "git@github.com:brianly1003/claude-code-chat.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-24T20:22:01.090037405+07:00",
+        "name": "claude-dev",
+        "path": "/Users/brianly/projects/claude-dev",
+        "remote_url": "git@github.com:brianly1003/claude-dev.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-01T02:13:06.387019367+07:00",
+        "name": "cleanspace-support",
+        "path": "/Users/brianly/projects/cleanspace-support",
+        "remote_url": "git@github.com:brianly1003/cleanspace-support.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-29T11:20:28.349841034+07:00",
+        "name": "codelab-android-accessibility",
+        "path": "/Users/brianly/projects/codelab-android-accessibility",
+        "remote_url": "https://github.com/android/codelab-android-accessibility.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-28T17:08:17.176924641+07:00",
+        "name": "com.example.vcam",
+        "path": "/Users/brianly/projects/com.example.vcam 2",
+        "remote_url": "git@github.com:Xposed-Modules-Repo/com.example.vcam.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:10:38.565787052+07:00",
+        "name": "cw88v2",
+        "path": "/Users/brianly/projects/cw88v2"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-23T00:33:10.491525125+07:00",
+        "name": "dotnet-llm-eval-samples",
+        "path": "/Users/brianly/projects/dotnet-llm-eval-samples",
+        "remote_url": "git@github.com:microsoft/dotnet-llm-eval-samples.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:29:40.895648206+07:00",
+        "name": "eShop",
+        "path": "/Users/brianly/projects/eShop.git",
+        "remote_url": "git@github.com:dotnet/eShop.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-05T23:40:46.859736956+07:00",
+        "name": "egcp-v3",
+        "path": "/Users/brianly/projects/egcp-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/egcp-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-02T14:31:48.106799342+07:00",
+        "name": "tun2socks",
+        "path": "/Users/brianly/projects/fork-tun2socks",
+        "remote_url": "git@github.com:brianly1003/tun2socks.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.572235321+07:00",
+        "name": "frida-agent-example",
+        "path": "/Users/brianly/projects/frida-agent-example",
+        "remote_url": "https://github.com/oleavr/frida-agent-example.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-30T10:55:27.131047941+07:00",
+        "name": "frontend-v3",
+        "path": "/Users/brianly/projects/frontend-v3",
+        "remote_url": "git@bitbucket.org:intexcashmarket/frontend-v3.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-06-03T00:25:03.238707767+07:00",
+        "name": "funsite",
+        "path": "/Users/brianly/projects/funsite",
+        "remote_url": "git@github.com:vanhuynhl/funsite.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-06-11T20:26:11.07284604+07:00",
+        "name": "google-top-ranking",
+        "path": "/Users/brianly/projects/google-top-ranking",
+        "remote_url": "git@github.com:vanhuynhl/google-top-ranking.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-26T20:51:05.168404494+07:00",
+        "name": "hermes-dec",
+        "path": "/Users/brianly/projects/hermes-dec",
+        "remote_url": "git@github.com:P1sec/hermes-dec.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-05-18T17:57:31.751138075+07:00",
+        "name": "karamel",
+        "path": "/Users/brianly/projects/karamel",
+        "remote_url": "git@github.com:Uberlegen/karamel.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-18T23:08:28.350934687+07:00",
+        "name": "karamel-backoffice",
+        "path": "/Users/brianly/projects/karamel-backoffice",
+        "remote_url": "git@github.com:Uberlegen/karamel-backoffice.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-21T22:58:34.301845272+07:00",
+        "name": "karamel-playerportal",
+        "path": "/Users/brianly/projects/karamel-playerportal",
+        "remote_url": "git@github.com:Uberlegen/karamel-playerportal.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:18.101632901+07:00",
+        "name": "karamelv2",
+        "path": "/Users/brianly/projects/karamelv2"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:40.623709417+07:00",
+        "name": "line-liff-v2-starter",
+        "path": "/Users/brianly/projects/line-liff-v2-starter",
+        "remote_url": "https://github.com/line/line-liff-v2-starter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-13T20:32:11.548485767+07:00",
+        "name": "lisa",
+        "path": "/Users/brianly/projects/lisa",
+        "remote_url": "git@github.com:WinnerSoftAsia/lisa.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:11:10.403357949+07:00",
+        "name": "llm_engineering",
+        "path": "/Users/brianly/projects/llm_engineering",
+        "remote_url": "git@github.com:ed-donner/llm_engineering.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T00:49:05.140422198+07:00",
+        "name": "mbbpatch",
+        "path": "/Users/brianly/projects/mbbpatch",
+        "remote_url": "https://git.disroot.org/mbcp/mbbpatch.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-04T09:35:37.398802485+07:00",
+        "name": "mbv4",
+        "path": "/Users/brianly/projects/mbv4",
+        "remote_url": "git@github.com:WinnerSoftAsia/mbv4.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2023-05-09T22:30:50.676875181+07:00",
+        "name": "mbv4",
+        "path": "/Users/brianly/projects/mbv4-1",
+        "remote_url": "git@github.com:brianly1003/mbv4.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-09-01T08:06:54.978881616+07:00",
+        "name": "mbzdefend-fix",
+        "path": "/Users/brianly/projects/mbzdefend-fix",
+        "remote_url": "git@gitlab.com:cuynu/mbzdefend-fix.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-19T14:05:15.870301069+07:00",
+        "name": "messenger-integrator",
+        "path": "/Users/brianly/projects/messenger-integrator",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-12T12:41:09.987643448+07:00",
+        "name": "messenger-integrator-gateway",
+        "path": "/Users/brianly/projects/messenger-integrator-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-10T15:34:39.297945178+07:00",
+        "name": "micam",
+        "path": "/Users/brianly/projects/micam",
+        "remote_url": "git@github.com:brianly1003/micam.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-30T15:23:00.214326933+07:00",
+        "name": "mihook",
+        "path": "/Users/brianly/projects/mihook",
+        "remote_url": "git@github.com:brianly1003/mihook.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-23T16:37:32.200211675+07:00",
+        "name": "mini-app",
+        "path": "/Users/brianly/projects/mini-app",
+        "remote_url": "git@github.com:brianly1003/mini-app.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-29T16:01:00.425397381+07:00",
+        "name": "articles",
+        "path": "/Users/brianly/projects/multitenants",
+        "remote_url": "git@github.com:Kharlap-Sergey/articles.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-09-15T19:31:24.037225734+07:00",
+        "name": "n8n",
+        "path": "/Users/brianly/projects/n8n",
+        "remote_url": "git@github.com:n8n-io/n8n.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-20T16:07:22.139857123+07:00",
+        "name": "nestjs-auth-refresh-token-example",
+        "path": "/Users/brianly/projects/nestjs-auth-refresh-token-example",
+        "remote_url": "git@github.com:zenstok/nestjs-auth-refresh-token-example.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T16:49:36.294401728+07:00",
+        "name": "nuxt3-awesome-starter",
+        "path": "/Users/brianly/projects/nuxt3-awesome-starter/nuxt3-awesome-starter",
+        "remote_url": "git@github.com:viandwi24/nuxt3-awesome-starter.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-11-23T18:58:12.789736486+07:00",
+        "name": "phimmoi",
+        "path": "/Users/brianly/projects/phimmoi",
+        "remote_url": "git@github.com:brianly1003/phimmoi.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-22T18:28:48.562226236+07:00",
+        "name": "puppeteer-mcp-server",
+        "path": "/Users/brianly/projects/puppeteer-mcp-server",
+        "remote_url": "git@github.com:merajmehrabi/puppeteer-mcp-server.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-06-01T21:48:45.532584744+07:00",
+        "name": "react-native-decompiler",
+        "path": "/Users/brianly/projects/react-native-decompiler",
+        "remote_url": "git@github.com:brianly1003/react-native-decompiler.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-10-18T01:58:53.711983946+07:00",
+        "name": "rs-api",
+        "path": "/Users/brianly/projects/rs-api",
+        "remote_url": "git@github.com:brianly1003/rs-api.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-07-27T16:52:27.508495934+07:00",
+        "name": "base",
+        "path": "/Users/brianly/projects/sacom250/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-25T02:31:28.546473523+07:00",
+        "name": "base",
+        "path": "/Users/brianly/projects/sacom261/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-04T18:26:44.673992183+07:00",
+        "name": "screenshot-to-code",
+        "path": "/Users/brianly/projects/screenshot-to-code",
+        "remote_url": "git@github.com:abi/screenshot-to-code.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-08-10T20:27:22.443613471+07:00",
+        "name": "base",
+        "path": "/Users/brianly/projects/shb333/base"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:26:33.379109879+07:00",
+        "name": "smolagents",
+        "path": "/Users/brianly/projects/smolagents",
+        "remote_url": "git@github.com:huggingface/smolagents.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-17T14:23:42.845927703+07:00",
+        "name": "chatwoot",
+        "path": "/Users/brianly/projects/softzensu/chatwoot",
+        "remote_url": "git@bitbucket.org:softzensu/chatwoot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-02T22:11:03.476795632+07:00",
+        "name": "messenger-integrator",
+        "path": "/Users/brianly/projects/softzensu/messenger-integrator",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-03T10:46:25.290758737+07:00",
+        "name": "messenger-integrator-gateway",
+        "path": "/Users/brianly/projects/softzensu/messenger-integrator-gateway",
+        "remote_url": "git@bitbucket.org:softzensu/messenger-integrator-gateway.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-20T10:31:03.384995042+07:00",
+        "name": "n8n",
+        "path": "/Users/brianly/projects/softzensu/n8n",
+        "remote_url": "git@bitbucket.org:softzensu/n8n.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-01-04T00:39:29.475479453+07:00",
+        "name": "telebot88",
+        "path": "/Users/brianly/projects/telebot88",
+        "remote_url": "git@github.com:brianly1003/telebot88.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T16:50:25.652911987+07:00",
+        "name": "tesseract",
+        "path": "/Users/brianly/projects/tesseract",
+        "remote_url": "git@github.com:tesseract-ocr/tesseract.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-03T11:13:02.692907821+07:00",
+        "name": "claudekit-engineer",
+        "path": "/Users/brianly/projects/test/claudekit-engineer",
+        "remote_url": "git@github.com:claudekit/claudekit-engineer.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:25:30.078781613+07:00",
+        "name": "tpbank",
+        "path": "/Users/brianly/projects/tpbank/base",
+        "remote_url": "git@github.com:brianly1003/tpbank.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-27T15:18:52.534521376+07:00",
+        "name": "tpsv1-caramel",
+        "path": "/Users/brianly/projects/tpsv1-caramel",
+        "remote_url": "git@github.com:Uberlegen/tpsv1-caramel.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-03-01T18:19:10.126220769+07:00",
+        "name": "tesseract",
+        "path": "/Users/brianly/projects/train-tesseract/tesseract",
+        "remote_url": "git@github.com:tesseract-ocr/tesseract.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2024-07-05T04:50:23.393009549+07:00",
+        "name": "truyenqq",
+        "path": "/Users/brianly/projects/truyenqq",
+        "remote_url": "git@github.com:brianly1003/truyenqq.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-12-02T14:06:26.251232976+07:00",
+        "name": "tun2socks",
+        "path": "/Users/brianly/projects/tun2socks",
+        "remote_url": "https://github.com/xjasonlyu/tun2socks.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:48:41.45772048+07:00",
+        "name": "v4_api_central",
+        "path": "/Users/brianly/projects/v4_api_central",
+        "remote_url": "git@bitbucket.org:softzensu/v4_api_central.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:52:33.139162358+07:00",
+        "name": "v4_api_product",
+        "path": "/Users/brianly/projects/v4_api_product",
+        "remote_url": "git@bitbucket.org:softzensu/v4_api_product.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-10-24T18:11:15.553186523+07:00",
+        "name": "v4_bo",
+        "path": "/Users/brianly/projects/v4_bo",
+        "remote_url": "git@bitbucket.org:softzensu/v4_bo.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-04-22T12:10:22.313050718+07:00",
+        "name": "v4_fe",
+        "path": "/Users/brianly/projects/v4_fe",
+        "remote_url": "git@bitbucket.org:softzensu/v4_fe.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-11-13T15:53:38.333466639+07:00",
+        "name": "v4_telegram_bot",
+        "path": "/Users/brianly/projects/v4_telegram_bot",
+        "remote_url": "git@bitbucket.org:softzensu/v4_telegram_bot.git"
+      },
+      {
+        "is_configured": false,
+        "last_modified": "2025-03-21T20:43:57.466958337+07:00",
+        "name": "yolov5",
+        "path": "/Users/brianly/projects/yolo/yolov5",
+        "remote_url": "https://github.com/ultralytics/yolov5"
+      }
+    ],
+    "scanned_paths": 0,
+    "skipped_paths": 0
+  }
+}

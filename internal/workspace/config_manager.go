@@ -2,6 +2,7 @@
 package workspace
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,14 +19,16 @@ type ConfigManager struct {
 	workspaces        map[string]*Workspace // keyed by workspace ID
 	configPath        string
 	gitTrackerManager *GitTrackerManager
+	repoDiscovery     *RepoDiscovery
 	mu                sync.RWMutex
 }
 
 // NewConfigManager creates a new workspace config manager.
 func NewConfigManager(cfg *config.WorkspacesConfig, configPath string) *ConfigManager {
 	m := &ConfigManager{
-		workspaces: make(map[string]*Workspace),
-		configPath: configPath,
+		workspaces:    make(map[string]*Workspace),
+		configPath:    configPath,
+		repoDiscovery: NewRepoDiscovery(DefaultDiscoveryConfig()),
 	}
 
 	// Load workspaces from config
@@ -34,7 +37,19 @@ func NewConfigManager(cfg *config.WorkspacesConfig, configPath string) *ConfigMa
 		m.workspaces[def.ID] = ws
 	}
 
+	// Update discovery engine with configured paths
+	m.updateDiscoveryConfiguredPaths()
+
 	return m
+}
+
+// updateDiscoveryConfiguredPaths updates the discovery engine with currently configured paths.
+func (m *ConfigManager) updateDiscoveryConfiguredPaths() {
+	configuredPaths := make(map[string]bool)
+	for _, ws := range m.workspaces {
+		configuredPaths[ws.Definition.Path] = true
+	}
+	m.repoDiscovery.SetConfiguredPaths(configuredPaths)
 }
 
 // SetGitTrackerManager sets the git tracker manager and registers all existing workspaces.
@@ -144,6 +159,10 @@ func (m *ConfigManager) AddWorkspace(name, path string, autoStart bool) (*Worksp
 		return nil, fmt.Errorf("failed to save config: %w", err)
 	}
 
+	// Update configured paths map so enrichWithConfiguredStatus() marks this repo as configured
+	// Note: We don't invalidate the cache - isConfigured is applied dynamically, not stored in cache
+	m.updateDiscoveryConfiguredPaths()
+
 	return ws, nil
 }
 
@@ -174,6 +193,9 @@ func (m *ConfigManager) RemoveWorkspace(id string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
+	// Update configured paths map so enrichWithConfiguredStatus() no longer marks this repo as configured
+	m.updateDiscoveryConfiguredPaths()
+
 	return nil
 }
 
@@ -196,80 +218,46 @@ func (m *ConfigManager) UpdateWorkspace(ws *Workspace) error {
 	return nil
 }
 
-// DiscoverRepositories scans directories for git repositories.
+// DiscoverRepositories scans directories for git repositories using the enterprise discovery engine.
+// Returns cached results immediately if available, with background refresh for stale cache.
 func (m *ConfigManager) DiscoverRepositories(searchPaths []string) ([]DiscoveredRepo, error) {
-	// Use default search paths if none provided
-	if len(searchPaths) == 0 {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-
-		searchPaths = []string{
-			filepath.Join(homeDir, "Projects"),
-			filepath.Join(homeDir, "Code"),
-			filepath.Join(homeDir, "Desktop"),
-			filepath.Join(homeDir, "Documents"),
-		}
-	}
-
-	discovered := make([]DiscoveredRepo, 0)
-	seen := make(map[string]bool)
-
-	// Get list of configured workspace paths for filtering
+	// Update configured paths before discovery
 	m.mu.RLock()
-	configuredPaths := make(map[string]bool)
-	for _, ws := range m.workspaces {
-		configuredPaths[ws.Definition.Path] = true
-	}
+	m.updateDiscoveryConfiguredPaths()
 	m.mu.RUnlock()
 
-	for _, searchPath := range searchPaths {
-		// Skip if path doesn't exist
-		if _, err := os.Stat(searchPath); err != nil {
-			continue
-		}
-
-		// Walk directory tree
-		filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil // Skip errors
-			}
-
-			// Check if this is a .git directory
-			if info.IsDir() && info.Name() == ".git" {
-				repoPath := filepath.Dir(path)
-
-				// Skip if already seen
-				if seen[repoPath] {
-					return filepath.SkipDir
-				}
-
-				// Mark as seen
-				seen[repoPath] = true
-
-				// Get repository info
-				repo := getRepoInfo(repoPath)
-				repo.IsConfigured = configuredPaths[repoPath]
-				discovered = append(discovered, repo)
-
-				// Don't descend into this repository
-				return filepath.SkipDir
-			}
-
-			// Skip common directories
-			if info.IsDir() {
-				name := info.Name()
-				if name == "node_modules" || name == ".cache" || name == "vendor" || name == ".venv" {
-					return filepath.SkipDir
-				}
-			}
-
-			return nil
-		})
+	// Use the new discovery engine
+	result, err := m.repoDiscovery.Discover(context.Background(), searchPaths)
+	if err != nil {
+		return nil, err
 	}
 
-	return discovered, nil
+	return result.Repositories, nil
+}
+
+// DiscoverRepositoriesWithResult returns the full discovery result including cache metadata.
+func (m *ConfigManager) DiscoverRepositoriesWithResult(searchPaths []string) (*DiscoveryResult, error) {
+	// Update configured paths before discovery
+	m.mu.RLock()
+	m.updateDiscoveryConfiguredPaths()
+	m.mu.RUnlock()
+
+	return m.repoDiscovery.Discover(context.Background(), searchPaths)
+}
+
+// DiscoverRepositoriesFresh forces a fresh scan, ignoring cache.
+func (m *ConfigManager) DiscoverRepositoriesFresh(searchPaths []string) (*DiscoveryResult, error) {
+	// Update configured paths before discovery
+	m.mu.RLock()
+	m.updateDiscoveryConfiguredPaths()
+	m.mu.RUnlock()
+
+	return m.repoDiscovery.DiscoverFresh(context.Background(), searchPaths)
+}
+
+// InvalidateDiscoveryCache clears the discovery cache.
+func (m *ConfigManager) InvalidateDiscoveryCache() error {
+	return m.repoDiscovery.InvalidateCache()
 }
 
 // saveConfig saves the current workspace configuration to file.

@@ -37,12 +37,9 @@ func getRepoInfo(repoPath string) DiscoveredRepo {
 		repo.RemoteURL = strings.TrimSpace(string(output))
 	}
 
-	// Try to extract a better name from remote URL
-	if repo.RemoteURL != "" {
-		if name := extractRepoNameFromURL(repo.RemoteURL); name != "" {
-			repo.Name = name
-		}
-	}
+	// Note: We keep Name as the folder name (filepath.Base) since the iOS app
+	// already displays the git remote URL on a separate line. This allows users
+	// to distinguish between repos with the same git origin but different folder names.
 
 	return repo
 }
@@ -50,18 +47,4 @@ func getRepoInfo(repoPath string) DiscoveredRepo {
 // GetRepoInfo is the exported version for external use
 func GetRepoInfo(repoPath string) DiscoveredRepo {
 	return getRepoInfo(repoPath)
-}
-
-// extractRepoNameFromURL extracts repository name from a Git URL
-func extractRepoNameFromURL(url string) string {
-	// Remove trailing .git
-	url = strings.TrimSuffix(url, ".git")
-
-	// Extract last path component
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-
-	return ""
 }

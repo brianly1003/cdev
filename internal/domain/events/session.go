@@ -46,6 +46,22 @@ type HeartbeatPayload struct {
 	Uptime       int64  `json:"uptime_seconds"`
 }
 
+// SessionJoinedPayload is the payload for session_joined events.
+// Sent when a device joins a session that other devices are viewing.
+type SessionJoinedPayload struct {
+	JoiningClientID string   `json:"joining_client_id"`
+	OtherViewers    []string `json:"other_viewers"`
+	ViewerCount     int      `json:"viewer_count"`
+}
+
+// SessionLeftPayload is the payload for session_left events.
+// Sent when a device leaves a session that other devices are viewing.
+type SessionLeftPayload struct {
+	LeavingClientID string   `json:"leaving_client_id"`
+	RemainingViewers []string `json:"remaining_viewers"`
+	ViewerCount     int      `json:"viewer_count"`
+}
+
 // NewSessionStartEvent creates a new session_start event.
 func NewSessionStartEvent(sessionID, repoPath, repoName, agentVersion string) *BaseEvent {
 	return NewEvent(EventTypeSessionStart, SessionStartPayload{
@@ -87,4 +103,26 @@ func NewHeartbeatEvent(sequence int64, claudeStatus string, uptimeSeconds int64)
 		ClaudeStatus: claudeStatus,
 		Uptime:       uptimeSeconds,
 	})
+}
+
+// NewSessionJoinedEvent creates a new session_joined event.
+// Sent when a device joins a session that other devices are viewing.
+func NewSessionJoinedEvent(joiningClientID, workspaceID, sessionID string, otherViewers []string) *BaseEvent {
+	event := NewEventWithContext(EventTypeSessionJoined, SessionJoinedPayload{
+		JoiningClientID: joiningClientID,
+		OtherViewers:    otherViewers,
+		ViewerCount:     len(otherViewers) + 1,
+	}, workspaceID, sessionID)
+	return event
+}
+
+// NewSessionLeftEvent creates a new session_left event.
+// Sent when a device leaves a session that other devices are viewing.
+func NewSessionLeftEvent(leavingClientID, workspaceID, sessionID string, remainingViewers []string) *BaseEvent {
+	event := NewEventWithContext(EventTypeSessionLeft, SessionLeftPayload{
+		LeavingClientID: leavingClientID,
+		RemainingViewers: remainingViewers,
+		ViewerCount:     len(remainingViewers),
+	}, workspaceID, sessionID)
+	return event
 }

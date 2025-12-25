@@ -27,8 +27,11 @@ const (
 	EventTypeGitOperationComplete EventType = "git_operation_completed"
 
 	// Session events
-	EventTypeSessionStart EventType = "session_start"
-	EventTypeSessionEnd   EventType = "session_end"
+	EventTypeSessionStart        EventType = "session_start"
+	EventTypeSessionEnd          EventType = "session_end"
+	EventTypeSessionWatchChanged EventType = "session_watch_changed"
+	EventTypeSessionJoined       EventType = "session_joined"
+	EventTypeSessionLeft         EventType = "session_left"
 
 	// Response events
 	EventTypeStatusResponse EventType = "status_response"

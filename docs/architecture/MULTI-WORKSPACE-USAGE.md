@@ -175,13 +175,19 @@ When you start a workspace, the manager:
 cdev workspace discover
 ```
 
-Scans common directories for Git repositories:
-- `~/Projects`
-- `~/Code`
-- `~/Desktop`
-- `~/Documents`
+Scans common directories for Git repositories using an **enterprise-grade discovery engine** with:
+- **Cache-first strategy**: Returns cached results in <100ms
+- **Parallel scanning**: Uses all CPU cores for 3-6x speedup
+- **Smart exclusions**: Skips 70+ directory patterns (node_modules, .venv, etc.)
+- **Background refresh**: Updates cache automatically when stale
 
-Shows repository name, path, remote URL, and configuration status.
+**Default scan paths** (in priority order):
+- `~/Projects`, `~/Code`, `~/Developer`, `~/Repos`
+- `~/src`, `~/go/src`, `~/workspace`, `~/Desktop`
+
+**Note:** `~/Documents` is excluded by default for performance reasons.
+
+See [REPOSITORY-DISCOVERY.md](./REPOSITORY-DISCOVERY.md) for full architecture details.
 
 ## Configuration
 
@@ -533,16 +539,33 @@ manager:
 
 ### Discovery Finds No Repositories
 
-Discovery scans these directories by default:
-- `~/Projects`
-- `~/Code`
-- `~/Desktop`
-- `~/Documents`
+Discovery scans common development directories by default (see [REPOSITORY-DISCOVERY.md](./REPOSITORY-DISCOVERY.md) for full list).
 
-If your repositories are elsewhere, add them manually:
-```bash
-cdev workspace add /custom/path/to/repo
-```
+**Troubleshooting steps:**
+
+1. **Check if repos are in default paths**: Discovery looks in `~/Projects`, `~/Code`, `~/Developer`, etc.
+
+2. **Specify custom paths**:
+   ```bash
+   # Via CLI
+   cdev workspace discover --paths /custom/path
+
+   # Via JSON-RPC
+   {"method": "workspace/discover", "params": {"paths": ["/custom/path"]}}
+   ```
+
+3. **Force fresh scan** (ignores cache):
+   ```bash
+   # Via JSON-RPC
+   {"method": "workspace/discover", "params": {"fresh": true}}
+   ```
+
+4. **Check depth limit**: Repos nested more than 4 levels deep may be skipped.
+
+5. **Add manually** if needed:
+   ```bash
+   cdev workspace add /custom/path/to/repo
+   ```
 
 ## Best Practices
 

@@ -218,6 +218,8 @@ var SkipDirectories = []string{
 	".git",
 	".svn",
 	".hg",
+	".cdev",   // cdev logs and cache
+	".claude", // Claude CLI cache
 	"node_modules",
 	"vendor",
 	"__pycache__",

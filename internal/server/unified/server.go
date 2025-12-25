@@ -44,6 +44,14 @@ const (
 // LegacyCommandHandler handles legacy commands.
 type LegacyCommandHandler func(clientID string, cmd *commands.Command)
 
+// SessionFocus represents which session a client is currently focused on.
+type SessionFocus struct {
+	ClientID    string
+	WorkspaceID string
+	SessionID   string
+	FocusedAt   time.Time
+}
+
 // Server is a unified WebSocket server supporting dual protocols.
 type Server struct {
 	addr string
@@ -69,6 +77,10 @@ type Server struct {
 	clients         map[string]*UnifiedClient
 	filteredClients map[string]*hub.FilteredSubscriber // Workspace-filtered subscribers
 
+	// Session focus tracking (multi-device awareness)
+	sessionFocusMu sync.RWMutex
+	sessionFocus   map[string]*SessionFocus // keyed by client_id
+
 	// Heartbeat
 	heartbeatDone chan struct{}
 	heartbeatSeq  int64
@@ -84,6 +96,7 @@ func NewServer(host string, port int, dispatcher *handler.Dispatcher, eventHub p
 		hub:             eventHub,
 		clients:         make(map[string]*UnifiedClient),
 		filteredClients: make(map[string]*hub.FilteredSubscriber),
+		sessionFocus:    make(map[string]*SessionFocus),
 		heartbeatDone:   make(chan struct{}),
 		startTime:       time.Now(),
 	}
@@ -212,6 +225,10 @@ func (s *Server) removeClient(id string) {
 	delete(s.clients, id)
 	delete(s.filteredClients, id)
 	s.mu.Unlock()
+
+	// Clear session focus and notify other viewers
+	s.clearClientFocus(id)
+
 	log.Info().Str("client_id", id).Msg("client disconnected")
 }
 
@@ -245,6 +262,136 @@ func (s *Server) GetClient(id string) *UnifiedClient {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.clients[id]
+}
+
+// FocusChangeResult is the result of a focus change operation.
+type FocusChangeResult struct {
+	WorkspaceID  string   `json:"workspace_id"`
+	SessionID    string   `json:"session_id"`
+	OtherViewers []string `json:"other_viewers"`
+	ViewerCount  int      `json:"viewer_count"`
+	Success      bool     `json:"success"`
+}
+
+// SetSessionFocus updates the session focus for a client and broadcasts join/leave events.
+func (s *Server) SetSessionFocus(clientID, workspaceID, sessionID string) (interface{}, error) {
+	s.sessionFocusMu.Lock()
+
+	// Get previous focus for this client
+	oldFocus := s.sessionFocus[clientID]
+
+	// Update to new focus
+	newFocus := &SessionFocus{
+		ClientID:    clientID,
+		WorkspaceID: workspaceID,
+		SessionID:   sessionID,
+		FocusedAt:   time.Now(),
+	}
+	s.sessionFocus[clientID] = newFocus
+
+	// Find other clients viewing the SAME session
+	var otherViewers []string
+	for cID, focus := range s.sessionFocus {
+		if cID != clientID &&
+			focus.WorkspaceID == workspaceID &&
+			focus.SessionID == sessionID {
+			otherViewers = append(otherViewers, cID)
+		}
+	}
+
+	s.sessionFocusMu.Unlock()
+
+	// Emit session_joined event to other viewers if any exist
+	if len(otherViewers) > 0 && s.hub != nil {
+		event := events.NewSessionJoinedEvent(clientID, workspaceID, sessionID, otherViewers)
+		s.hub.Publish(event)
+	}
+
+	// If client had previous focus on a different session, emit session_left
+	if oldFocus != nil &&
+		(oldFocus.WorkspaceID != workspaceID || oldFocus.SessionID != sessionID) {
+		s.emitSessionLeft(clientID, oldFocus.WorkspaceID, oldFocus.SessionID)
+	}
+
+	return &FocusChangeResult{
+		WorkspaceID:  workspaceID,
+		SessionID:    sessionID,
+		OtherViewers: otherViewers,
+		ViewerCount:  len(otherViewers) + 1,
+		Success:      true,
+	}, nil
+}
+
+// emitSessionLeft broadcasts that a client left a session.
+func (s *Server) emitSessionLeft(leavingClientID, workspaceID, sessionID string) {
+	s.sessionFocusMu.RLock()
+
+	// Find remaining viewers of the OLD session
+	var remainingViewers []string
+	for cID, focus := range s.sessionFocus {
+		if cID != leavingClientID &&
+			focus.WorkspaceID == workspaceID &&
+			focus.SessionID == sessionID {
+			remainingViewers = append(remainingViewers, cID)
+		}
+	}
+
+	s.sessionFocusMu.RUnlock()
+
+	// Only broadcast if there are viewers left to notify
+	if len(remainingViewers) > 0 && s.hub != nil {
+		event := events.NewSessionLeftEvent(leavingClientID, workspaceID, sessionID, remainingViewers)
+		s.hub.Publish(event)
+	}
+}
+
+// clearClientFocus removes a client's focus and notifies other viewers.
+// Called when a client disconnects.
+func (s *Server) clearClientFocus(clientID string) {
+	s.sessionFocusMu.Lock()
+	focus, ok := s.sessionFocus[clientID]
+	delete(s.sessionFocus, clientID)
+	s.sessionFocusMu.Unlock()
+
+	// Emit session_left if client was viewing a session
+	if ok && focus != nil {
+		s.emitSessionLeft(clientID, focus.WorkspaceID, focus.SessionID)
+	}
+}
+
+// GetSessionViewers returns a map of session ID to list of client IDs viewing that session.
+// Optionally filter by workspace ID.
+func (s *Server) GetSessionViewers(workspaceID string) map[string][]string {
+	s.sessionFocusMu.RLock()
+	defer s.sessionFocusMu.RUnlock()
+
+	result := make(map[string][]string)
+	for clientID, focus := range s.sessionFocus {
+		// Filter by workspace if specified
+		if workspaceID != "" && focus.WorkspaceID != workspaceID {
+			continue
+		}
+		result[focus.SessionID] = append(result[focus.SessionID], clientID)
+	}
+	return result
+}
+
+// GetAllSessionFocus returns all session focus info.
+// Returns a map of client ID to their focus info.
+func (s *Server) GetAllSessionFocus() map[string]*SessionFocus {
+	s.sessionFocusMu.RLock()
+	defer s.sessionFocusMu.RUnlock()
+
+	result := make(map[string]*SessionFocus, len(s.sessionFocus))
+	for clientID, focus := range s.sessionFocus {
+		result[clientID] = &SessionFocus{
+			ClientID:    focus.ClientID,
+			WorkspaceID: focus.WorkspaceID,
+			SessionID:   focus.SessionID,
+			FocusedAt:   focus.FocusedAt,
+		}
+	}
+	return result
 }
 
 // heartbeatLoop broadcasts periodic heartbeat events.

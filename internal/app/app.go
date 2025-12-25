@@ -319,6 +319,12 @@ func (a *App) Start(ctx context.Context) error {
 	sessionManagerService := methods.NewSessionManagerService(a.sessionManager)
 	sessionManagerService.RegisterMethods(rpcRegistry)
 
+	// Repository service (repository/search, repository/files/list, etc.)
+	if a.repoIndexer != nil {
+		repositoryService := methods.NewRepositoryService(a.repoIndexer)
+		repositoryService.RegisterMethods(rpcRegistry)
+	}
+
 	// Lifecycle service with capabilities
 	caps := methods.ServerCapabilities{
 		Agent: &methods.AgentCapabilities{
@@ -344,9 +350,12 @@ func (a *App) Start(ctx context.Context) error {
 			List: a.repoIndexer != nil,
 		},
 		Repository: &methods.RepositoryCapabilities{
-			Index:  a.repoIndexer != nil,
-			Search: a.repoIndexer != nil,
-			Tree:   a.repoIndexer != nil,
+			Index:   a.repoIndexer != nil,
+			Search:  a.repoIndexer != nil,
+			List:    a.repoIndexer != nil,
+			Tree:    a.repoIndexer != nil,
+			Stats:   a.repoIndexer != nil,
+			Rebuild: a.repoIndexer != nil,
 		},
 		Notifications:   []string{"agent_log", "agent_state", "file_changed", "git_status"},
 		SupportedAgents: []string{"claude"},
@@ -357,6 +366,11 @@ func (a *App) Start(ctx context.Context) error {
 	// Subscription service (for workspace event filtering)
 	subscriptionService := methods.NewSubscriptionService()
 	subscriptionService.RegisterMethods(rpcRegistry)
+
+	// Client service (for multi-device session awareness)
+	// Provider will be set after unified server is created
+	clientService := methods.NewClientService(nil)
+	clientService.RegisterMethods(rpcRegistry)
 
 	a.rpcDispatcher = handler.NewDispatcher(rpcRegistry)
 
@@ -374,6 +388,13 @@ func (a *App) Start(ctx context.Context) error {
 	a.unifiedServer.SetStatusProvider(a)
 	// Set subscription provider (unified server manages filtered subscribers)
 	subscriptionService.SetProvider(a.unifiedServer)
+	// Set client focus provider (unified server tracks multi-device session awareness)
+	clientFocusAdapter := NewClientFocusAdapter(a.unifiedServer)
+	clientService.SetProvider(clientFocusAdapter)
+	// Set viewer provider for workspace/list to include session viewers
+	workspaceConfigService.SetViewerProvider(a.unifiedServer)
+	// Set focus provider for session manager so workspace/session/watch updates viewers
+	sessionManagerService.SetFocusProvider(clientFocusAdapter)
 	// Start background tasks (heartbeat)
 	a.unifiedServer.StartBackgroundTasks()
 

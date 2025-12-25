@@ -871,7 +871,24 @@ Returns git diff for a specific file or all files.
 
 ## Repository API
 
-The Repository API provides fast file search and browsing capabilities. See [REPOSITORY-INDEXER.md](./REPOSITORY-INDEXER.md) for detailed documentation.
+The Repository API provides fast file search and browsing capabilities. See [REPOSITORY-INDEXER.md](../architecture/REPOSITORY-INDEXER.md) for detailed documentation.
+
+### JSON-RPC Methods (Recommended)
+
+All repository endpoints have JSON-RPC 2.0 equivalents available via WebSocket at `/ws`:
+
+| HTTP Endpoint | JSON-RPC Method |
+|--------------|-----------------|
+| `GET /api/repository/index/status` | `repository/index/status` |
+| `GET /api/repository/search` | `repository/search` |
+| `GET /api/repository/files/list` | `repository/files/list` |
+| `GET /api/repository/files/tree` | `repository/files/tree` |
+| `GET /api/repository/stats` | `repository/stats` |
+| `POST /api/repository/index/rebuild` | `repository/index/rebuild` |
+
+See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md) for complete JSON-RPC documentation.
+
+### HTTP Endpoints
 
 ### Get Index Status
 

@@ -15,6 +15,8 @@ This directory contains all project documentation organized by category.
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
 | **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
 | **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
+| **Integrate iOS app** | [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) |
+| **LIVE session support** | [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) |
 | **Integrate with VS Code** | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) |
 | **Acquisition strategy** | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) |
 | **Multi-agent (Claude/Gemini/Codex)** | [architecture/MULTI-AGENT-ARCHITECTURE.md](./architecture/MULTI-AGENT-ARCHITECTURE.md) |
@@ -46,6 +48,10 @@ docs/
 │   ├── SECURITY.md            # Security guidelines & threat model
 │   ├── TECHNICAL-REVIEW.md    # Security analysis
 │   └── IMAGE-UPLOAD-SECURITY-ANALYSIS.md
+├── mobile/                    # Mobile Integration docs
+│   ├── IOS-INTEGRATION-GUIDE.md       # iOS integration reference
+│   ├── IOS-WORKSPACE-INTEGRATION.md   # Multi-workspace iOS guide
+│   └── LIVE-SESSION-INTEGRATION.md    # LIVE session support for terminal sessions
 ├── guides/                    # Guides & Testing docs
 │   ├── WORKSPACE-MANAGER-SETUP.md  # Workspace manager setup with VS Code tunnels
 │   ├── POC-TESTING-GUIDE.md   # POC testing guide
@@ -136,7 +142,25 @@ docs/
 
 ---
 
-### 5. Guides & Testing
+### 5. Mobile Integration
+*For iOS/mobile app developers*
+
+| Document | Description |
+|----------|-------------|
+| [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) | Complete iOS integration reference |
+| [mobile/IOS-WORKSPACE-INTEGRATION.md](./mobile/IOS-WORKSPACE-INTEGRATION.md) | Multi-workspace support for iOS |
+| [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) | **LIVE session support** - Watch and interact with terminal sessions |
+
+**Key Topics:**
+- JSON-RPC 2.0 WebSocket integration
+- Session types: managed, live, historical
+- Real-time session watching
+- Permission handling UI
+- TTY injection for LIVE sessions
+
+---
+
+### 6. Guides & Testing
 *For testing and development*
 
 | Document | Description |
@@ -148,7 +172,7 @@ docs/
 
 ---
 
-### 6. Project Management & Strategy
+### 7. Project Management & Strategy
 *For planning, tracking, and strategic direction*
 
 | Document | Description |
@@ -163,7 +187,7 @@ docs/
 
 ---
 
-### 7. Operations & Deployment
+### 8. Operations & Deployment
 *For production deployment*
 
 | Document | Description |

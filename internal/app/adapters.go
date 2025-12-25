@@ -566,3 +566,28 @@ func (a *ClaudeSessionAdapter) DeleteAllSessions(ctx context.Context) (int, erro
 	}
 	return a.cache.DeleteAllSessions()
 }
+
+// ClientFocusServer interface for server operations.
+// Note: The actual implementation returns *unified.FocusChangeResult, but we use interface{}
+// to avoid circular dependencies.
+type ClientFocusServer interface {
+	SetSessionFocus(clientID, workspaceID, sessionID string) (interface{}, error)
+}
+
+// ClientFocusAdapter wraps the unified server to implement methods.ClientFocusProvider.
+type ClientFocusAdapter struct {
+	server ClientFocusServer
+}
+
+// NewClientFocusAdapter creates a new client focus adapter.
+func NewClientFocusAdapter(server ClientFocusServer) *ClientFocusAdapter {
+	return &ClientFocusAdapter{server: server}
+}
+
+// SetSessionFocus updates the session focus for a client.
+func (a *ClientFocusAdapter) SetSessionFocus(clientID, workspaceID, sessionID string) (interface{}, error) {
+	if a.server == nil {
+		return nil, nil
+	}
+	return a.server.SetSessionFocus(clientID, workspaceID, sessionID)
+}
