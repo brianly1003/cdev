@@ -1237,7 +1237,42 @@ The `watch_session` command enables real-time message streaming when Claude Code
     "role": "assistant",
     "content": [
       {"type": "text", "text": "Here's the implementation..."}
-    ]
+    ],
+    "stop_reason": ""
+  }
+}
+```
+
+**claude_message Payload Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | string | Claude session ID |
+| `type` | string | Message type: `user`, `assistant`, `system` |
+| `role` | string | Message role |
+| `content` | array | Content blocks |
+| `stop_reason` | string | Empty = still working, `end_turn` = finished, `tool_use` = calling tool |
+| `is_context_compaction` | boolean | `true` for auto-generated context compaction messages |
+
+**stop_reason Values:**
+| Value | Description |
+|-------|-------------|
+| `""` (empty) | Claude is still generating or intermediate message |
+| `"end_turn"` | Claude finished its response |
+| `"tool_use"` | Claude is calling a tool |
+
+**Final message example (Claude finished):**
+```json
+{
+  "event": "claude_message",
+  "timestamp": "2025-12-20T01:46:00Z",
+  "payload": {
+    "session_id": "bd2ddce2-d50a-43b9-8129-602e7cdba072",
+    "type": "assistant",
+    "role": "assistant",
+    "content": [
+      {"type": "text", "text": "Done! The implementation is complete."}
+    ],
+    "stop_reason": "end_turn"
   }
 }
 ```
@@ -1354,6 +1389,7 @@ func handleEvent(_ event: WebSocketEvent) {
     switch event.type {
     case "session_watch_started":
         print("Now watching session: \(event.payload.sessionId)")
+        showStopButton()  // Show stop button while Claude is working
 
     case "claude_message":
         let message = event.payload
@@ -1372,14 +1408,38 @@ func handleEvent(_ event: WebSocketEvent) {
             appendMessage(message)
         }
 
+        // Check if Claude finished (stop_reason indicates completion)
+        if message.stopReason == "end_turn" {
+            hideStopButton()
+            showCompletionIndicator()
+        }
+
     case "session_watch_stopped":
         print("Stopped watching session")
+        hideStopButton()
     }
 }
 
 // When leaving session view
 func leaveSessionView() {
     ws.send(UnwatchSessionCommand())
+}
+
+// Claude message model with stop_reason
+struct ClaudeMessagePayload: Codable {
+    let sessionId: String
+    let type: String
+    let role: String
+    let content: [MessageContent]
+    let stopReason: String?
+    let isContextCompaction: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case type, role, content
+        case stopReason = "stop_reason"
+        case isContextCompaction = "is_context_compaction"
+    }
 }
 ```
 
@@ -1594,6 +1654,84 @@ func handleClaudeLog(_ event: ClaudeLogEvent) {
 func showThinkingIndicator(tokens: Int) {
     let tokenStr = tokens > 1000 ? String(format: "%.1fk", Double(tokens)/1000) : "\(tokens)"
     statusLabel.text = "✻ Ideating... (↓ \(tokenStr) tokens)"
+}
+```
+
+---
+
+### PTY Events (Interactive Mode)
+
+The following events are specific to **interactive PTY mode** (`permission_mode: "interactive"`). See [INTERACTIVE-PTY-MODE.md](../mobile/INTERACTIVE-PTY-MODE.md) for detailed documentation.
+
+#### pty_permission
+
+Sent when a permission prompt is detected in PTY mode.
+
+```json
+{
+  "event": "pty_permission",
+  "timestamp": "2025-12-26T12:00:01Z",
+  "payload": {
+    "type": "write_file",
+    "target": "UserProfile.swift",
+    "description": "Claude wants to create a file",
+    "preview": "struct UserProfile: View {\n    var body: some View {\n        Text(\"Hello\")\n    }\n}",
+    "options": [
+      {"key": "1", "label": "Yes", "description": null, "selected": true},
+      {"key": "2", "label": "Yes, and don't ask again for this file type", "description": null, "selected": false},
+      {"key": "3", "label": "No", "description": null, "selected": false}
+    ],
+    "session_id": "sess-456"
+  }
+}
+```
+
+**Payload Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Permission type: `write_file`, `edit_file`, `delete_file`, `bash_command`, `trust_folder`, `mcp_tool` |
+| `target` | string | Target filename or command |
+| `description` | string | Human-readable description |
+| `preview` | string | Content preview |
+| `options` | array | Available choices |
+| `options[].selected` | boolean | `true` if cursor is on this option (❯) |
+| `session_id` | string | Session ID |
+
+---
+
+#### pty_state
+
+Sent when PTY state changes. **Important for detecting when Claude finishes.**
+
+```json
+{
+  "event": "pty_state",
+  "timestamp": "2025-12-26T12:00:02Z",
+  "payload": {
+    "state": "idle",
+    "waiting_for_input": false,
+    "prompt_type": "",
+    "session_id": "sess-456"
+  }
+}
+```
+
+**State Values:**
+| State | Description | `waiting_for_input` |
+|-------|-------------|---------------------|
+| `idle` | Claude finished or not running | `false` |
+| `thinking` | Claude is processing | `false` |
+| `permission` | Waiting for permission approval | `true` |
+| `question` | Waiting for user answer | `true` |
+| `error` | Error occurred | `false` |
+
+**iOS Usage:**
+```swift
+func handlePTYState(_ event: PTYStateEvent) {
+    if event.payload.state == "idle" {
+        hideStopButton()
+        setClaudeFinished()
+    }
 }
 ```
 

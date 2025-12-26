@@ -18,7 +18,7 @@ func NewClaudeAdapter(manager *claude.Manager) *ClaudeAdapter {
 }
 
 // StartWithSession implements AgentManager.
-func (a *ClaudeAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+func (a *ClaudeAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error {
 	// Convert SessionMode to Claude's session mode
 	var claudeMode claude.SessionMode
 	switch mode {
@@ -27,7 +27,7 @@ func (a *ClaudeAdapter) StartWithSession(ctx context.Context, prompt string, mod
 	default:
 		claudeMode = claude.SessionModeNew
 	}
-	return a.manager.StartWithSession(ctx, prompt, claudeMode, sessionID)
+	return a.manager.StartWithSession(ctx, prompt, claudeMode, sessionID, permissionMode)
 }
 
 // Stop implements AgentManager.
@@ -68,6 +68,16 @@ func (a *ClaudeAdapter) SessionID() string {
 // AgentType implements AgentManager.
 func (a *ClaudeAdapter) AgentType() string {
 	return "claude"
+}
+
+// SendPTYInput implements AgentManager.
+func (a *ClaudeAdapter) SendPTYInput(input string) error {
+	return a.manager.SendPTYInput(input)
+}
+
+// IsPTYMode implements AgentManager.
+func (a *ClaudeAdapter) IsPTYMode() bool {
+	return a.manager.IsPTYMode()
 }
 
 // Ensure ClaudeAdapter implements AgentManager

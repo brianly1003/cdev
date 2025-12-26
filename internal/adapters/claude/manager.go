@@ -19,6 +19,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/creack/pty"
 	"github.com/rs/zerolog/log"
 )
 
@@ -55,6 +56,15 @@ type Manager struct {
 	cancel        context.CancelFunc
 	pid           int
 	logFile       *os.File
+
+	// PTY mode for true interactive terminal support
+	ptmx      *os.File   // PTY master file descriptor
+	usePTY    bool       // Whether currently using PTY mode
+	ptyParser *PTYParser // Parser for PTY output
+
+	// PTY state tracking
+	ptyState      PTYState       // Current PTY interaction state
+	ptyPromptType PermissionType // Type of permission being requested
 
 	// Session tracking
 	claudeSessionID string // Session ID from Claude CLI output
@@ -142,11 +152,21 @@ func (m *Manager) SetWorkDir(dir string) {
 
 // Start spawns Claude CLI with the given prompt (new session).
 func (m *Manager) Start(ctx context.Context, prompt string) error {
-	return m.StartWithSession(ctx, prompt, SessionModeNew, "")
+	return m.StartWithSession(ctx, prompt, SessionModeNew, "", "")
 }
 
 // StartWithSession spawns Claude CLI with session control.
-func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+// permissionMode controls how Claude handles permissions:
+// - "" or "default": Use skipPermissions config setting
+// - "acceptEdits": Auto-accept file edits
+// - "bypassPermissions": Skip all permission checks
+// - "plan": Plan mode only
+func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error {
+	// Handle interactive (PTY) mode - use PTY for true terminal-like permission prompts
+	if permissionMode == "interactive" {
+		return m.StartWithPTY(ctx, prompt, mode, sessionID)
+	}
+
 	m.mu.Lock()
 	if m.state == events.ClaudeStateRunning {
 		m.mu.Unlock()
@@ -196,17 +216,20 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 		// SessionModeNew: no flags needed, starts fresh conversation
 	}
 
-	// Add skip permissions flag if enabled
-	if m.skipPermissions {
+	// Handle permission mode
+	// Priority: explicit permissionMode parameter > skipPermissions config
+	if permissionMode != "" && permissionMode != "default" {
+		// Use explicit --permission-mode flag for acceptEdits, bypassPermissions, plan
+		cmdArgs = append(cmdArgs, "--permission-mode", permissionMode)
+	} else if m.skipPermissions {
+		// Fallback to config-based skip permissions
 		cmdArgs = append(cmdArgs, "--dangerously-skip-permissions")
-	} else {
-		// When permissions are not skipped, we need stream-json input format
-		// for sending permission responses via stdin
-		// The prompt is still passed as CLI argument, but responses are JSON
-		cmdArgs = append(cmdArgs, "--input-format", "stream-json")
 	}
+	// Note: If neither is set, Claude will prompt for permissions interactively.
+	// Since stdin is closed, this may cause Claude to hang or fail on permission prompts.
+	// Consider using "acceptEdits" or "bypassPermissions" for non-interactive use.
 
-	// Add the prompt as the last argument
+	// Add the prompt as the last argument (always)
 	cmdArgs = append(cmdArgs, prompt)
 
 	// Debug: Log the full command being executed
@@ -237,11 +260,6 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	}
 	m.stdin = stdin
 
-	// If skip permissions is enabled, we won't need stdin for responses
-	// Claude CLI waits for stdin EOF when stdin is a pipe, so close it
-	// to prevent blocking
-	closeStdinAfterStart := m.skipPermissions
-
 	// Get stdout and stderr pipes
 	stdout, err := m.cmd.StdoutPipe()
 	if err != nil {
@@ -264,13 +282,12 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 		return fmt.Errorf("failed to start claude: %w", err)
 	}
 
-	// Close stdin if not needed (in skip permissions mode)
-	// Claude CLI waits for stdin EOF when stdin is a pipe
-	if closeStdinAfterStart {
-		stdin.Close()
-		m.stdin = nil
-		log.Debug().Msg("closed stdin (skip permissions mode)")
-	}
+	// Always close stdin after starting Claude.
+	// Claude CLI waits for stdin EOF when stdin is a pipe before processing.
+	// For permission responses, we'll need a different approach (TBD).
+	stdin.Close()
+	m.stdin = nil
+	log.Debug().Msg("closed stdin to trigger EOF")
 
 	m.state = events.ClaudeStateRunning
 	m.currentPrompt = prompt
@@ -373,17 +390,418 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 		m.pendingToolUseID = ""
 		m.pendingToolName = ""
 		m.claudeSessionID = ""
+
+		// Close PTY if used
+		if m.ptmx != nil {
+			m.ptmx.Close()
+			m.ptmx = nil
+		}
+		m.usePTY = false
 	}()
 
 	return nil
 }
 
-// Stop gracefully terminates the running Claude process.
-func (m *Manager) Stop(ctx context.Context) error {
+// StartWithPTY spawns Claude CLI with a pseudo-terminal for true interactive support.
+// This allows permission prompts to work interactively from remote clients.
+// The PTY makes Claude think it's running in a real terminal.
+func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+	m.mu.Lock()
+	if m.state == events.ClaudeStateRunning {
+		m.mu.Unlock()
+		return domain.ErrClaudeAlreadyRunning
+	}
+
+	if prompt == "" {
+		m.mu.Unlock()
+		return domain.ErrInvalidPrompt
+	}
+
+	// Create cancellable context with timeout
+	runCtx, cancel := context.WithTimeout(ctx, m.timeout)
+	m.cancel = cancel
+
+	// Build command arguments for PTY mode
+	// For true terminal-like behavior, we run Claude WITHOUT -p flag
+	// This gives us the full interactive UI with permission prompts
+	var cmdArgs []string
+
+	// Add session mode flags (resume)
+	switch mode {
+	case SessionModeContinue:
+		if sessionID == "" {
+			m.mu.Unlock()
+			cancel()
+			return fmt.Errorf("session_id is required for continue mode")
+		}
+		cmdArgs = append(cmdArgs, "--resume", sessionID)
+	}
+
+	// NOTE: We do NOT add the prompt as a CLI argument!
+	// The prompt will be sent via PTY input after Claude starts
+
+	log.Debug().
+		Str("command", m.command).
+		Strs("args", cmdArgs).
+		Str("work_dir", m.workDir).
+		Bool("pty_mode", true).
+		Msg("spawning claude process with PTY")
+
+	// Create command
+	m.cmd = exec.CommandContext(runCtx, m.command, cmdArgs...)
+
+	// Set working directory
+	if m.workDir != "" {
+		m.cmd.Dir = m.workDir
+	}
+
+	// Set up environment for PTY mode
+	m.cmd.Env = append(os.Environ(),
+		"TERM=xterm-256color", // Tell Claude it's in a capable terminal
+		"COLORTERM=truecolor",
+		"COLUMNS=120",
+		"LINES=40",
+	)
+
+	// Start with PTY - this creates a pseudo-terminal
+	ptmx, err := pty.Start(m.cmd)
+	if err != nil {
+		m.mu.Unlock()
+		cancel()
+		return fmt.Errorf("failed to start claude with PTY: %w", err)
+	}
+
+	// Set terminal size
+	if err := pty.Setsize(ptmx, &pty.Winsize{Rows: 40, Cols: 120}); err != nil {
+		log.Warn().Err(err).Msg("failed to set PTY size")
+	}
+
+	m.ptmx = ptmx
+	m.usePTY = true
+	m.state = events.ClaudeStateRunning
+	m.currentPrompt = prompt
+	m.pid = m.cmd.Process.Pid
+
+	// Open log file if logging is enabled
+	if m.logDir != "" {
+		if err := os.MkdirAll(m.logDir, 0755); err != nil {
+			log.Warn().Err(err).Msg("failed to create log directory")
+		} else {
+			logPath := filepath.Join(m.logDir, fmt.Sprintf("claude_%d.jsonl", m.pid))
+			f, err := os.Create(logPath)
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to create log file")
+			} else {
+				m.logFile = f
+				log.Info().Str("path", logPath).Msg("claude log file created (PTY mode)")
+			}
+		}
+	}
+	m.mu.Unlock()
+
+	log.Info().
+		Str("prompt", truncatePrompt(prompt, 50)).
+		Int("pid", m.pid).
+		Bool("pty_mode", true).
+		Msg("claude started with PTY")
+
+	// Publish status event
+	m.publishEvent(events.NewClaudeStatusEvent(events.ClaudeStateRunning, prompt, m.pid))
+
+	// Stream PTY output in a goroutine
+	go func() {
+		m.streamPTYOutput(ptmx)
+	}()
+
+	// Send the initial prompt after Claude UI initializes
+	go func() {
+		// Wait for Claude to initialize (show the UI)
+		// Claude needs ~3-4 seconds to fully initialize its TUI
+		time.Sleep(4 * time.Second)
+
+		// Send the prompt text followed by Enter (carriage return for TTY)
+		if prompt != "" {
+			log.Info().Str("prompt", truncatePrompt(prompt, 50)).Msg("sending initial prompt to PTY")
+			// First send the prompt text
+			ptmx.Write([]byte(prompt))
+
+			// Wait a moment for Claude's TUI to process the input
+			time.Sleep(200 * time.Millisecond)
+
+			// Then send Enter (carriage return) to submit the prompt
+			log.Debug().Msg("sending Enter key to submit prompt")
+			ptmx.Write([]byte("\r"))
+		}
+	}()
+
+	// Wait for process to complete in a goroutine
+	go func() {
+		err := m.cmd.Wait()
+
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		exitCode := 0
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			}
+		}
+
+		// Check if context was cancelled
+		if runCtx.Err() == context.Canceled {
+			m.state = events.ClaudeStateStopped
+			m.publishEvent(events.NewClaudeStoppedEvent(exitCode))
+			log.Info().Int("exit_code", exitCode).Msg("claude stopped by user (PTY mode)")
+		} else if runCtx.Err() == context.DeadlineExceeded {
+			m.state = events.ClaudeStateError
+			m.publishEvent(events.NewClaudeErrorEvent("timeout exceeded", exitCode))
+			log.Warn().Msg("claude timed out (PTY mode)")
+		} else if exitCode != 0 {
+			m.state = events.ClaudeStateError
+			m.publishEvent(events.NewClaudeErrorEvent(fmt.Sprintf("exit code %d", exitCode), exitCode))
+			log.Warn().Int("exit_code", exitCode).Msg("claude exited with error (PTY mode)")
+		} else {
+			m.state = events.ClaudeStateIdle
+			m.publishEvent(events.NewClaudeIdleEvent())
+			log.Info().Msg("claude completed successfully (PTY mode)")
+		}
+
+		// Cleanup
+		if m.logFile != nil {
+			m.logFile.Close()
+			m.logFile = nil
+		}
+		if m.ptmx != nil {
+			m.ptmx.Close()
+			m.ptmx = nil
+		}
+
+		m.cmd = nil
+		m.cancel = nil
+		m.currentPrompt = ""
+		m.pid = 0
+		m.waitingForInput = false
+		m.pendingToolUseID = ""
+		m.pendingToolName = ""
+		m.claudeSessionID = ""
+		m.usePTY = false
+	}()
+
+	return nil
+}
+
+// streamPTYOutput reads from the PTY and publishes events.
+// PTY output is raw terminal data with ANSI codes that we parse for mobile display.
+func (m *Manager) streamPTYOutput(ptmx *os.File) {
+	log.Debug().Msg("PTY output streaming started")
+
+	reader := bufio.NewReader(ptmx)
+	parser := NewPTYParser()
+
+	// Store parser reference for state queries
+	m.mu.Lock()
+	m.ptyParser = parser
+	m.mu.Unlock()
+
+	lineCount := 0
+	var lastState PTYState
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				log.Debug().Err(err).Msg("PTY read error")
+			}
+			break
+		}
+
+		lineCount++
+		line = strings.TrimSuffix(line, "\n")
+		line = strings.TrimSuffix(line, "\r") // Remove CRLF from PTY
+
+		// Parse line with PTY parser (strips ANSI, detects prompts)
+		parsedLine := parser.ansi.ParseLine(line)
+		permissionPrompt, ptyState := parser.ProcessLine(line)
+
+		// Update manager state
+		m.mu.Lock()
+		m.ptyState = ptyState
+		if permissionPrompt != nil {
+			m.waitingForInput = true
+			m.ptyPromptType = permissionPrompt.Type
+		}
+		m.mu.Unlock()
+
+		// NOTE: pty_output event disabled - too verbose for cdev-ios
+		// cdev-ios should use pty_permission and claude_message events instead
+		// if parsedLine.CleanText != "" {
+		// 	m.publishEvent(events.NewPTYOutputEventWithSession(
+		// 		parsedLine.CleanText,
+		// 		parsedLine.RawText,
+		// 		string(ptyState),
+		// 		m.sessionID,
+		// 	))
+		// }
+
+		// Emit pty_permission event when a prompt is detected
+		if permissionPrompt != nil {
+			// Convert options to event format
+			options := make([]events.PTYPromptOption, len(permissionPrompt.Options))
+			for i, opt := range permissionPrompt.Options {
+				options[i] = events.PTYPromptOption{
+					Key:         opt.Key,
+					Label:       opt.Label,
+					Description: opt.Description,
+					Selected:    opt.Selected,
+				}
+			}
+
+			m.publishEvent(events.NewPTYPermissionEventWithSession(
+				string(permissionPrompt.Type),
+				permissionPrompt.Target,
+				permissionPrompt.Description,
+				permissionPrompt.Preview,
+				m.sessionID,
+				options,
+			))
+
+			log.Info().
+				Str("type", string(permissionPrompt.Type)).
+				Str("target", permissionPrompt.Target).
+				Int("options", len(permissionPrompt.Options)).
+				Msg("PTY permission prompt detected")
+		}
+
+		// Emit pty_state event when state changes
+		if ptyState != lastState {
+			m.publishEvent(events.NewPTYStateEventWithSession(
+				string(ptyState),
+				parser.IsWaitingForInput(),
+				string(m.ptyPromptType),
+				m.sessionID,
+			))
+			lastState = ptyState
+		}
+
+		// NOTE: claude_log event disabled for interactive mode - too verbose for cdev-ios
+		// cdev-ios should use pty_permission and claude_message events instead
+		// m.publishEvent(events.NewClaudeLogEvent(line, events.StreamStdout))
+
+		// Write to log file if enabled
+		m.mu.RLock()
+		if m.logFile != nil {
+			m.logFile.WriteString(line + "\n")
+		}
+		m.mu.RUnlock()
+
+		log.Debug().
+			Str("clean", truncatePrompt(parsedLine.CleanText, 80)).
+			Str("state", string(ptyState)).
+			Msg("PTY output")
+	}
+
+	// Clean up parser reference
+	m.mu.Lock()
+	m.ptyParser = nil
+	sessionID := m.sessionID
+	m.mu.Unlock()
+
+	// Emit final pty_state event with idle state so cdev-ios knows Claude finished
+	m.publishEvent(events.NewPTYStateEventWithSession(
+		string(PTYStateIdle),
+		false, // not waiting for input
+		"",    // no prompt type
+		sessionID,
+	))
+
+	log.Debug().Int("lines_read", lineCount).Msg("PTY output streaming finished")
+	log.Info().Str("session_id", sessionID).Msg("emitted pty_state idle - Claude PTY session finished")
+}
+
+// SendPTYInput sends input to the PTY (for interactive responses).
+// This allows remote clients to respond to permission prompts.
+// For regular text input, a carriage return is automatically appended.
+// For special keys (escape sequences, control characters), the input is sent as-is.
+func (m *Manager) SendPTYInput(input string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.state != events.ClaudeStateRunning {
+		return domain.ErrClaudeNotRunning
+	}
+
+	if !m.usePTY || m.ptmx == nil {
+		return fmt.Errorf("not running in PTY mode")
+	}
+
+	// Check if input is a key name (e.g., "enter", "escape") and convert to escape sequence
+	// This allows cdev-ios to send input: "enter" as a convenience
+	keyNameToSequence := map[string]string{
+		"enter": "\r", "return": "\r",
+		"escape": "\x1b", "esc": "\x1b",
+		"up": "\x1b[A", "down": "\x1b[B", "right": "\x1b[C", "left": "\x1b[D",
+		"tab": "\t", "backspace": "\x7f", "space": " ",
+	}
+	if seq, ok := keyNameToSequence[strings.ToLower(input)]; ok {
+		input = seq
+	}
+
+	// Determine if this is a special key/control sequence that should be sent as-is
+	isSpecialKey := false
+	if len(input) > 0 {
+		firstByte := input[0]
+		// Control characters (0x00-0x1F) and escape sequences (\x1b...) are special
+		if firstByte < 0x20 || firstByte == 0x7f {
+			isSpecialKey = true
+		}
+	}
+
+	// Auto-append carriage return only for regular text input
+	if !isSpecialKey && !strings.HasSuffix(input, "\r") && !strings.HasSuffix(input, "\n") {
+		input = input + "\r"
+	}
+
+	// Write input to PTY (simulates keyboard input)
+	_, err := m.ptmx.Write([]byte(input))
+	if err != nil {
+		return fmt.Errorf("failed to write to PTY: %w", err)
+	}
+
+	// Reset waiting state after user responds
+	m.waitingForInput = false
+	m.ptyPromptType = ""
+
+	// Reset parser state if available
+	if m.ptyParser != nil {
+		m.ptyParser.SetState(PTYStateIdle)
+	}
+
+	log.Info().
+		Str("input", truncatePrompt(input, 50)).
+		Bool("special_key", isSpecialKey).
+		Msg("sent input to claude PTY")
+
+	return nil
+}
+
+// IsPTYMode returns true if running in PTY mode.
+func (m *Manager) IsPTYMode() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.usePTY
+}
+
+// Stop gracefully terminates the running Claude process.
+func (m *Manager) Stop(ctx context.Context) error {
+	m.mu.Lock()
+	sessionID := m.sessionID
+	wasPTY := m.usePTY
+	m.mu.Unlock()
+
+	m.mu.Lock()
+	if m.state != events.ClaudeStateRunning {
+		m.mu.Unlock()
 		return domain.ErrClaudeNotRunning
 	}
 
@@ -396,6 +814,18 @@ func (m *Manager) Stop(ctx context.Context) error {
 		if err := m.terminateProcess(m.cmd); err != nil {
 			log.Warn().Err(err).Msg("graceful termination failed, will force kill")
 		}
+	}
+	m.mu.Unlock()
+
+	// Emit pty_state idle when stopped (backup in case streamPTYOutput doesn't emit it)
+	if wasPTY && sessionID != "" {
+		m.publishEvent(events.NewPTYStateEventWithSession(
+			string(PTYStateIdle),
+			false,
+			"",
+			sessionID,
+		))
+		log.Info().Str("session_id", sessionID).Msg("emitted pty_state idle on Stop()")
 	}
 
 	return nil

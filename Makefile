@@ -25,7 +25,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) 
 SWAG := $(shell go env GOPATH)/bin/swag
 
 # Targets
-.PHONY: all build build-all clean test test-race fmt vet lint tidy run run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
+.PHONY: all build build-all clean test test-race fmt vet lint tidy run run-headless run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
 
 # Default target
 all: build
@@ -59,22 +59,35 @@ build-linux-amd64:
 	@mkdir -p $(DIST_DIR)
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/cdev
 
-# Run the application (usage: make run or make run REPO=/path/to/repo)
+# Run the application in TERMINAL mode (default, Claude runs in current terminal)
+# Usage: make run or make run REPO=/path/to/repo
 REPO ?=
 run: build
+	@echo "Starting cdev in TERMINAL mode (Claude will run in this terminal)..."
 ifneq ($(REPO),)
 	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
 else
 	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
 endif
 
-# Run server in background
-run-bg: build
-	@echo "Starting cdev server in background..."
+# Run the application in HEADLESS mode (Claude runs as background subprocess)
+# Usage: make run-headless or make run-headless REPO=/path/to/repo
+run-headless: build
+	@echo "Starting cdev in HEADLESS mode (Claude runs as background process)..."
 ifneq ($(REPO),)
-	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO) > ~/.cdev/server.log 2>&1 &
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --headless --config configs/config.yaml --repo $(REPO)
 else
-	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml > ~/.cdev/server.log 2>&1 &
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --headless --config configs/config.yaml
+endif
+
+# Run server in background (always headless mode for background operation)
+run-bg: build
+	@echo "Starting cdev server in background (headless mode)..."
+	@mkdir -p ~/.cdev
+ifneq ($(REPO),)
+	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --headless --config configs/config.yaml --repo $(REPO) > ~/.cdev/server.log 2>&1 &
+else
+	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --headless --config configs/config.yaml > ~/.cdev/server.log 2>&1 &
 endif
 	@sleep 1
 	@echo "Server started on port 8766. Logs: ~/.cdev/server.log"
@@ -263,10 +276,18 @@ help:
 	@echo "  make build-all    Build for all platforms (macOS, Windows, Linux)"
 	@echo ""
 	@echo "Run Server (port 8766):"
-	@echo "  make run             Run server (debug mode, foreground)"
-	@echo "  make run REPO=/path  Run with specific repo"
-	@echo "  make run-bg          Run server in background"
-	@echo "  make stop            Stop the server"
+	@echo ""
+	@echo "  TERMINAL MODE (default) - Claude runs in current terminal:"
+	@echo "    make run               Run in terminal mode (Claude visible in this terminal)"
+	@echo "    make run REPO=/path    Run with specific repo in terminal mode"
+	@echo ""
+	@echo "  HEADLESS MODE - Claude runs as background subprocess:"
+	@echo "    make run-headless      Run in headless mode (Claude as background process)"
+	@echo "    make run-headless REPO=/path  Run headless with specific repo"
+	@echo ""
+	@echo "  BACKGROUND (daemon):"
+	@echo "    make run-bg            Run server in background (always headless)"
+	@echo "    make stop              Stop the server"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test                  Run tests"

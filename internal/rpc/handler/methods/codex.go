@@ -53,9 +53,13 @@ func NewCodexAdapter(manager CodexManager) *CodexAdapter {
 }
 
 // StartWithSession implements AgentManager.
-func (a *CodexAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+func (a *CodexAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error {
 	if a.manager == nil {
 		return errors.New("codex manager not configured")
+	}
+	// Codex doesn't support permission modes like Claude
+	if permissionMode == "interactive" {
+		return errors.New("codex does not support interactive (PTY) mode")
 	}
 	return a.manager.Start(ctx, prompt)
 }
@@ -117,6 +121,18 @@ func (a *CodexAdapter) SessionID() string {
 // AgentType implements AgentManager.
 func (a *CodexAdapter) AgentType() string {
 	return "codex"
+}
+
+// SendPTYInput implements AgentManager.
+// Codex doesn't support PTY mode, so this always returns an error.
+func (a *CodexAdapter) SendPTYInput(input string) error {
+	return errors.New("codex does not support PTY mode")
+}
+
+// IsPTYMode implements AgentManager.
+// Codex doesn't support PTY mode, so this always returns false.
+func (a *CodexAdapter) IsPTYMode() bool {
+	return false
 }
 
 // Ensure CodexAdapter implements AgentManager

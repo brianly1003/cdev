@@ -61,11 +61,11 @@ func NewClaudeAgentAdapter(manager *claude.Manager) *ClaudeAgentAdapter {
 }
 
 // StartWithSession starts the agent with a prompt and session configuration.
-func (a *ClaudeAgentAdapter) StartWithSession(ctx context.Context, prompt string, mode methods.SessionMode, sessionID string) error {
+func (a *ClaudeAgentAdapter) StartWithSession(ctx context.Context, prompt string, mode methods.SessionMode, sessionID string, permissionMode string) error {
 	if a.manager == nil {
 		return nil
 	}
-	return a.manager.StartWithSession(ctx, prompt, claude.SessionMode(mode), sessionID)
+	return a.manager.StartWithSession(ctx, prompt, claude.SessionMode(mode), sessionID, permissionMode)
 }
 
 // Stop stops the running agent process.
@@ -111,6 +111,22 @@ func (a *ClaudeAgentAdapter) SessionID() string {
 // AgentType returns the type of agent.
 func (a *ClaudeAgentAdapter) AgentType() string {
 	return "claude"
+}
+
+// SendPTYInput sends input to the PTY (for interactive responses).
+func (a *ClaudeAgentAdapter) SendPTYInput(input string) error {
+	if a.manager == nil {
+		return nil
+	}
+	return a.manager.SendPTYInput(input)
+}
+
+// IsPTYMode returns true if running in PTY mode.
+func (a *ClaudeAgentAdapter) IsPTYMode() bool {
+	if a.manager == nil {
+		return false
+	}
+	return a.manager.IsPTYMode()
 }
 
 // GitProviderAdapter wraps git.Tracker to implement methods.GitProvider.

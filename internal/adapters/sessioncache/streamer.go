@@ -262,15 +262,17 @@ func (s *SessionStreamer) checkForNewContent() {
 func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.ClaudeMessagePayload {
 	// Parse the raw message
 	var raw struct {
-		Type      string `json:"type"`
-		Subtype   string `json:"subtype,omitempty"`  // "compact_boundary" for context compaction marker
-		UserType  string `json:"userType,omitempty"` // "external" for auto-generated messages
-		Content   string `json:"content,omitempty"`  // For system messages (e.g., "Conversation compacted")
-		UUID      string `json:"uuid,omitempty"`
-		Timestamp string `json:"timestamp,omitempty"`
-		Message   struct {
-			Role    string          `json:"role"`
-			Content json.RawMessage `json:"content"`
+		Type       string `json:"type"`
+		Subtype    string `json:"subtype,omitempty"`    // "compact_boundary" for context compaction marker
+		UserType   string `json:"userType,omitempty"`   // "external" for auto-generated messages
+		Content    string `json:"content,omitempty"`    // For system messages (e.g., "Conversation compacted")
+		UUID       string `json:"uuid,omitempty"`
+		Timestamp  string `json:"timestamp,omitempty"`
+		StopReason string `json:"stop_reason,omitempty"` // "end_turn", "tool_use", etc.
+		Message    struct {
+			Role       string          `json:"role"`
+			Content    json.RawMessage `json:"content"`
+			StopReason string          `json:"stop_reason,omitempty"` // Also check inside message
 		} `json:"message"`
 	}
 
@@ -365,6 +367,12 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		}
 	}
 
+	// Get stop_reason (check both top-level and inside message)
+	stopReason := raw.StopReason
+	if stopReason == "" {
+		stopReason = raw.Message.StopReason
+	}
+
 	// Create and emit event
 	payload := &events.ClaudeMessagePayload{
 		SessionID:           sessionID,
@@ -372,6 +380,15 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		Role:                raw.Message.Role,
 		Content:             contentBlocks,
 		IsContextCompaction: isContextCompaction,
+		StopReason:          stopReason,
+	}
+
+	// Log when we emit stop_reason for debugging
+	if stopReason != "" {
+		log.Info().
+			Str("session_id", sessionID).
+			Str("stop_reason", stopReason).
+			Msg("emitting claude_message with stop_reason")
 	}
 
 	s.hub.Publish(events.NewClaudeMessageEventFull(*payload))

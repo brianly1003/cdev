@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -219,6 +220,8 @@ func (d *RepoDiscovery) parallelScan(ctx context.Context, searchPaths []string) 
 		scannedCount int
 		skippedCount int
 		countMu      sync.Mutex
+		inFlight     int64 // Track number of jobs being processed
+		closed       int32 // Flag to indicate channel is closed
 	)
 
 	// Channel for directories to scan
@@ -233,11 +236,13 @@ func (d *RepoDiscovery) parallelScan(ctx context.Context, searchPaths []string) 
 			for job := range dirQueue {
 				select {
 				case <-ctx.Done():
+					atomic.AddInt64(&inFlight, -1)
 					return
 				default:
 				}
 
-				d.processDirectory(ctx, job, dirQueue, &results, &resultsMu, seen, &seenMu, &scannedCount, &skippedCount, &countMu)
+				d.processDirectory(ctx, job, dirQueue, &results, &resultsMu, seen, &seenMu, &scannedCount, &skippedCount, &countMu, &inFlight, &closed)
+				atomic.AddInt64(&inFlight, -1)
 			}
 		}()
 	}
@@ -245,6 +250,7 @@ func (d *RepoDiscovery) parallelScan(ctx context.Context, searchPaths []string) 
 	// Seed the queue with initial paths
 	for _, path := range searchPaths {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			atomic.AddInt64(&inFlight, 1)
 			dirQueue <- scanJob{path: path, depth: 0}
 		}
 	}
@@ -252,22 +258,31 @@ func (d *RepoDiscovery) parallelScan(ctx context.Context, searchPaths []string) 
 	// Wait for all workers to finish (with timeout awareness)
 	done := make(chan struct{})
 	go func() {
-		// Give workers time to drain the queue
+		// Give workers time to start processing
 		time.Sleep(100 * time.Millisecond)
-		for len(dirQueue) > 0 {
+
+		for {
 			select {
 			case <-ctx.Done():
+				atomic.StoreInt32(&closed, 1)
 				close(dirQueue)
 				wg.Wait()
 				close(done)
 				return
 			default:
+				// Check if queue is empty AND no workers are processing
+				queueLen := len(dirQueue)
+				processing := atomic.LoadInt64(&inFlight)
+				if queueLen == 0 && processing == 0 {
+					atomic.StoreInt32(&closed, 1)
+					close(dirQueue)
+					wg.Wait()
+					close(done)
+					return
+				}
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
-		close(dirQueue)
-		wg.Wait()
-		close(done)
 	}()
 
 	<-done
@@ -295,6 +310,8 @@ func (d *RepoDiscovery) processDirectory(
 	seenMu *sync.Mutex,
 	scannedCount, skippedCount *int,
 	countMu *sync.Mutex,
+	inFlight *int64,
+	closed *int32,
 ) {
 	// Check context
 	select {
@@ -369,11 +386,22 @@ func (d *RepoDiscovery) processDirectory(
 			continue
 		}
 
-		// Queue subdirectory for scanning
+		// Check if channel is closed before sending
+		if atomic.LoadInt32(closed) != 0 {
+			countMu.Lock()
+			*skippedCount++
+			countMu.Unlock()
+			continue
+		}
+
+		// Queue subdirectory for scanning - increment inFlight before sending
+		atomic.AddInt64(inFlight, 1)
 		select {
 		case queue <- scanJob{path: fullPath, depth: job.depth + 1}:
+			// Successfully queued
 		default:
 			// Queue full, skip this directory
+			atomic.AddInt64(inFlight, -1)
 			countMu.Lock()
 			*skippedCount++
 			countMu.Unlock()
@@ -386,6 +414,8 @@ func (d *RepoDiscovery) parallelScanStreaming(ctx context.Context, searchPaths [
 	var (
 		seen     = make(map[string]bool)
 		seenMu   sync.Mutex
+		inFlight int64 // Track number of jobs being processed
+		closed   int32 // Flag to indicate channel is closed
 	)
 
 	dirQueue := make(chan scanJob, 10000)
@@ -399,11 +429,13 @@ func (d *RepoDiscovery) parallelScanStreaming(ctx context.Context, searchPaths [
 			for job := range dirQueue {
 				select {
 				case <-ctx.Done():
+					atomic.AddInt64(&inFlight, -1)
 					return
 				default:
 				}
 
-				d.processDirectoryStreaming(ctx, job, dirQueue, results, seen, &seenMu)
+				d.processDirectoryStreaming(ctx, job, dirQueue, results, seen, &seenMu, &inFlight, &closed)
+				atomic.AddInt64(&inFlight, -1)
 			}
 		}()
 	}
@@ -411,6 +443,7 @@ func (d *RepoDiscovery) parallelScanStreaming(ctx context.Context, searchPaths [
 	// Seed the queue
 	for _, path := range searchPaths {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			atomic.AddInt64(&inFlight, 1)
 			dirQueue <- scanJob{path: path, depth: 0}
 		}
 	}
@@ -419,20 +452,29 @@ func (d *RepoDiscovery) parallelScanStreaming(ctx context.Context, searchPaths [
 	done := make(chan struct{})
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		for len(dirQueue) > 0 {
+
+		for {
 			select {
 			case <-ctx.Done():
+				atomic.StoreInt32(&closed, 1)
 				close(dirQueue)
 				wg.Wait()
 				close(done)
 				return
 			default:
+				// Check if queue is empty AND no workers are processing
+				queueLen := len(dirQueue)
+				processing := atomic.LoadInt64(&inFlight)
+				if queueLen == 0 && processing == 0 {
+					atomic.StoreInt32(&closed, 1)
+					close(dirQueue)
+					wg.Wait()
+					close(done)
+					return
+				}
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
-		close(dirQueue)
-		wg.Wait()
-		close(done)
 	}()
 
 	<-done
@@ -446,6 +488,8 @@ func (d *RepoDiscovery) processDirectoryStreaming(
 	results chan<- DiscoveredRepo,
 	seen map[string]bool,
 	seenMu *sync.Mutex,
+	inFlight *int64,
+	closed *int32,
 ) {
 	select {
 	case <-ctx.Done():
@@ -499,9 +543,19 @@ func (d *RepoDiscovery) processDirectoryStreaming(
 			continue
 		}
 
+		// Check if channel is closed before sending
+		if atomic.LoadInt32(closed) != 0 {
+			continue
+		}
+
+		// Queue subdirectory for scanning - increment inFlight before sending
+		atomic.AddInt64(inFlight, 1)
 		select {
 		case queue <- scanJob{path: fullPath, depth: job.depth + 1}:
+			// Successfully queued
 		default:
+			// Queue full, skip this directory
+			atomic.AddInt64(inFlight, -1)
 		}
 	}
 }

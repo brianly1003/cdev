@@ -44,9 +44,13 @@ func NewGeminiAdapter(manager GeminiManager) *GeminiAdapter {
 }
 
 // StartWithSession implements AgentManager.
-func (a *GeminiAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+func (a *GeminiAdapter) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error {
 	if a.manager == nil {
 		return errors.New("gemini manager not configured")
+	}
+	// Gemini CLI doesn't support permission modes like Claude
+	if permissionMode == "interactive" {
+		return errors.New("gemini does not support interactive (PTY) mode")
 	}
 	// Gemini CLI doesn't have explicit session modes like Claude
 	// The conversation ID is used for continuity
@@ -100,6 +104,18 @@ func (a *GeminiAdapter) SessionID() string {
 // AgentType implements AgentManager.
 func (a *GeminiAdapter) AgentType() string {
 	return "gemini"
+}
+
+// SendPTYInput implements AgentManager.
+// Gemini doesn't support PTY mode, so this always returns an error.
+func (a *GeminiAdapter) SendPTYInput(input string) error {
+	return errors.New("gemini does not support PTY mode")
+}
+
+// IsPTYMode implements AgentManager.
+// Gemini doesn't support PTY mode, so this always returns false.
+func (a *GeminiAdapter) IsPTYMode() bool {
+	return false
 }
 
 // Ensure GeminiAdapter implements AgentManager

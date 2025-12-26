@@ -140,7 +140,7 @@ func TestClaudeAgentAdapter_NilManager(t *testing.T) {
 
 	ctx := context.Background()
 
-	err := adapter.StartWithSession(ctx, "test", methods.SessionModeNew, "")
+	err := adapter.StartWithSession(ctx, "test", methods.SessionModeNew, "", "")
 	if err != nil {
 		t.Errorf("StartWithSession with nil manager should return nil, got %v", err)
 	}

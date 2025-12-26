@@ -30,6 +30,7 @@ type ServerConfig struct {
 	Host            string `mapstructure:"host"`
 	ExternalWSURL   string `mapstructure:"external_ws_url"`   // Optional: public URL for WebSocket (e.g., wss://tunnel.devtunnels.ms)
 	ExternalHTTPURL string `mapstructure:"external_http_url"` // Optional: public URL for HTTP API (e.g., https://tunnel.devtunnels.ms)
+	Headless        bool   `mapstructure:"headless"`          // If true, run as background daemon; if false (default), run in terminal mode
 }
 
 // RepositoryConfig holds repository-related configuration.

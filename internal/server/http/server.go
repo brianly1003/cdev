@@ -752,7 +752,8 @@ func (s *Server) handleClaudeRun(w http.ResponseWriter, r *http.Request) {
 
 	// Start Claude - use Background context since Claude should continue running
 	// even if the HTTP request is cancelled
-	if err := s.claudeManager.StartWithSession(context.Background(), req.Prompt, mode, req.SessionID); err != nil {
+	// Note: HTTP API doesn't support permission_mode, use empty string for default behavior
+	if err := s.claudeManager.StartWithSession(context.Background(), req.Prompt, mode, req.SessionID, ""); err != nil {
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": err.Error(),
 		})

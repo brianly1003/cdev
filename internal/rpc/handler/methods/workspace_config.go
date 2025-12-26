@@ -164,7 +164,10 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 		// Track running session IDs to avoid duplicates
 		runningSessionIDs := make(map[string]bool)
 
-		// Get running sessions for this workspace
+		// Get the active (LIVE attached) session for this workspace
+		activeSessionID := s.sessionManager.GetActiveSession(ws.Definition.ID)
+
+		// Get running sessions for this workspace (managed by cdev)
 		runningSessions := s.sessionManager.GetSessionsForWorkspace(ws.Definition.ID)
 		allSessions := make([]map[string]interface{}, 0)
 		runningCount := 0
@@ -195,14 +198,22 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 		// Get historical sessions from ~/.claude/projects/
 		historicalSessions, _ := s.sessionManager.ListHistory(ws.Definition.ID, 50)
 		for _, hist := range historicalSessions {
-			// Skip if this session is already running
+			// Skip if this session is already running (managed by cdev)
 			if runningSessionIDs[hist.SessionID] {
 				continue
 			}
+
+			// Determine status: "running" if this is the active LIVE session, otherwise "historical"
+			status := "historical"
+			if hist.SessionID == activeSessionID {
+				status = "running"
+				runningCount++ // Count LIVE sessions as active too
+			}
+
 			sessInfo := map[string]interface{}{
 				"id":            hist.SessionID,
 				"workspace_id":  ws.Definition.ID,
-				"status":        "historical",
+				"status":        status,
 				"summary":       hist.Summary,
 				"message_count": hist.MessageCount,
 				"last_updated":  hist.LastUpdated,
@@ -218,6 +229,7 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 
 		info["sessions"] = allSessions
 		info["active_session_count"] = runningCount
+		info["active_session_id"] = activeSessionID
 		info["has_active_session"] = runningCount > 0
 
 		result = append(result, info)

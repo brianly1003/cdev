@@ -452,6 +452,51 @@ class WebSocketManager {
 
 ---
 
+#### `workspace/file/get` - Get file content from a workspace
+
+**Returns the content of a file from a workspace. Use this for multi-workspace mode instead of `file/get`.**
+
+```json
+// Request
+{"jsonrpc": "2.0", "id": 7, "method": "workspace/file/get", "params": {
+  "workspace_id": "ws-abc123",
+  "path": "src/main.ts"
+}}
+
+// Response
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "result": {
+    "path": "src/main.ts",
+    "content": "import { App } from './app';\n\nconst app = new App();\napp.run();",
+    "encoding": "utf-8",
+    "truncated": false,
+    "size": 65
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter | Required | Type | Default | Description |
+|-----------|----------|------|---------|-------------|
+| `workspace_id` | Yes | string | - | Workspace ID |
+| `path` | Yes | string | - | File path relative to workspace root |
+| `max_size_kb` | No | int | 500 | Max file size to return (max 10000 KB) |
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | string | File path |
+| `content` | string | File content (UTF-8) |
+| `encoding` | string | Always "utf-8" |
+| `truncated` | boolean | `true` if content was truncated due to size limit |
+| `size` | int | Size of returned content in bytes |
+
+---
+
 ### Session Methods
 
 #### `session/start` - Start a Claude session

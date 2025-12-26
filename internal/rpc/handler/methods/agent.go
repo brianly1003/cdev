@@ -34,13 +34,19 @@ const (
 // - Any other AI coding assistant CLI
 type AgentManager interface {
 	// StartWithSession starts the agent with a prompt and session configuration.
-	StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string) error
+	StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error
 
 	// Stop stops the running agent process.
 	Stop(ctx context.Context) error
 
 	// SendResponse sends a response to an interactive prompt.
 	SendResponse(toolUseID, response string, isError bool) error
+
+	// SendPTYInput sends input to the PTY (for interactive responses).
+	SendPTYInput(input string) error
+
+	// IsPTYMode returns true if running in PTY mode.
+	IsPTYMode() bool
 
 	// State returns the current agent state.
 	State() AgentState
@@ -83,6 +89,7 @@ func (s *AgentService) RegisterMethods(r *handler.Registry) {
 			{Name: "prompt", Description: "The prompt to send to the agent", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "mode", Description: "Session mode: 'new' for new session, 'continue' to continue existing", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}, "default": "new"}},
 			{Name: "session_id", Description: "Session ID to continue (required if mode is 'continue')", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "permission_mode", Description: "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all, 'interactive' for PTY mode with terminal-like permission prompts.", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default"}},
 		},
 		Result: &handler.OpenRPCResult{Name: "AgentRunResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/AgentRunResult"}},
 		Errors: []string{"AgentAlreadyRunning", "AgentNotConfigured"},
@@ -117,6 +124,17 @@ func (s *AgentService) RegisterMethods(r *handler.Registry) {
 		Params:      []handler.OpenRPCParam{},
 		Result:      &handler.OpenRPCResult{Name: "AgentStatusResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/AgentStatusResult"}},
 	})
+
+	// agent/input
+	r.RegisterWithMeta("agent/input", s.Input, handler.MethodMeta{
+		Summary:     "Send input to interactive agent",
+		Description: "Sends keyboard input to an agent running in interactive (PTY) mode. Use this to respond to permission prompts.",
+		Params: []handler.OpenRPCParam{
+			{Name: "input", Description: "The keyboard input to send (e.g., '1' to select option 1, or '1\\n' with newline)", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{Name: "AgentInputResult", Schema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{"status": map[string]interface{}{"type": "string"}}}},
+		Errors: []string{"AgentNotRunning", "InvalidRequest"},
+	})
 }
 
 // AgentRunParams for agent/run method.
@@ -130,6 +148,14 @@ type AgentRunParams struct {
 
 	// SessionID is required when mode is "continue".
 	SessionID string `json:"session_id,omitempty"`
+
+	// PermissionMode controls how permissions are handled.
+	// "default" - standard permission prompts
+	// "acceptEdits" - auto-accept file edits
+	// "bypassPermissions" - skip all permission checks
+	// "plan" - plan mode
+	// "interactive" - PTY mode with terminal-like permission prompts
+	PermissionMode string `json:"permission_mode,omitempty"`
 }
 
 // AgentRunResult for agent/run method.
@@ -179,8 +205,23 @@ func (s *AgentService) Run(ctx context.Context, params json.RawMessage) (interfa
 		return nil, message.ErrInvalidParams("invalid mode: must be 'new' or 'continue'")
 	}
 
+	// Validate permission mode
+	permissionMode := p.PermissionMode
+	if permissionMode != "" {
+		validModes := map[string]bool{
+			"default":           true,
+			"acceptEdits":       true,
+			"bypassPermissions": true,
+			"plan":              true,
+			"interactive":       true,
+		}
+		if !validModes[permissionMode] {
+			return nil, message.ErrInvalidParams("permission_mode must be one of: default, acceptEdits, bypassPermissions, plan, interactive")
+		}
+	}
+
 	// Start agent (use background context so process continues even if request is cancelled)
-	if err := s.manager.StartWithSession(context.Background(), p.Prompt, mode, p.SessionID); err != nil {
+	if err := s.manager.StartWithSession(context.Background(), p.Prompt, mode, p.SessionID, permissionMode); err != nil {
 		return nil, message.NewError(message.AgentAlreadyRunning, err.Error())
 	}
 
@@ -284,4 +325,41 @@ func (s *AgentService) Status(ctx context.Context, params json.RawMessage) (inte
 		SessionID: s.manager.SessionID(),
 		AgentType: s.manager.AgentType(),
 	}, nil
+}
+
+// AgentInputParams for agent/input method.
+type AgentInputParams struct {
+	// Input is the keyboard input to send.
+	Input string `json:"input"`
+}
+
+// AgentInputResult for agent/input method.
+type AgentInputResult struct {
+	Status string `json:"status"`
+}
+
+// Input sends keyboard input to the agent's PTY (for interactive mode).
+func (s *AgentService) Input(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	if s.manager == nil {
+		return nil, message.ErrInternalError("Agent manager not available")
+	}
+
+	var p AgentInputParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.ErrInvalidParams("invalid params: " + err.Error())
+	}
+
+	if p.Input == "" {
+		return nil, message.ErrInvalidParams("input is required")
+	}
+
+	if !s.manager.IsPTYMode() {
+		return nil, message.NewError(message.InvalidRequest, "agent is not running in interactive (PTY) mode")
+	}
+
+	if err := s.manager.SendPTYInput(p.Input); err != nil {
+		return nil, message.NewError(message.AgentError, err.Error())
+	}
+
+	return AgentInputResult{Status: "sent"}, nil
 }

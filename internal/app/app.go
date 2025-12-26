@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
 	"github.com/brianly1003/cdev/internal/server/unified"
 	"github.com/brianly1003/cdev/internal/session"
+	"github.com/brianly1003/cdev/internal/terminal"
 	"github.com/brianly1003/cdev/internal/workspace"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -55,6 +57,9 @@ type App struct {
 	workspaceConfigManager *workspace.ConfigManager
 	gitTrackerManager      *workspace.GitTrackerManager
 
+	// Terminal mode support (headless=false)
+	terminalRunner *terminal.Runner
+
 	// Session info
 	sessionID string
 	startTime time.Time
@@ -73,6 +78,16 @@ func New(cfg *config.Config, version string) (*App, error) {
 		version:   version,
 		hub:       hub.New(),
 		sessionID: sessionID,
+	}
+
+	// Create terminal runner if not in headless mode
+	if !cfg.Server.Headless {
+		app.terminalRunner = terminal.NewRunner(
+			cfg.Repository.Path,
+			cfg.Claude.Command,
+			cfg.Claude.Args,
+		)
+		log.Info().Msg("terminal mode enabled - Claude will run in current terminal")
 	}
 
 	return app, nil
@@ -221,6 +236,9 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Connect session manager to git tracker manager
 	a.sessionManager.SetGitTrackerManager(a.gitTrackerManager)
+
+	// Enable LIVE session support for the repository
+	a.sessionManager.SetLiveSessionSupport(a.cfg.Repository.Path)
 
 	if err := a.sessionManager.Start(); err != nil {
 		log.Warn().Err(err).Msg("failed to start session manager")
@@ -580,7 +598,8 @@ func (a *App) handleLegacyCommand(clientID string, cmd *commands.Command) {
 			return
 		}
 
-		if err := a.claudeManager.StartWithSession(ctx, payload.Prompt, mode, payload.SessionID); err != nil {
+		// Note: Legacy command handler doesn't support permission_mode, use empty string for default behavior
+		if err := a.claudeManager.StartWithSession(ctx, payload.Prompt, mode, payload.SessionID, ""); err != nil {
 			a.sendErrorToClient(clientID, "CLAUDE_ERROR", err.Error(), cmd.RequestID)
 			return
 		}
@@ -745,6 +764,13 @@ func (a *App) handleFileChangeForRepoIndex(ctx context.Context, event events.Eve
 		return
 	}
 
+	// Skip files in directories that should not be indexed (reuse SkipDirectories config)
+	for _, skipDir := range repository.SkipDirectories {
+		if strings.HasPrefix(wrapper.Payload.Path, skipDir+"/") {
+			return
+		}
+	}
+
 	log.Debug().
 		Str("path", wrapper.Payload.Path).
 		Str("change", wrapper.Payload.Change).
@@ -898,4 +924,57 @@ func truncateString(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// IsTerminalMode returns whether the app is running in terminal mode.
+func (a *App) IsTerminalMode() bool {
+	return a.terminalRunner != nil
+}
+
+// GetTerminalRunner returns the terminal runner (nil if in headless mode).
+func (a *App) GetTerminalRunner() *terminal.Runner {
+	return a.terminalRunner
+}
+
+// RunTerminalSession runs Claude in terminal mode (blocking).
+// This takes over the current terminal and runs Claude interactively.
+// Output is sent to both the local terminal and WebSocket clients.
+func (a *App) RunTerminalSession(ctx context.Context, prompt string) error {
+	if a.terminalRunner == nil {
+		return fmt.Errorf("not in terminal mode")
+	}
+
+	// Set output writer to broadcast to WebSocket clients
+	a.terminalRunner.SetOutputWriter(&wsOutputWriter{app: a})
+
+	log.Info().
+		Str("prompt", truncateString(prompt, 50)).
+		Msg("starting terminal session")
+
+	// Run Claude (blocks until completion)
+	return a.terminalRunner.Run(ctx, prompt)
+}
+
+// SendTerminalInput sends input to the terminal session from WebSocket.
+func (a *App) SendTerminalInput(data []byte) error {
+	if a.terminalRunner == nil {
+		return fmt.Errorf("not in terminal mode")
+	}
+	return a.terminalRunner.SendInput(data)
+}
+
+// wsOutputWriter writes PTY output to WebSocket clients.
+type wsOutputWriter struct {
+	app *App
+}
+
+func (w *wsOutputWriter) Write(p []byte) (n int, err error) {
+	// Broadcast PTY output to all WebSocket clients as pty_output event
+	if w.app.hub != nil {
+		text := string(p)
+		// Send same text as both clean and raw (terminal mode sends raw PTY output)
+		event := events.NewPTYOutputEvent(text, text, "running")
+		w.app.hub.Publish(event)
+	}
+	return len(p), nil
 }

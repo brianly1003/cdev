@@ -13,23 +13,26 @@ import (
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
 	"github.com/brianly1003/cdev/internal/adapters/git"
+	"github.com/brianly1003/cdev/internal/adapters/live"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/workspace"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 // Manager orchestrates multiple Claude sessions across workspaces.
 type Manager struct {
-	sessions          map[string]*Session             // keyed by session ID
-	workspaces        map[string]*workspace.Workspace // keyed by workspace ID
-	activeSessions    map[string]string               // workspace ID -> active session ID
-	gitTrackerManager *workspace.GitTrackerManager
-	hub               ports.EventHub
-	cfg               *config.Config
-	logger            *slog.Logger
+	sessions                map[string]*Session             // keyed by session ID
+	workspaces              map[string]*workspace.Workspace // keyed by workspace ID
+	activeSessions          map[string]string               // workspace ID -> active session ID
+	activeSessionWorkspaces map[string]string               // session ID -> workspace ID (reverse mapping)
+	gitTrackerManager       *workspace.GitTrackerManager
+	hub                     ports.EventHub
+	cfg                     *config.Config
+	logger                  *slog.Logger
 
 	// Configuration
 	idleTimeout time.Duration
@@ -39,6 +42,9 @@ type Manager struct {
 	streamerWorkspaceID   string // Workspace ID of currently watched session
 	streamerSessionID     string // Session ID currently being watched
 	streamerMu            sync.Mutex
+
+	// LIVE session support (Claude running in user's terminal)
+	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -54,15 +60,16 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 	// TODO: Read from config when available
 
 	return &Manager{
-		sessions:       make(map[string]*Session),
-		workspaces:     make(map[string]*workspace.Workspace),
-		activeSessions: make(map[string]string),
-		hub:            hub,
-		cfg:            cfg,
-		logger:         logger,
-		idleTimeout:    idleTimeout,
-		ctx:            ctx,
-		cancel:         cancel,
+		sessions:                make(map[string]*Session),
+		workspaces:              make(map[string]*workspace.Workspace),
+		activeSessions:          make(map[string]string),
+		activeSessionWorkspaces: make(map[string]string),
+		hub:                     hub,
+		cfg:                     cfg,
+		logger:                  logger,
+		idleTimeout:             idleTimeout,
+		ctx:                     ctx,
+		cancel:                  cancel,
 	}
 }
 
@@ -71,6 +78,16 @@ func (m *Manager) SetGitTrackerManager(gtm *workspace.GitTrackerManager) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.gitTrackerManager = gtm
+}
+
+// SetLiveSessionSupport enables LIVE session support.
+// This allows sending messages to Claude instances running in the user's terminal.
+// The detector is created dynamically per workspace, but the injector is shared.
+func (m *Manager) SetLiveSessionSupport(workspacePath string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.liveInjector = live.NewInjector()
+	log.Info().Msg("LIVE session support enabled")
 }
 
 // Start starts the session manager and idle monitor.
@@ -164,6 +181,199 @@ func (m *Manager) GetWorkspace(workspaceID string) (*workspace.Workspace, error)
 		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
 	}
 	return ws, nil
+}
+
+// findWorkspaceForSession searches all workspaces to find which one contains the given session.
+// This is used for LIVE sessions that were discovered but not explicitly activated.
+func (m *Manager) findWorkspaceForSession(sessionID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for workspaceID, ws := range m.workspaces {
+		// Check if this workspace has the session in its session files
+		exists, _ := m.sessionFileExistsForWorkspace(ws, sessionID)
+		if exists {
+			log.Debug().
+				Str("session_id", sessionID).
+				Str("workspace_id", workspaceID).
+				Msg("found workspace for session")
+			return workspaceID
+		}
+	}
+	return ""
+}
+
+// sessionFileExistsForWorkspace checks if a session file exists for a workspace.
+// This is a standalone check that does file I/O only.
+func (m *Manager) sessionFileExistsForWorkspace(ws *workspace.Workspace, sessionID string) (bool, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false, err
+	}
+
+	// Convert workspace path to Claude's project path format
+	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
+	if !strings.HasPrefix(projectPath, "-") {
+		projectPath = "-" + projectPath
+	}
+
+	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
+	_, err = os.Stat(sessionFile)
+	return err == nil, nil
+}
+
+// SessionFileExists checks if a session file exists in .claude/projects for the workspace.
+// This validates against the source of truth for Claude Code sessions.
+func (m *Manager) SessionFileExists(workspaceID string, sessionID string) (bool, error) {
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
+		return false, err
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return false, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Convert workspace path to Claude's project path format
+	// /Users/brian/Projects/cdev-ios -> -Users-brian-Projects-cdev-ios
+	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
+	if !strings.HasPrefix(projectPath, "-") {
+		projectPath = "-" + projectPath
+	}
+
+	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
+	_, err = os.Stat(sessionFile)
+	exists := err == nil
+
+	log.Debug().
+		Str("workspace_id", workspaceID).
+		Str("session_id", sessionID).
+		Str("session_file", sessionFile).
+		Bool("exists", exists).
+		Msg("checking session file in .claude/projects")
+
+	return exists, nil
+}
+
+// GetLatestSessionID returns the most recently modified session ID from .claude/projects.
+// This is the source of truth for Claude Code sessions.
+// Only returns main sessions (UUID-formatted files with user interaction), not agent sub-sessions.
+func (m *Manager) GetLatestSessionID(workspaceID string) (string, error) {
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Convert workspace path to Claude's project path format
+	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
+	if !strings.HasPrefix(projectPath, "-") {
+		projectPath = "-" + projectPath
+	}
+
+	sessionsDir := filepath.Join(homeDir, ".claude", "projects", projectPath)
+
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil // No sessions directory yet
+		}
+		return "", fmt.Errorf("failed to read sessions directory: %w", err)
+	}
+
+	// Collect valid main sessions (UUID format with user interaction)
+	type sessionCandidate struct {
+		sessionID string
+		modTime   int64
+	}
+	var candidates []sessionCandidate
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+
+		// Skip agent sub-sessions (agent-*.jsonl)
+		if strings.HasPrefix(entry.Name(), "agent-") {
+			continue
+		}
+
+		// Get session ID (filename without .jsonl)
+		sessionID := strings.TrimSuffix(entry.Name(), ".jsonl")
+
+		// Validate UUID format (main sessions have UUID filenames)
+		if _, err := uuid.Parse(sessionID); err != nil {
+			continue // Not a valid UUID, skip
+		}
+
+		// Check if file contains "role":"user" (actual user session)
+		sessionPath := filepath.Join(sessionsDir, entry.Name())
+		if !m.sessionHasUserRole(sessionPath) {
+			log.Debug().
+				Str("session_id", sessionID).
+				Msg("skipping session without user interaction")
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		candidates = append(candidates, sessionCandidate{
+			sessionID: sessionID,
+			modTime:   info.ModTime().UnixNano(),
+		})
+	}
+
+	if len(candidates) == 0 {
+		return "", nil // No valid session files found
+	}
+
+	// Find the most recently modified valid session
+	var latestSession string
+	var latestModTime int64
+	for _, c := range candidates {
+		if c.modTime > latestModTime {
+			latestModTime = c.modTime
+			latestSession = c.sessionID
+		}
+	}
+
+	log.Info().
+		Str("workspace_id", workspaceID).
+		Str("session_id", latestSession).
+		Str("sessions_dir", sessionsDir).
+		Int("candidates_count", len(candidates)).
+		Msg("found latest session from .claude/projects")
+
+	return latestSession, nil
+}
+
+// sessionHasUserRole checks if a session file contains "role":"user" entries.
+// This indicates actual user interaction (not just summaries or system metadata).
+func (m *Manager) sessionHasUserRole(sessionPath string) bool {
+	file, err := os.Open(sessionPath)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	// Read first 32KB to check for user role (avoid reading entire large files)
+	buf := make([]byte, 32*1024)
+	n, err := file.Read(buf)
+	if err != nil && n == 0 {
+		return false
+	}
+
+	// Check for "role":"user" pattern
+	content := string(buf[:n])
+	return strings.Contains(content, `"role":"user"`)
 }
 
 // ListWorkspaces returns all registered workspaces.
@@ -261,6 +471,62 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	return session, nil
 }
 
+// startSessionWithID starts a managed session with a specific session ID.
+// This is used when resuming a historical session where we know the exact session ID.
+// Note: This is an internal helper - external callers should use StartSession.
+func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check workspace exists
+	ws, ok := m.workspaces[workspaceID]
+	if !ok {
+		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
+	}
+
+	// Check if session already exists
+	if existing, ok := m.sessions[sessionID]; ok {
+		return existing, nil
+	}
+
+	session := NewSession(sessionID, workspaceID)
+	session.SetStatus(StatusStarting)
+
+	// Create Claude manager for this session
+	claudeManager := claude.NewManagerWithContext(
+		m.hub,
+		m.cfg.Claude.Command,
+		m.cfg.Claude.Args,
+		m.cfg.Claude.TimeoutMinutes,
+		m.cfg.Claude.SkipPermissions,
+		ws.Definition.Path,
+		workspaceID,
+		sessionID,
+	)
+	session.SetClaudeManager(claudeManager)
+
+	// Create git tracker for this workspace
+	gitTracker := git.NewTracker(ws.Definition.Path, m.cfg.Git.Command, m.hub)
+	session.SetGitTracker(gitTracker)
+
+	// Store session
+	m.sessions[sessionID] = session
+	session.SetStatus(StatusRunning)
+
+	// Auto-activate this session for the workspace
+	m.activeSessions[workspaceID] = sessionID
+	m.activeSessionWorkspaces[sessionID] = workspaceID
+
+	m.logger.Info("Started session with specific ID",
+		"session_id", sessionID,
+		"workspace_id", workspaceID,
+		"workspace_name", ws.Definition.Name,
+		"path", ws.Definition.Path,
+	)
+
+	return session, nil
+}
+
 // getMostRecentHistoricalSessionID returns the most recent Claude session ID
 // from the historical sessions stored in ~/.claude/projects/<encoded-path>.
 // Returns empty string if no historical session is found.
@@ -276,6 +542,14 @@ func (m *Manager) getMostRecentHistoricalSessionID(workspacePath string) string 
 		return ""
 	}
 	defer cache.Stop()
+
+	// Force sync to ensure we have fresh data from disk
+	if err := cache.ForceSync(); err != nil {
+		m.logger.Debug("Failed to sync session cache",
+			"path", workspacePath,
+			"error", err,
+		)
+	}
 
 	// Get session list (already sorted by last_updated, most recent first)
 	sessions, err := cache.ListSessions()
@@ -397,6 +671,9 @@ func (m *Manager) ActivateSession(workspaceID, sessionID string) error {
 	// In the future, this could be extended to track per-client active sessions.
 	m.activeSessions[workspaceID] = sessionID
 
+	// Store reverse mapping: session ID -> workspace ID (for LIVE session lookup)
+	m.activeSessionWorkspaces[sessionID] = workspaceID
+
 	m.logger.Info("Activated session",
 		"workspace_id", workspaceID,
 		"session_id", sessionID,
@@ -443,14 +720,187 @@ func (m *Manager) ListSessions(workspaceID string) []*Info {
 }
 
 // SendPrompt sends a prompt to a session's Claude instance.
-// Only works on running sessions. To resume a historical session,
-// first call StartSessionWithResume, then SendPrompt.
-func (m *Manager) SendPrompt(sessionID string, prompt string, mode string) error {
+// Supports both managed sessions (started by cdev) and LIVE sessions (user's terminal).
+// permissionMode controls how Claude handles permissions:
+// - "default": Standard permission prompts (may hang if stdin is closed)
+// - "acceptEdits": Auto-accept file edits
+// - "bypassPermissions": Skip all permission checks
+// - "plan": Plan mode only
+// - "interactive": Use PTY mode for true interactive permission handling
+func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permissionMode string) error {
+	// First try to get from managed sessions
 	session, err := m.GetSession(sessionID)
+
+	// If not found in managed sessions, check for LIVE sessions or historical sessions
 	if err != nil {
-		return err
+		m.mu.RLock()
+		injector := m.liveInjector
+		workspaceID := m.activeSessionWorkspaces[sessionID]
+		m.mu.RUnlock()
+
+		// If workspaceID not found in activeSessionWorkspaces, search all workspaces
+		// This handles LIVE sessions and historical sessions that weren't explicitly activated
+		if workspaceID == "" {
+			workspaceID = m.findWorkspaceForSession(sessionID)
+		}
+
+		if workspaceID != "" {
+			// Get workspace for context
+			ws, wsErr := m.GetWorkspace(workspaceID)
+			if wsErr == nil {
+				// If permission_mode is "interactive", skip LIVE detection and spawn PTY
+				// User explicitly wants PTY mode with pty_output/pty_permission events
+				if permissionMode == "interactive" {
+					log.Info().
+						Str("session_id", sessionID).
+						Str("workspace_id", workspaceID).
+						Str("prompt", truncateString(prompt, 50)).
+						Msg("interactive mode requested - spawning PTY session instead of LIVE injection")
+
+					// Start a new managed session with the specific session ID
+					newSession, startErr := m.startSessionWithID(workspaceID, sessionID)
+					if startErr != nil {
+						return fmt.Errorf("failed to start PTY session: %w", startErr)
+					}
+
+					// Use the new managed session
+					session = newSession
+					// Fall through to normal session handling below (will hit PTY code path)
+				} else {
+					// Not interactive mode - try LIVE session first, then fall back to managed session
+					if injector != nil {
+						detector := live.NewDetector(ws.Definition.Path)
+						liveSession := detector.GetLiveSession(sessionID)
+						if liveSession != nil {
+							log.Info().
+								Str("session_id", sessionID).
+								Str("tty", liveSession.TTY).
+								Int("pid", liveSession.PID).
+								Str("terminal_app", liveSession.TerminalApp).
+								Str("prompt", truncateString(prompt, 50)).
+								Msg("sending prompt to LIVE session via keystroke injection")
+
+							// Auto-activate the session for future calls
+							m.mu.Lock()
+							m.activeSessionWorkspaces[sessionID] = workspaceID
+							m.activeSessions[workspaceID] = sessionID
+							m.mu.Unlock()
+
+							// For LIVE sessions, inject prompt with Enter to the specific terminal app
+							if err := injector.SendWithEnterToApp(prompt, liveSession.TerminalApp); err != nil {
+								return fmt.Errorf("failed to inject prompt to LIVE session: %w", err)
+							}
+							return nil
+						}
+					}
+
+					// No LIVE session found - auto-start a managed session
+					log.Info().
+						Str("session_id", sessionID).
+						Str("workspace_id", workspaceID).
+						Str("prompt", truncateString(prompt, 50)).
+						Msg("auto-starting managed session to resume historical session")
+
+					// Start a new managed session with the specific session ID
+					newSession, startErr := m.startSessionWithID(workspaceID, sessionID)
+					if startErr != nil {
+						return fmt.Errorf("failed to auto-start session for historical session %s: %w", sessionID, startErr)
+					}
+
+					// Update session reference and continue with the new managed session
+					session = newSession
+					// Fall through to normal session handling below
+				}
+			}
+		}
+
+		// If we still don't have a session, return original error
+		if session == nil {
+			return err
+		}
 	}
 
+	// Handle interactive mode (PTY) - check before status check since we can restart stopped sessions
+	if permissionMode == "interactive" {
+		// If session exists but is stopped, restart it for interactive mode
+		if session.GetStatus() != StatusRunning {
+			log.Info().
+				Str("session_id", sessionID).
+				Str("current_status", string(session.GetStatus())).
+				Msg("session exists but not running - restarting for interactive mode")
+
+			// Set status back to running
+			session.SetStatus(StatusRunning)
+		}
+
+		cm := session.ClaudeManager()
+		if cm == nil {
+			return fmt.Errorf("no Claude manager for session: %s", sessionID)
+		}
+
+		session.UpdateLastActive()
+		// Check if Claude is already running in PTY mode
+		// If yes, send the prompt via PTY input instead of starting a new process
+		if cm.IsPTYMode() && cm.IsRunning() {
+			log.Info().
+				Str("session_id", sessionID).
+				Str("prompt", truncateString(prompt, 50)).
+				Msg("sending prompt to existing PTY session")
+
+			// Type the prompt text
+			if err := cm.SendPTYInput(prompt); err != nil {
+				return fmt.Errorf("failed to send prompt to PTY: %w", err)
+			}
+
+			// Small delay for TUI to process the input
+			time.Sleep(100 * time.Millisecond)
+
+			// Press Enter to submit
+			if err := cm.SendPTYInput("\r"); err != nil {
+				return fmt.Errorf("failed to send Enter to PTY: %w", err)
+			}
+
+			return nil
+		}
+
+		// Claude not running in PTY mode, start new process
+		claudeMode := claude.SessionModeNew
+		claudeSessionID := ""
+		if mode == "continue" {
+			claudeMode = claude.SessionModeContinue
+			claudeSessionID = sessionID
+		}
+
+		// Start the PTY session
+		if err := cm.StartWithPTY(m.ctx, prompt, claudeMode, claudeSessionID); err != nil {
+			return err
+		}
+
+		// Start watching the JSONL session file for claude_message events
+		// This allows cdev-ios to receive structured messages in addition to pty_output events
+		watchSessionID := session.ID
+		if claudeSessionID != "" {
+			watchSessionID = claudeSessionID
+		}
+		if _, err := m.WatchWorkspaceSession(session.WorkspaceID, watchSessionID); err != nil {
+			// Don't fail the whole operation if watch fails - PTY will still work
+			// claude_message events just won't be emitted
+			log.Warn().
+				Str("session_id", watchSessionID).
+				Str("workspace_id", session.WorkspaceID).
+				Err(err).
+				Msg("failed to start JSONL watch for PTY session (claude_message events may not be emitted)")
+		} else {
+			log.Info().
+				Str("session_id", watchSessionID).
+				Str("workspace_id", session.WorkspaceID).
+				Msg("started JSONL watch for PTY session - will emit claude_message events")
+		}
+
+		return nil
+	}
+
+	// Non-interactive mode - check session status
 	if session.GetStatus() != StatusRunning {
 		return fmt.Errorf("session not running: %s (use session/start with resume_session_id to resume historical sessions)", sessionID)
 	}
@@ -466,10 +916,173 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string) error
 	if mode == "continue" {
 		// Use the cdev session ID which now equals the historical Claude session ID
 		// (set in StartSession from getMostRecentHistoricalSessionID)
-		return cm.StartWithSession(m.ctx, prompt, claude.SessionModeContinue, sessionID)
+		return cm.StartWithSession(m.ctx, prompt, claude.SessionModeContinue, sessionID, permissionMode)
 	}
 
-	return cm.Start(m.ctx, prompt)
+	return cm.StartWithSession(m.ctx, prompt, claude.SessionModeNew, "", permissionMode)
+}
+
+// SendKey sends a special key (like arrow keys, enter, escape) to a session.
+// For LIVE sessions, uses platform-specific key code injection instead of text keystroke.
+func (m *Manager) SendKey(sessionID string, key string) error {
+	// First try to get from managed sessions
+	session, err := m.GetSession(sessionID)
+
+	// If not found in managed sessions, check for LIVE sessions
+	if err != nil {
+		m.mu.RLock()
+		injector := m.liveInjector
+		workspaceID := m.activeSessionWorkspaces[sessionID]
+		m.mu.RUnlock()
+
+		// If workspaceID not found in activeSessionWorkspaces, search all workspaces
+		if workspaceID == "" {
+			workspaceID = m.findWorkspaceForSession(sessionID)
+		}
+
+		if injector != nil && workspaceID != "" {
+			// Get workspace path for the detector
+			ws, wsErr := m.GetWorkspace(workspaceID)
+			if wsErr == nil {
+				// Create detector for this workspace
+				detector := live.NewDetector(ws.Definition.Path)
+				liveSession := detector.GetLiveSession(sessionID)
+				if liveSession != nil {
+					log.Info().
+						Str("session_id", sessionID).
+						Str("tty", liveSession.TTY).
+						Int("pid", liveSession.PID).
+						Str("terminal_app", liveSession.TerminalApp).
+						Str("key", key).
+						Msg("sending key to LIVE session via key code injection")
+
+					// Auto-activate the session for future calls
+					m.mu.Lock()
+					m.activeSessionWorkspaces[sessionID] = workspaceID
+					m.activeSessions[workspaceID] = sessionID
+					m.mu.Unlock()
+
+					// For LIVE sessions, use SendKeyToApp which uses key codes
+					if err := injector.SendKeyToApp(key, liveSession.TerminalApp); err != nil {
+						return fmt.Errorf("failed to inject key to LIVE session: %w", err)
+					}
+					return nil
+				}
+			}
+		}
+		return err // Return original error if no LIVE session found
+	}
+
+	// For managed sessions, convert key to escape sequence and send via PTY
+	if session.GetStatus() != StatusRunning {
+		return fmt.Errorf("session not running: %s", sessionID)
+	}
+
+	cm := session.ClaudeManager()
+	if cm == nil {
+		return fmt.Errorf("no Claude manager for session: %s", sessionID)
+	}
+
+	if !cm.IsPTYMode() {
+		return fmt.Errorf("session not in interactive mode (PTY): %s", sessionID)
+	}
+
+	// Convert key name to escape sequence for PTY
+	var input string
+	switch key {
+	case "enter", "return":
+		input = "\r"
+	case "escape", "esc":
+		input = "\x1b"
+	case "up":
+		input = "\x1b[A"
+	case "down":
+		input = "\x1b[B"
+	case "right":
+		input = "\x1b[C"
+	case "left":
+		input = "\x1b[D"
+	case "tab":
+		input = "\t"
+	case "backspace":
+		input = "\x7f"
+	case "space":
+		input = " "
+	default:
+		return fmt.Errorf("unknown key: %s", key)
+	}
+
+	session.UpdateLastActive()
+	return cm.SendPTYInput(input)
+}
+
+// SendInput sends input to a session's Claude PTY (for interactive responses).
+// Supports both managed sessions (started by cdev) and LIVE sessions (user's terminal).
+// This is used to respond to permission prompts when running in interactive mode.
+func (m *Manager) SendInput(sessionID string, input string) error {
+	// First try to get from managed sessions
+	session, err := m.GetSession(sessionID)
+
+	// If not found in managed sessions, check for LIVE sessions
+	if err != nil {
+		m.mu.RLock()
+		injector := m.liveInjector
+		workspaceID := m.activeSessionWorkspaces[sessionID]
+		m.mu.RUnlock()
+
+		// If workspaceID not found in activeSessionWorkspaces, search all workspaces
+		if workspaceID == "" {
+			workspaceID = m.findWorkspaceForSession(sessionID)
+		}
+
+		if injector != nil && workspaceID != "" {
+			// Get workspace path for the detector
+			ws, wsErr := m.GetWorkspace(workspaceID)
+			if wsErr == nil {
+				// Create detector for this workspace
+				detector := live.NewDetector(ws.Definition.Path)
+				liveSession := detector.GetLiveSession(sessionID)
+				if liveSession != nil {
+					log.Info().
+						Str("session_id", sessionID).
+						Str("tty", liveSession.TTY).
+						Int("pid", liveSession.PID).
+						Str("terminal_app", liveSession.TerminalApp).
+						Str("input", truncateString(input, 20)).
+						Msg("sending input to LIVE session via keystroke injection")
+
+					// Auto-activate the session for future calls
+					m.mu.Lock()
+					m.activeSessionWorkspaces[sessionID] = workspaceID
+					m.activeSessions[workspaceID] = sessionID
+					m.mu.Unlock()
+
+					// For LIVE sessions, inject input to the specific terminal app
+					if err := injector.SendToApp(input, liveSession.TerminalApp); err != nil {
+						return fmt.Errorf("failed to inject input to LIVE session: %w", err)
+					}
+					return nil
+				}
+			}
+		}
+		return err // Return original error if no LIVE session found
+	}
+
+	if session.GetStatus() != StatusRunning {
+		return fmt.Errorf("session not running: %s", sessionID)
+	}
+
+	cm := session.ClaudeManager()
+	if cm == nil {
+		return fmt.Errorf("no Claude manager for session: %s", sessionID)
+	}
+
+	if !cm.IsPTYMode() {
+		return fmt.Errorf("session not in interactive mode (PTY): %s", sessionID)
+	}
+
+	session.UpdateLastActive()
+	return cm.SendPTYInput(input)
 }
 
 // RespondToPermission responds to a permission request in a session.
@@ -759,6 +1372,14 @@ func (m *Manager) ListHistory(workspaceID string, limit int) ([]HistoryInfo, err
 	}
 	defer cache.Stop()
 
+	// Force sync to ensure we have fresh data from disk
+	if err := cache.ForceSync(); err != nil {
+		m.logger.Warn("Failed to sync session cache",
+			"workspace_id", workspaceID,
+			"error", err,
+		)
+	}
+
 	// Get session list
 	sessions, err := cache.ListSessions()
 	if err != nil {
@@ -1016,4 +1637,15 @@ func (m *Manager) GetWatchedSession() *WatchInfo {
 		SessionID:   m.streamerSessionID,
 		Watching:    true,
 	}
+}
+
+// truncateString truncates a string to the specified length with ellipsis.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
 }

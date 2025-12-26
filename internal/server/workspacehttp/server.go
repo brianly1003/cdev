@@ -428,7 +428,8 @@ func (s *Server) handleSendPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.sessionManager.SendPrompt(id, req.Prompt, req.Mode); err != nil {
+	// Note: HTTP API doesn't support permission_mode, use empty string for default behavior
+	if err := s.sessionManager.SendPrompt(id, req.Prompt, req.Mode, ""); err != nil {
 		s.respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}

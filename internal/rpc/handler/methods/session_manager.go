@@ -4,6 +4,7 @@ package methods
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -45,10 +46,11 @@ func (s *SessionManagerService) SetFocusProvider(provider SessionFocusProvider) 
 func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	// Session lifecycle methods
 	registry.RegisterWithMeta("session/start", s.Start, handler.MethodMeta{
-		Summary:     "Start a Claude session for a workspace",
-		Description: "Starts a new Claude CLI session for the specified workspace. Only one session per workspace is allowed.",
+		Summary:     "Start or attach to a Claude session for a workspace",
+		Description: "If session_id is provided, validates it exists in .claude/projects and returns it for LIVE session attachment. If session_id doesn't exist, returns empty to let user select from history. If no session_id provided, starts a new managed session.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional session ID to attach to. If provided, validates against .claude/projects source of truth."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "session",
@@ -75,6 +77,21 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "prompt", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}}},
+			{Name: "permission_mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default", "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all permission checks, 'interactive' to use PTY mode for true terminal-like permission prompts."}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("session/input", s.Input, handler.MethodMeta{
+		Summary:     "Send input to an interactive session",
+		Description: "Sends keyboard input to a session running in interactive (PTY) mode. Use this to respond to permission prompts. Either 'input' (raw text) or 'key' (special key name) must be provided.",
+		Params: []handler.OpenRPCParam{
+			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "input", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Raw text input to send (e.g., '1' for Yes, '2' for Yes all, 'n' for No). A carriage return is auto-appended for text input."}},
+			{Name: "key", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"enter", "escape", "up", "down", "left", "right", "tab", "backspace", "delete", "home", "end", "pageup", "pagedown", "space"}, "description": "Special key name to send. Use 'enter' to confirm prompts, arrow keys for navigation."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -359,12 +376,31 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 			Schema: map[string]interface{}{"type": "object"},
 		},
 	})
+
+	registry.RegisterWithMeta("workspace/file/get", s.FileGet, handler.MethodMeta{
+		Summary:     "Get file content from a workspace",
+		Description: "Returns the content of a file from a workspace. Use this for multi-workspace mode instead of file/get.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "path", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "max_size_kb", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 500}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "file_content",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
 }
 
-// Start starts a new Claude session for a workspace.
+// Start starts or attaches to a Claude session for a workspace.
+// If session_id is provided, validates it exists in .claude/projects (source of truth).
+// If session_id exists, returns it for LIVE session attachment.
+// If session_id doesn't exist, returns empty session_id to let user select from history.
+// If no session_id provided, starts a new managed session.
 func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
+		SessionID   string `json:"session_id"` // Optional: attach to existing LIVE session
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -374,12 +410,61 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
 
-	sess, err := s.manager.StartSession(p.WorkspaceID)
+	// If session_id is provided, validate against .claude/projects
+	if p.SessionID != "" {
+		exists, err := s.manager.SessionFileExists(p.WorkspaceID, p.SessionID)
+		if err != nil {
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+
+		if exists {
+			// Session exists in .claude/projects - activate it for LIVE attachment
+			s.manager.ActivateSession(p.WorkspaceID, p.SessionID)
+			return map[string]interface{}{
+				"session_id":   p.SessionID,
+				"workspace_id": p.WorkspaceID,
+				"source":       "live",
+				"status":       "attached",
+				"message":      "Session found in .claude/projects - ready for LIVE interaction",
+			}, nil
+		} else {
+			// Session doesn't exist - return empty to let user select from history
+			return map[string]interface{}{
+				"session_id":   "",
+				"workspace_id": p.WorkspaceID,
+				"source":       "",
+				"status":       "not_found",
+				"message":      "Session not found in .claude/projects. Use workspace/session/history to select a valid session.",
+			}, nil
+		}
+	}
+
+	// No session_id provided - get the latest session from .claude/projects
+	latestSessionID, err := s.manager.GetLatestSessionID(p.WorkspaceID)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
-	return sess.ToInfo(), nil
+	if latestSessionID != "" {
+		// Activate the latest session for LIVE attachment
+		s.manager.ActivateSession(p.WorkspaceID, latestSessionID)
+		return map[string]interface{}{
+			"session_id":   latestSessionID,
+			"workspace_id": p.WorkspaceID,
+			"source":       "live",
+			"status":       "attached",
+			"message":      "Latest session found in .claude/projects - ready for LIVE interaction",
+		}, nil
+	}
+
+	// No sessions found in .claude/projects
+	return map[string]interface{}{
+		"session_id":   "",
+		"workspace_id": p.WorkspaceID,
+		"source":       "",
+		"status":       "no_sessions",
+		"message":      "No sessions found in .claude/projects for this workspace.",
+	}, nil
 }
 
 // Stop stops a running session.
@@ -408,9 +493,10 @@ func (s *SessionManagerService) Stop(ctx context.Context, params json.RawMessage
 // Send sends a prompt to a session.
 func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		SessionID string `json:"session_id"`
-		Prompt    string `json:"prompt"`
-		Mode      string `json:"mode"` // "new" or "continue"
+		SessionID      string `json:"session_id"`
+		Prompt         string `json:"prompt"`
+		Mode           string `json:"mode"`            // "new" or "continue"
+		PermissionMode string `json:"permission_mode"` // "default", "acceptEdits", "bypassPermissions", "plan", "interactive"
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -423,13 +509,76 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "prompt is required")
 	}
 
-	if err := s.manager.SendPrompt(p.SessionID, p.Prompt, p.Mode); err != nil {
+	// Validate permission_mode if provided
+	if p.PermissionMode != "" {
+		validModes := map[string]bool{"default": true, "acceptEdits": true, "bypassPermissions": true, "plan": true, "interactive": true}
+		if !validModes[p.PermissionMode] {
+			return nil, message.NewError(message.InvalidParams, "permission_mode must be one of: default, acceptEdits, bypassPermissions, plan, interactive")
+		}
+	}
+
+	if err := s.manager.SendPrompt(p.SessionID, p.Prompt, p.Mode, p.PermissionMode); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	return map[string]interface{}{
 		"status": "sent",
 	}, nil
+}
+
+// Input sends keyboard input to an interactive (PTY) session.
+// Supports special key names: "enter", "escape", "up", "down", "left", "right", "tab", "backspace"
+// For special keys, uses SendKey which handles platform-specific key codes for LIVE sessions.
+// For text input, uses SendInput which sends raw text.
+func (s *SessionManagerService) Input(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		SessionID string `json:"session_id"`
+		Input     string `json:"input"`
+		Key       string `json:"key"` // Special key name (alternative to input)
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.SessionID == "" {
+		return nil, message.NewError(message.InvalidParams, "session_id is required")
+	}
+
+	// If a special key is provided, use SendKey (handles key codes for LIVE sessions)
+	if p.Key != "" {
+		// Validate key name
+		validKeys := map[string]bool{
+			"enter": true, "return": true, "escape": true, "esc": true,
+			"up": true, "down": true, "left": true, "right": true,
+			"tab": true, "backspace": true, "delete": true,
+			"home": true, "end": true, "pageup": true, "pagedown": true, "space": true,
+		}
+		if !validKeys[p.Key] {
+			return nil, message.NewError(message.InvalidParams, "unknown key: "+p.Key+". Valid keys: enter, escape, up, down, left, right, tab, backspace, delete, home, end, pageup, pagedown, space")
+		}
+
+		if err := s.manager.SendKey(p.SessionID, p.Key); err != nil {
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+
+		return map[string]interface{}{
+			"status": "sent",
+			"key":    p.Key,
+		}, nil
+	}
+
+	// If text input is provided, use SendInput
+	if p.Input != "" {
+		if err := s.manager.SendInput(p.SessionID, p.Input); err != nil {
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+
+		return map[string]interface{}{
+			"status": "sent",
+		}, nil
+	}
+
+	return nil, message.NewError(message.InvalidParams, "either 'input' or 'key' is required")
 }
 
 // Respond responds to a permission or question.
@@ -927,11 +1076,14 @@ type FileInfo struct {
 
 // DirectoryInfo represents a directory in the listing (matches HTTP API format).
 type DirectoryInfo struct {
-	Path           string    `json:"path"`
-	Name           string    `json:"name"`
-	FileCount      int       `json:"file_count"`
-	TotalSizeBytes int64     `json:"total_size_bytes"`
-	LastModified   time.Time `json:"last_modified,omitempty"`
+	Path             string    `json:"path"`
+	Name             string    `json:"name"`
+	FolderCount      int       `json:"folder_count"`       // Direct subdirectories count
+	FileCount        int       `json:"file_count"`         // Recursive file count
+	TotalSizeBytes   int64     `json:"total_size_bytes"`
+	TotalSizeDisplay string    `json:"total_size_display"` // Human readable: "35 KB"
+	LastModified     time.Time `json:"last_modified,omitempty"`
+	ModifiedDisplay  string    `json:"modified_display,omitempty"` // Relative: "2 hours ago"
 }
 
 // PaginationInfo contains pagination metadata.
@@ -1032,13 +1184,17 @@ func (s *SessionManagerService) FilesList(ctx context.Context, params json.RawMe
 
 		if entry.IsDir() {
 			// Count files in directory
-			fileCount, totalSize := countDirContents(filepath.Join(targetPath, name))
+			stats := countDirContents(filepath.Join(targetPath, name))
+			modTime := info.ModTime()
 			dirs = append(dirs, DirectoryInfo{
-				Path:           relPath,
-				Name:           name,
-				FileCount:      fileCount,
-				TotalSizeBytes: totalSize,
-				LastModified:   info.ModTime(),
+				Path:             relPath,
+				Name:             name,
+				FolderCount:      stats.FolderCount,
+				FileCount:        stats.FileCount,
+				TotalSizeBytes:   stats.TotalSize,
+				TotalSizeDisplay: formatBytes(stats.TotalSize),
+				LastModified:     modTime,
+				ModifiedDisplay:  formatRelativeTime(modTime),
 			})
 		} else {
 			ext := ""
@@ -1118,24 +1274,227 @@ func (s *SessionManagerService) FilesList(ctx context.Context, params json.RawMe
 	}, nil
 }
 
-// countDirContents counts files and total size in a directory (non-recursive for performance).
-func countDirContents(path string) (int, int64) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return 0, 0
+// FileGet returns the content of a file from a workspace.
+func (s *SessionManagerService) FileGet(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Path        string `json:"path"`
+		MaxSizeKB   int    `json:"max_size_kb"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
 	}
 
-	var count int
-	var size int64
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			count++
-			if info, err := entry.Info(); err == nil {
-				size += info.Size()
-			}
-		}
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
-	return count, size
+	if p.Path == "" {
+		return nil, message.NewError(message.InvalidParams, "path is required")
+	}
+
+	// Default max size
+	if p.MaxSizeKB <= 0 {
+		p.MaxSizeKB = 500 // 500KB default
+	}
+	if p.MaxSizeKB > 10000 {
+		p.MaxSizeKB = 10000 // 10MB max
+	}
+
+	// Get workspace to find the path
+	ws, err := s.manager.GetWorkspace(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Build full path
+	basePath := ws.Definition.Path
+	targetPath := filepath.Join(basePath, p.Path)
+
+	// Validate path is within workspace (security check)
+	absTarget, err := filepath.Abs(targetPath)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "invalid path: "+err.Error())
+	}
+	absBase, _ := filepath.Abs(basePath)
+	if !strings.HasPrefix(absTarget, absBase) {
+		return nil, message.NewError(message.InvalidParams, "path is outside workspace")
+	}
+
+	// Check if file exists
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, message.NewError(message.InvalidParams, "file not found: "+p.Path)
+		}
+		return nil, message.NewError(message.InternalError, "failed to stat file: "+err.Error())
+	}
+
+	if info.IsDir() {
+		return nil, message.NewError(message.InvalidParams, "path is a directory, not a file")
+	}
+
+	// Check file size
+	maxSizeBytes := int64(p.MaxSizeKB * 1024)
+	truncated := false
+	readSize := info.Size()
+	if readSize > maxSizeBytes {
+		readSize = maxSizeBytes
+		truncated = true
+	}
+
+	// Read file content
+	file, err := os.Open(targetPath)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "failed to open file: "+err.Error())
+	}
+	defer file.Close()
+
+	content := make([]byte, readSize)
+	n, err := file.Read(content)
+	if err != nil && err.Error() != "EOF" {
+		return nil, message.NewError(message.InternalError, "failed to read file: "+err.Error())
+	}
+	content = content[:n]
+
+	return map[string]interface{}{
+		"path":      p.Path,
+		"content":   string(content),
+		"encoding":  "utf-8",
+		"truncated": truncated,
+		"size":      len(content),
+	}, nil
+}
+
+// DirStats holds directory statistics.
+type DirStats struct {
+	FolderCount int   // Direct subdirectories
+	FileCount   int   // Recursive file count
+	TotalSize   int64 // Total size in bytes
+}
+
+// countDirContents counts folders, files and total size in a directory using filepath.WalkDir.
+// Uses iterative traversal (not recursive) for better performance.
+// Limits: max 10 levels deep, max 10000 files, skips ignored directories.
+func countDirContents(root string) DirStats {
+	const maxDepth = 10
+	const maxFiles = 10000
+
+	// Directories to skip for performance
+	ignoredDirs := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".svn":         true,
+		".hg":          true,
+		"vendor":       true,
+		"__pycache__":  true,
+		".cache":       true,
+		"dist":         true,
+		"build":        true,
+		".next":        true,
+		".nuxt":        true,
+		"coverage":     true,
+	}
+
+	rootDepth := strings.Count(root, string(filepath.Separator))
+	var stats DirStats
+
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // Skip errors, continue walking
+		}
+
+		// Check depth limit
+		currentDepth := strings.Count(path, string(filepath.Separator)) - rootDepth
+		if currentDepth > maxDepth {
+			return fs.SkipDir
+		}
+
+		// Skip ignored directories
+		if d.IsDir() {
+			name := d.Name()
+			if ignoredDirs[name] || (len(name) > 0 && name[0] == '.' && name != ".") {
+				return fs.SkipDir
+			}
+			// Count direct subdirectories only (depth == 1)
+			if currentDepth == 1 {
+				stats.FolderCount++
+			}
+			return nil // Continue into directory
+		}
+
+		// Count file
+		stats.FileCount++
+		if stats.FileCount > maxFiles {
+			return fs.SkipAll // Stop walking, we have enough
+		}
+
+		if info, err := d.Info(); err == nil {
+			stats.TotalSize += info.Size()
+		}
+		return nil
+	})
+
+	return stats
+}
+
+// formatBytes converts bytes to human readable format.
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB", "MB", "GB", "TB"}
+	value := float64(bytes) / float64(div)
+	if value < 10 {
+		return fmt.Sprintf("%.1f %s", value, units[exp])
+	}
+	return fmt.Sprintf("%.0f %s", value, units[exp])
+}
+
+// formatRelativeTime converts a time to relative format like "2 hours ago".
+func formatRelativeTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	now := time.Now()
+	diff := now.Sub(t)
+
+	switch {
+	case diff < time.Minute:
+		return "just now"
+	case diff < time.Hour:
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	case diff < 24*time.Hour:
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	case diff < 7*24*time.Hour:
+		days := int(diff.Hours() / 24)
+		if days == 1 {
+			return "yesterday"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	case diff < 30*24*time.Hour:
+		weeks := int(diff.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1 week ago"
+		}
+		return fmt.Sprintf("%d weeks ago", weeks)
+	default:
+		return t.Format("Jan 2, 2006")
+	}
 }
 
 // isBinaryExtension checks if a file extension indicates a binary file.

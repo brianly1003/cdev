@@ -634,7 +634,16 @@ func (c *UnifiedClient) handleMessage(data []byte) {
 	case ProtocolLegacy:
 		c.handleLegacy(data)
 	default:
-		log.Warn().Str("client_id", c.id).Msg("unknown protocol")
+		// Log the actual message for debugging
+		msgPreview := string(data)
+		if len(msgPreview) > 100 {
+			msgPreview = msgPreview[:100] + "..."
+		}
+		log.Warn().
+			Str("client_id", c.id).
+			Str("message", msgPreview).
+			Int("length", len(data)).
+			Msg("unknown protocol")
 	}
 }
 

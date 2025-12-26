@@ -20,6 +20,7 @@ var (
 	httpPort        int
 	externalWSURL   string
 	externalHTTPURL string
+	headless        bool
 )
 
 // startCmd represents the start command.
@@ -29,14 +30,22 @@ var startCmd = &cobra.Command{
 	Long: `Start the cdev server to begin monitoring your repository
 and accepting connections from mobile devices.
 
-The agent will:
-- Watch the repository for file changes
-- Accept WebSocket connections for real-time event streaming
-- Provide HTTP API for commands and status
-- Display a QR code for easy mobile pairing
+Two modes are available:
+
+Terminal Mode (default, --headless=false):
+  - Runs in the current terminal with full PTY support
+  - When mobile sends commands, Claude spawns in THIS terminal
+  - You can interact with Claude locally AND via mobile
+  - Permission prompts are visible and can be answered from either side
+
+Headless Mode (--headless=true):
+  - Runs as a background daemon
+  - Claude runs as subprocess without terminal UI
+  - Best for server deployments or background automation
 
 Example:
-  cdev start
+  cdev start                           # Terminal mode (default)
+  cdev start --headless                # Headless/daemon mode
   cdev start --repo /path/to/project
   cdev start --ws-port 8765 --http-port 8766
 
@@ -56,6 +65,7 @@ func init() {
 	startCmd.Flags().IntVar(&httpPort, "http-port", 0, "HTTP port (default: 8766)")
 	startCmd.Flags().StringVar(&externalWSURL, "external-ws-url", "", "external WebSocket URL for QR code (e.g., wss://tunnel.devtunnels.ms)")
 	startCmd.Flags().StringVar(&externalHTTPURL, "external-http-url", "", "external HTTP URL for QR code (e.g., https://tunnel.devtunnels.ms)")
+	startCmd.Flags().BoolVar(&headless, "headless", false, "run in headless mode (no terminal UI, daemon mode)")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
@@ -81,6 +91,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if externalHTTPURL != "" {
 		cfg.Server.ExternalHTTPURL = externalHTTPURL
 	}
+	// Headless flag (default is false = terminal mode)
+	cfg.Server.Headless = headless
 
 	// Re-validate after overrides
 	if err := config.Validate(cfg); err != nil {
@@ -90,8 +102,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Setup logging
 	setupLogging(cfg)
 
+	mode := "terminal"
+	if cfg.Server.Headless {
+		mode = "headless"
+	}
+
 	log.Info().
 		Str("version", version).
+		Str("mode", mode).
 		Str("repo", cfg.Repository.Path).
 		Int("ws_port", cfg.Server.WebSocketPort).
 		Int("http_port", cfg.Server.HTTPPort).

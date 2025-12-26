@@ -1,0 +1,1035 @@
+2:20PM DBG PTY output clean="[04:41:32.066] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:32.067] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:32.068] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:32.069] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:32.142] [WS] JSON-RPC: event/claude_message - c8fb3292-9332-45f6-b6d5-..." state=permission
+2:20PM DBG PTY output clean="[04:41:41.386] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:41.391] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:41.393] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:41.394] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:41.395] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:41.397] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:41.398] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:41.399] [WS] JSON-RPC: event/pty_output - c8fb3292-9332-45f6-b6d5-92e6..." state=permission
+2:20PM DBG PTY output clean="[04:41:41.399] [WS] JSON-RPC: event/claude_log - event/claude_log" state=permission
+2:20PM DBG PTY output clean="[04:41:51.114] [WS] heartbeat - heartbeat" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ I see the issue. Looking at the logs, there's an event/pty_state event at..." state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Search(pattern: \"ptyState|pty_state\", path: \"cdev/Presentation/Screens/Da..." state=permission
+2:20PM DBG PTY output clean="        output_mode: \"content\")" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Found 2 lines (ctrl+o to expand)" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Read(cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift)" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Read 30 lines" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Search(pattern: \"struct PTYStatePayload\", path: \"cdev\", output_mode: \"con..." state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Found 9 lines (ctrl+o to expand)" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Search(pattern: \"enum PTYState\", path: \"cdev\", output_mode: \"content\")" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Found 16 lines (ctrl+o to expand)" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Search(pattern: \"case .claudeMessage\", path: \"cdev/Presentation/Screens/D..." state=permission
+2:20PM DBG PTY output clean="        output_mode: \"content\")" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Found 44 lines (ctrl+o to expand)" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Read(cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift)" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Read 60 lines" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ I found the issue. Looking at lines 1665-1668 in the claude_message handler:" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="  } else if payload.effectiveRole == \"assistant\" && claudeState == .idle {" state=permission
+2:20PM DBG PTY output clean="      claudeState = .running" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="  This code sets claudeState back to .running whenever an assistant message a..." state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Update(cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift)" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Added 4 lines, removed 5 lines" state=permission
+2:20PM DBG PTY output clean="       1648                        streamingStartTime = nil" state=permission
+2:20PM DBG PTY output clean="       1649                    }" state=permission
+2:20PM DBG PTY output clean="       1650" state=permission
+2:20PM DBG PTY output clean="       1651 -                  // In interactive mode, update claudeState and..." state=permission
+2:20PM DBG PTY output clean="       1651 +                  // In interactive mode, update isLoading based..." state=permission
+2:20PM DBG PTY output clean="       1652 +                  // Note: claudeState is managed by pty_state e..." state=permission
+2:20PM DBG PTY output clean="       1653                    if isInteractiveMode {" state=permission
+2:20PM DBG PTY output clean="       1654                        // Reset isLoading when we receive any ass..." state=permission
+2:20PM DBG PTY output clean="              responding)" state=permission
+2:20PM DBG PTY output clean="       1655                        if payload.effectiveRole == \"assistant\" &&..." state=permission
+2:20PM DBG PTY output clean="     ..." state=permission
+2:20PM DBG PTY output clean="       1656                            AppLogger.log(\"[Dashboard] Interactive..." state=permission
+2:20PM DBG PTY output clean="              assistant message)\")" state=permission
+2:20PM DBG PTY output clean="       1657                        }" state=permission
+2:20PM DBG PTY output clean="       1658" state=permission
+2:20PM DBG PTY output clean="       1659 +                      // Only use stop_reason as a fallback if p..." state=permission
+2:20PM DBG PTY output clean="       1660                        if let stopReason = payload.stopReason, !s..." state=permission
+2:20PM DBG PTY output clean="       1661                            // Claude finished - set to idle" state=permission
+2:20PM DBG PTY output clean="       1662                            if claudeState == .running {" state=permission
+2:20PM DBG PTY output clean="       1663                                claudeState = .idle" state=permission
+2:20PM DBG PTY output clean="       1664                                AppLogger.log(\"[Dashboard] Interac..." state=permission
+2:20PM DBG PTY output clean="              (stop_reason: \\(stopReason))\")" state=permission
+2:20PM DBG PTY output clean="       1665                            }" state=permission
+2:20PM DBG PTY output clean="       1666 -                      } else if payload.effectiveRole == \"assist..." state=permission
+2:20PM DBG PTY output clean="       1667 -                          // Assistant message without stop_reas..." state=permission
+2:20PM DBG PTY output clean="       1668 -                          claudeState = .running" state=permission
+2:20PM DBG PTY output clean="       1669 -                          AppLogger.log(\"[Dashboard] Interactive..." state=permission
+2:20PM DBG PTY output clean="       1666                        }" state=permission
+2:20PM DBG PTY output clean="       1667 +                      // Don't set claudeState = .running here -..." state=permission
+2:20PM DBG PTY output clean="       1668                    }" state=permission
+2:20PM DBG PTY output clean="       1669                }" state=permission
+2:20PM DBG PTY output clean="       1670" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Let me also add more detailed logging to the pty_state handler to help de..." state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean="⏺ Update(cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift)" state=permission
+2:20PM DBG PTY output clean="  ⎿ \u00a0Added 20 lines, removed 13 lines" state=permission
+2:20PM DBG PTY output clean="       1760" state=permission
+2:20PM DBG PTY output clean="       1761            case .ptyState:" state=permission
+2:20PM DBG PTY output clean="       1762                // PTY state change (idle, thinking, permission, q..." state=thinking
+2:20PM DBG PTY output clean="       1763 -              if case .ptyState(let payload) = event.payload," state=thinking
+2:20PM DBG PTY output clean="       1764 -                 let state = payload.state {" state=thinking
+2:20PM DBG PTY output clean="       1765 -                  // Map PTY state to Claude state" state=thinking
+2:20PM DBG PTY output clean="       1766 -                  switch state {" state=thinking
+2:20PM DBG PTY output clean="       1767 -                  case .idle:" state=thinking
+2:20PM DBG PTY output clean="       1768 -                      claudeState = .idle" state=thinking
+2:20PM DBG PTY output clean="       1769 -                  case .thinking:" state=thinking
+2:20PM DBG PTY output clean="       1770 -                      claudeState = .running" state=thinking
+2:20PM DBG PTY output clean="       1771 -                  case .permission, .question:" state=thinking
+2:20PM DBG PTY output clean="       1772 -                      claudeState = .waiting" state=thinking
+2:20PM DBG PTY output clean="       1773 -                  case .error:" state=thinking
+2:20PM DBG PTY output clean="       1774 -                      claudeState = .error" state=thinking
+2:20PM DBG PTY output clean="       1763 +              if case .ptyState(let payload) = event.payload {" state=thinking
+2:20PM DBG PTY output clean="       1764 +                  if let state = payload.state {" state=thinking
+2:20PM DBG PTY output clean="       1765 +                      let previousClaudeState = claudeState" state=thinking
+2:20PM DBG PTY output clean="       1766 +                      // Map PTY state to Claude state" state=thinking
+2:20PM DBG PTY output clean="       1767 +                      switch state {" state=thinking
+2:20PM DBG PTY output clean="       1768 +                      case .idle:" state=thinking
+2:20PM DBG PTY output clean="       1769 +                          claudeState = .idle" state=thinking
+2:20PM DBG PTY output clean="       1770 +                          isLoading = false  // Also reset loadi..." state=thinking
+2:20PM DBG PTY output clean="       1771 +                      case .thinking:" state=thinking
+2:20PM DBG PTY output clean="       1772 +                          claudeState = .running" state=thinking
+2:20PM DBG PTY output clean="       1773 +                      case .permission, .question:" state=thinking
+2:20PM DBG PTY output clean="       1774 +                          claudeState = .waiting" state=thinking
+2:20PM DBG PTY output clean="       1775 +                      case .error:" state=thinking
+2:20PM DBG PTY output clean="       1776 +                          claudeState = .error" state=thinking
+2:20PM DBG PTY output clean="       1777 +                      }" state=thinking
+2:20PM DBG PTY output clean="       1778 +                      AppLogger.log(\"[Dashboard] PTY state: \\(st..." state=thinking
+2:20PM DBG PTY output clean="            + \\(previousClaudeState) → \\(claudeState)\")" state=thinking
+2:20PM DBG PTY output clean="       1779 +                  } else {" state=thinking
+2:20PM DBG PTY output clean="       1780 +                      AppLogger.log(\"[Dashboard] PTY state event..." state=thinking
+2:20PM DBG PTY output clean="       1781                    }" state=thinking
+2:20PM DBG PTY output clean="       1782 -                  AppLogger.log(\"[Dashboard] PTY state changed: ..." state=thinking
+2:20PM DBG PTY output clean="       1782 +              } else {" state=thinking
+2:20PM DBG PTY output clean="       1783 +                  AppLogger.log(\"[Dashboard] PTY state event pay..." state=thinking
+2:20PM DBG PTY output clean="       1784                }" state=thinking
+2:20PM DBG PTY output clean="       1785" state=thinking
+2:20PM DBG PTY output clean="       1786            case .gitDiff:" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Bash(xcodebuild -scheme cdev -destination 'platform=iOS Simulator,name=iP..." state=thinking
+2:20PM DBG PTY output clean="      tail -3)                                                               ..." state=thinking
+2:20PM DBG PTY output clean="  ⎿ \u00a0** BUILD SUCCEEDED **" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Build succeeded." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="  Summary of fixes:" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=23, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="  1. Removed conflicting state management in claude_message handler:" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=24, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="    - Previously, it would set claudeState = .running whenever an assistant m..." state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=25, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="    - Now in interactive mode, claudeState is managed solely by pty_state events" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=26, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="  2. Enhanced pty_state handler:" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=27, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="    - Added isLoading = false when state becomes .idle" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=28, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="    - Added detailed logging to debug state transitions" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=29, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="    - Added error logging if payload decode fails" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="  The root cause was that claude_message events kept arriving after pty_state..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="> for the \"x\" button at the right corner of permission options, we need to se..." state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"session/input\",\"params\":{\"session_id\":\"5ac3..." state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean=":\"escape\"}}\\" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="\\" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="to server once click" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="⏺ I need to update dismissPendingInteraction() to send the \"escape\" key to ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="⏺ Update(cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift)" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="  ⎿ \u00a0Added 32 lines, removed 3 lines" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1103            }" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1104        }" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1105" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1106 -      /// Dismiss the pending interaction without responding" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1106 +      /// Dismiss the pending interaction by sending escape key" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1107        /// Used when user closes the permission panel via X button" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1108        func dismissPendingInteraction() {" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1109 -          pendingInteraction = nil" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1110 -          AppLogger.log(\"[Dashboard] Pending interaction dismiss..." state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1109 +          Task {" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1110 +              await dismissPTYPermission()" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1111 +          }" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1112        }" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1113" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1114 +      /// Send escape key to dismiss PTY permission and clear lo..." state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1115 +      private func dismissPTYPermission() async {" state=thinking
+2:20PM DBG PTY parser: allowPattern=false, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=30, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="       1116 +          guard pendingInteraction?.isPTYMode == true else {" state=thinking
+2:20PM DBG PTY output clean="       1117 +              pendingInteraction = nil" state=thinking
+2:20PM DBG PTY output clean="       1118 +              return" state=thinking
+2:20PM DBG PTY output clean="       1119 +          }" state=thinking
+2:20PM DBG PTY output clean="       1120 +" state=thinking
+2:20PM DBG PTY output clean="       1121 +          // Get current session ID" state=thinking
+2:20PM DBG PTY output clean="       1122 +          let sessionId = userSelectedSessionId ?? agentStatus.s..." state=thinking
+2:20PM DBG PTY output clean="       1123 +          guard let sessionId = sessionId, !sessionId.isEmpty el..." state=thinking
+2:20PM DBG PTY output clean="       1124 +              AppLogger.log(\"[Dashboard] No session ID for PTY d..." state=thinking
+2:20PM DBG PTY output clean="       1125 +              pendingInteraction = nil" state=thinking
+2:20PM DBG PTY output clean="       1126 +              return" state=thinking
+2:20PM DBG PTY output clean="       1127 +          }" state=thinking
+2:20PM DBG PTY output clean="       1128 +" state=thinking
+2:20PM DBG PTY output clean="       1129 +          do {" state=thinking
+2:20PM DBG PTY output clean="       1130 +              // Send escape key to server to cancel the permiss..." state=thinking
+2:20PM DBG PTY output clean="       1131 +              try await _agentRepository.sendInput(sessionId: se..." state=thinking
+2:20PM DBG PTY output clean="       1132 +              pendingInteraction = nil" state=thinking
+2:20PM DBG PTY output clean="       1133 +              AppLogger.log(\"[Dashboard] PTY permission dismisse..." state=thinking
+2:20PM DBG PTY output clean="       1134 +              Haptics.light()" state=thinking
+2:20PM DBG PTY output clean="       1135 +          } catch {" state=thinking
+2:20PM DBG PTY output clean="       1136 +              // Still clear local state even if server request ..." state=thinking
+2:20PM DBG PTY output clean="       1137 +              pendingInteraction = nil" state=thinking
+2:20PM DBG PTY output clean="       1138 +              AppLogger.log(\"[Dashboard] PTY dismiss failed: \\(e..." state=error
+2:20PM DBG PTY output clean="       1139 +          }" state=error
+2:20PM DBG PTY output clean="       1140 +      }" state=error
+2:20PM DBG PTY output clean="       1141 +" state=error
+2:20PM DBG PTY output clean="       1142        // MARK: - PTY Mode Permission Responses" state=error
+2:20PM DBG PTY output clean="       1143" state=error
+2:20PM DBG PTY output clean="       1144        /// Respond to PTY permission by navigating to the selecte..." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Bash(xcodebuild -scheme cdev -destination 'platform=iOS Simulator,name=iP..." state=error
+2:20PM DBG PTY output clean="      tail -3)                                                               ..." state=error
+2:20PM DBG PTY output clean="  ⎿ \u00a0** BUILD SUCCEEDED **" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Build succeeded." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="  Summary:" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="  Updated dismissPendingInteraction() to send an \"escape\" key to the server w..." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="  // Sends: {\"jsonrpc\":\"2.0\",\"id\":...,\"method\":\"session/input\",\"params\":{\"ses..." state=error
+2:20PM DBG PTY output clean="  try await _agentRepository.sendInput(sessionId: sessionId, input: \"escape\")" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="  This properly cancels the permission prompt on the server side instead of j..." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="> create text2.md and Hwllow world conent" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Write(text2.md)" state=error
+2:20PM DBG PTY output clean="  ⎿ \u00a0Wrote 2 lines to text2.md" state=error
+2:20PM DBG PTY output clean="     Hello world" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Created text2.md with \"Hello world\" content." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="> remove text2.md" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Bash(rm /Users/brianly/Projects/cdev-ios/text2.md)" state=error
+2:20PM DBG PTY output clean="  ⎿ \u00a0(No content)" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Done. Removed text2.md." state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="> hello" state=error
+2:20PM DBG PTY output clean= state=error
+2:20PM DBG PTY output clean="⏺ Hello! How can I help you?" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> pls create new text2.md with Hello text" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> hello create new text3.md with Hello World" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0Try \"how do I log an error?\"" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0Try \"how do I log an error?\"" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM INF sending initial prompt to PTY prompt="continue pls"
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0continue pls" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="                                                                             ..." state=question
+2:20PM DBG sending Enter key to submit prompt
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> continue pls" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> continue pls" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> continue pls" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> continue pls" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="> continue pls" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG streamed new session messages messages=1 new_offset=23288675 session_id=c8fb3292-9332-45f6-b6d5-92e60e78ea75
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt)" state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean=">\u00a0" state=question
+2:20PM DBG PTY output clean="─────────────────────────��..." state=question
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=question
+2:20PM DBG PTY output clean= state=question
+2:20PM DBG PTY output clean="✽ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✻ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✶ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✳ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts                                                            ..." state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG streamed new session messages messages=1 new_offset=23289871 session_id=c8fb3292-9332-45f6-b6d5-92e60e78ea75
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Write(text3.md)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Write(text3.md)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Write(text3.md)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="· Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Write(text3.md)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="✢ Spelunking… (esc to interrupt · thinking)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=">\u00a0" state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="⏺ Write(text3.md)" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:20PM DBG PTY output clean=" Create file text3.md" state=thinking
+2:20PM DBG PTY output clean="╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌��..." state=thinking
+2:20PM DBG PTY output clean=" Hello World" state=thinking
+2:20PM DBG PTY output clean= state=thinking
+2:20PM DBG PTY output clean="╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌��..." state=thinking
+2:20PM DBG PTY parser: allowPattern=true, numberedOpts=0, textOpts=0, hasPromptEnd=false, bufferLen=11, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean=" Do you want to create text3.md?" state=thinking
+2:20PM DBG PTY parser: allowPattern=true, numberedOpts=1, textOpts=0, hasPromptEnd=false, bufferLen=12, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean=" ❯ 1. Yes" state=thinking
+2:20PM DBG PTY parser: allowPattern=true, numberedOpts=2, textOpts=0, hasPromptEnd=false, bufferLen=13, type=bash_command, target=|| claudeState == .waiting {
+2:20PM DBG PTY output clean="   2. Yes, allow all edits during this session (shift+tab)" state=thinking
+2:20PM DBG PTY parser: allowPattern=true, numberedOpts=3, textOpts=0, hasPromptEnd=false, bufferLen=14, type=bash_command, target=|| claudeState == .waiting {
+2:20PM INF PTY permission prompt detected options=3 target="|| claudeState == .waiting {" type=bash_command
+2:20PM DBG PTY output clean="   3. Type here to tell Claude what to do differently" state=permission
+2:20PM DBG PTY output clean= state=permission
+2:20PM DBG PTY output clean=" Esc to cancel" state=permission
+2:20PM DBG streamed new session messages messages=1 new_offset=23290801 session_id=c8fb3292-9332-45f6-b6d5-92e60e78ea75
+2:20PM INF client disconnected client_id=07f2af98-78b8-4ea8-a1f2-393385291d57
+2:20PM DBG subscriber unregistered subscriber_id=07f2af98-78b8-4ea8-a1f2-393385291d57
+2:21PM DBG dispatching request id=92586E22-A385-4A4F-9959-333D2B01453E method=workspace/session/unwatch notification=false
+2:21PM INF stopped watching session session_id=c8fb3292-9332-45f6-b6d5-92e60e78ea75
+{"time":"2025-12-26T14:21:28.88829+07:00","level":"INFO","msg":"Stopped watching session","workspace_id":"867ff826-5080-48b7-9a8e-489c1046f2e4","session_id":"c8fb3292-9332-45f6-b6d5-92e60e78ea75"}
+2:21PM DBG request completed id=92586E22-A385-4A4F-9959-333D2B01453E method=workspace/session/unwatch
+2:21PM INF client disconnected client_id=46461f63-1a46-4795-b12a-83317aad5e81
+2:21PM DBG subscriber unregistered subscriber_id=46461f63-1a46-4795-b12a-83317aad5e81
+2:21PM DBG incoming request host=localhost:8766 method=GET path=/ws remote_addr=127.0.0.1:53330 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:21PM DBG HTTP request received method=GET path=/ws remote=127.0.0.1:53330
+2:21PM INF WebSocket upgrade request received at /ws host=localhost:8766 origin= path=/ws remote_addr=127.0.0.1:53330 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:21PM DBG processing WebSocket upgrade connection=Upgrade path=/ws remote_addr=127.0.0.1:53330 sec_websocket_key=Fs96xOKKR5Nx0RAhdYzN7w== upgrade=websocket
+2:21PM INF client connected (unified) client_id=4309c08d-21ca-4c70-9ce4-26a0c910efd0 remote_addr=127.0.0.1:53330
+2:21PM DBG HTTP request completed elapsed=1.874917 method=GET path=/ws
+2:21PM DBG request completed duration=2.270125 method=GET path=/ws
+2:21PM DBG subscriber registered subscriber_id=4309c08d-21ca-4c70-9ce4-26a0c910efd0
+2:21PM DBG protocol detected client_id=4309c08d-21ca-4c70-9ce4-26a0c910efd0 protocol=json-rpc
+2:21PM DBG dispatching request id=6E93F768-7683-4DCF-A1D1-5D311FA7A40B method=initialize notification=false
+2:21PM DBG request completed id=6E93F768-7683-4DCF-A1D1-5D311FA7A40B method=initialize
+2:21PM DBG dispatching request id=<nil> method=initialized notification=true
+2:21PM DBG dispatching request id=E551DB05-1D45-418A-8CC5-929DE1348789 method=workspace/list notification=false
+2:21PM INF full session sync complete elapsed_ms=325.158167 files_scanned=26 sessions_cached=2
+2:21PM DBG listed sessions from cache count=2 elapsed_ms=0.022292
+2:21PM DBG request completed id=E551DB05-1D45-418A-8CC5-929DE1348789 method=workspace/list
+2:21PM DBG dispatching request id=DAA05BC0-CE92-4D58-8DB5-3FB1427AD519 method=workspace/list notification=false
+2:21PM INF full session sync complete elapsed_ms=5.349791 files_scanned=26 sessions_cached=2
+2:21PM DBG listed sessions from cache count=2 elapsed_ms=0.026125
+2:21PM DBG request completed id=DAA05BC0-CE92-4D58-8DB5-3FB1427AD519 method=workspace/list
+2:21PM DBG dispatching request id=C68EDAA7-8E6E-4753-B5B3-137D38B603A6 method=session/list notification=false
+2:21PM DBG listed sessions from cache count=13 elapsed_ms=0.161917
+2:21PM DBG request completed id=C68EDAA7-8E6E-4753-B5B3-137D38B603A6 method=session/list
+2:22PM INF client disconnected client_id=4309c08d-21ca-4c70-9ce4-26a0c910efd0
+2:22PM DBG subscriber unregistered subscriber_id=4309c08d-21ca-4c70-9ce4-26a0c910efd0
+2:23PM DBG incoming request host=localhost:8766 method=GET path=/ws remote_addr=127.0.0.1:53622 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:23PM DBG HTTP request received method=GET path=/ws remote=127.0.0.1:53622
+2:23PM INF WebSocket upgrade request received at /ws host=localhost:8766 origin= path=/ws remote_addr=127.0.0.1:53622 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:23PM DBG processing WebSocket upgrade connection=Upgrade path=/ws remote_addr=127.0.0.1:53622 sec_websocket_key=vP6pgSZ/tx5IXd8U3eAjcA== upgrade=websocket
+2:23PM INF client connected (unified) client_id=8131f6f2-c826-4e78-97a6-40ece7c5fe29 remote_addr=127.0.0.1:53622
+2:23PM DBG HTTP request completed elapsed=0.552208 method=GET path=/ws
+2:23PM DBG request completed duration=0.91575 method=GET path=/ws
+2:23PM DBG subscriber registered subscriber_id=8131f6f2-c826-4e78-97a6-40ece7c5fe29
+2:23PM DBG protocol detected client_id=8131f6f2-c826-4e78-97a6-40ece7c5fe29 protocol=json-rpc
+2:23PM DBG dispatching request id=BDE2615C-90B2-4A79-B2D6-D0ACC732B241 method=initialize notification=false
+2:23PM DBG request completed id=BDE2615C-90B2-4A79-B2D6-D0ACC732B241 method=initialize
+2:23PM DBG dispatching request id=<nil> method=initialized notification=true
+2:23PM DBG dispatching request id=B56BFD34-8586-4AF6-A6EA-4320A1AE71D0 method=workspace/list notification=false
+2:23PM INF full session sync complete elapsed_ms=23.969875 files_scanned=26 sessions_cached=2
+2:23PM DBG listed sessions from cache count=2 elapsed_ms=0.092666
+2:23PM DBG request completed id=B56BFD34-8586-4AF6-A6EA-4320A1AE71D0 method=workspace/list
+2:23PM DBG dispatching request id=BD4C7DF1-DE12-48FE-80B7-541D9EFE42C4 method=session/list notification=false
+2:23PM DBG listed sessions from cache count=13 elapsed_ms=1.895334
+2:23PM DBG request completed id=BD4C7DF1-DE12-48FE-80B7-541D9EFE42C4 method=session/list
+2:24PM DBG running session reconciliation
+2:24PM INF full session sync complete elapsed_ms=16.731 files_scanned=85 sessions_cached=13
+2:24PM INF client disconnected client_id=8131f6f2-c826-4e78-97a6-40ece7c5fe29
+2:24PM DBG subscriber unregistered subscriber_id=8131f6f2-c826-4e78-97a6-40ece7c5fe29
