@@ -166,12 +166,9 @@ func createDefaultWorkspacesConfig() *WorkspacesConfig {
 		Workspaces: []WorkspaceDefinition{},
 		Defaults: WorkspaceDefaults{
 			Watcher: WatcherConfig{
-				Enabled:     true,
-				DebounceMS:  100,
-				IgnorePatterns: []string{
-					".git", ".DS_Store", "node_modules", ".vscode",
-					".idea", "*.swp", "*.swo", ".cache",
-				},
+				Enabled:        true,
+				DebounceMS:     100,
+				IgnorePatterns: DefaultWatcherIgnorePatterns,
 			},
 			Git: GitConfig{
 				Enabled:      true,
@@ -208,13 +205,10 @@ func setWorkspaceDefaults(v *viper.Viper) {
 	v.SetDefault("manager.max_restart_attempts", 3)
 	v.SetDefault("manager.restart_backoff_seconds", 5)
 
-	// Defaults for all workspaces
+	// Defaults for all workspaces - uses centralized patterns from defaults.go
 	v.SetDefault("defaults.watcher.enabled", true)
 	v.SetDefault("defaults.watcher.debounce_ms", 100)
-	v.SetDefault("defaults.watcher.ignore_patterns", []string{
-		".git", ".DS_Store", "node_modules", ".vscode",
-		".idea", "*.swp", "*.swo", ".cache",
-	})
+	v.SetDefault("defaults.watcher.ignore_patterns", DefaultWatcherIgnorePatterns)
 	v.SetDefault("defaults.git.enabled", true)
 	v.SetDefault("defaults.git.command", "git")
 	v.SetDefault("defaults.git.diff_on_change", true)

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
@@ -1379,21 +1380,8 @@ func countDirContents(root string) DirStats {
 	const maxDepth = 10
 	const maxFiles = 10000
 
-	// Directories to skip for performance
-	ignoredDirs := map[string]bool{
-		"node_modules": true,
-		".git":         true,
-		".svn":         true,
-		".hg":          true,
-		"vendor":       true,
-		"__pycache__":  true,
-		".cache":       true,
-		"dist":         true,
-		"build":        true,
-		".next":        true,
-		".nuxt":        true,
-		"coverage":     true,
-	}
+	// Use centralized skip directories from config
+	ignoredDirs := config.SkipDirectoriesSet(nil)
 
 	rootDepth := strings.Count(root, string(filepath.Separator))
 	var stats DirStats

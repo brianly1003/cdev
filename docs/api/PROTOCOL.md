@@ -1,8 +1,8 @@
 # cdev Protocol Specification
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Status:** Implemented
-**Last Updated:** 21 Dec 2025
+**Last Updated:** 26 Dec 2025
 
 ---
 
@@ -376,7 +376,24 @@ Response to `get_file` command.
 
 #### `git_status_changed`
 
-Git repository status changed.
+Git repository status changed. This event is emitted in two scenarios:
+
+1. **Real-time git state watcher** (automatic) - Detects changes from external tools (terminal, IDE, SourceTree)
+2. **After git operations** - Emitted after `git/stage`, `git/commit`, `git/push`, etc.
+
+**Real-Time Git State Watcher:**
+
+The server monitors the `.git` directory for state changes, enabling real-time updates when:
+- Files are staged/unstaged (`git add`, `git reset`)
+- Commits are created (`git commit`)
+- Branches are switched (`git checkout`, `git switch`)
+- Remote changes are fetched/pulled (`git fetch`, `git pull`)
+- Merges/rebases occur (`git merge`, `git rebase`)
+
+**Key Features:**
+- **IDE-safe**: Only watches `.git` directory, not working directory (won't conflict with VS Code, IntelliJ, SourceTree)
+- **Debounced**: Uses 500ms debounce + 1 second minimum interval to prevent event spam
+- **Startup delay**: 2 second delay on startup to avoid initial event burst
 
 ```json
 {

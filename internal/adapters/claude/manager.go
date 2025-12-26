@@ -3,7 +3,6 @@ package claude
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -73,6 +72,9 @@ type Manager struct {
 	waitingForInput  bool
 	pendingToolUseID string
 	pendingToolName  string
+
+	// Callback when PTY completes (for emitting stop_reason)
+	onPTYComplete func(sessionID string)
 }
 
 // NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
@@ -148,6 +150,14 @@ func (m *Manager) SetWorkDir(dir string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.workDir = dir
+}
+
+// SetOnPTYComplete sets a callback that's called when PTY streaming finishes.
+// Used by session manager to emit claude_message with stop_reason.
+func (m *Manager) SetOnPTYComplete(callback func(sessionID string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onPTYComplete = callback
 }
 
 // Start spawns Claude CLI with the given prompt (new session).
@@ -673,14 +683,17 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 				Msg("PTY permission prompt detected")
 		}
 
-		// Emit pty_state event when state changes
+		// Emit pty_state event only when state becomes idle (reduces noise)
+		// Other state changes (thinking, permission, question) are too frequent
 		if ptyState != lastState {
-			m.publishEvent(events.NewPTYStateEventWithSession(
-				string(ptyState),
-				parser.IsWaitingForInput(),
-				string(m.ptyPromptType),
-				m.sessionID,
-			))
+			if ptyState == PTYStateIdle {
+				m.publishEvent(events.NewPTYStateEventWithSession(
+					string(ptyState),
+					parser.IsWaitingForInput(),
+					string(m.ptyPromptType),
+					m.sessionID,
+				))
+			}
 			lastState = ptyState
 		}
 
@@ -714,6 +727,14 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 		"",    // no prompt type
 		sessionID,
 	))
+
+	// Call completion callback if set (to emit claude_message with stop_reason)
+	m.mu.RLock()
+	callback := m.onPTYComplete
+	m.mu.RUnlock()
+	if callback != nil {
+		callback(sessionID)
+	}
 
 	log.Debug().Int("lines_read", lineCount).Msg("PTY output streaming finished")
 	log.Info().Str("session_id", sessionID).Msg("emitted pty_state idle - Claude PTY session finished")
@@ -1385,55 +1406,15 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 		log.Info().Str("generated_session_id", sessionID).Msg("generated new session ID for bash execution")
 	}
 
-	m.mu.Lock()
-
 	// Set up working directory
 	workDir := m.workDir
 	if workDir == "" {
 		var err error
 		workDir, err = os.Getwd()
 		if err != nil {
-			m.mu.Unlock()
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
 	}
-
-	// Construct Claude Code session file path
-	// Transform: /Users/brianly/Projects/cdev -> -Users-brianly-Projects-cdev
-	projectDirName := strings.TrimPrefix(workDir, "/")
-	projectDirName = strings.ReplaceAll(projectDirName, "/", "-")
-	projectDirName = "-" + projectDirName
-
-	// Claude Code session file path
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		m.mu.Unlock()
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	claudeProjectsDir := filepath.Join(homeDir, ".claude", "projects", projectDirName)
-	sessionFilePath := filepath.Join(claudeProjectsDir, fmt.Sprintf("%s.jsonl", sessionID))
-
-	// Ensure the Claude projects directory exists
-	if err := os.MkdirAll(claudeProjectsDir, 0700); err != nil {
-		m.mu.Unlock()
-		return fmt.Errorf("failed to create Claude projects directory: %w", err)
-	}
-
-	// Open or create the session file for appending
-	logFile, err := os.OpenFile(sessionFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		m.mu.Unlock()
-		return fmt.Errorf("failed to open Claude session file: %w", err)
-	}
-	defer logFile.Close()
-
-	log.Info().
-		Str("session_file", sessionFilePath).
-		Str("session_id", sessionID).
-		Msg("appending to Claude Code session file")
-
-	m.mu.Unlock()
 
 	log.Info().
 		Str("command", truncatePrompt(command, 50)).
@@ -1449,7 +1430,7 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 	cmd.Stderr = &stderr
 
 	startTime := time.Now()
-	err = cmd.Run()
+	err := cmd.Run()
 	duration := time.Since(startTime)
 
 	exitCode := 0
@@ -1466,100 +1447,9 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 		Dur("duration", duration).
 		Msg("bash command completed")
 
-	// Get git branch for logging
-	gitBranch := "main" // Default
-	branchCmd := exec.Command("git", "branch", "--show-current")
-	branchCmd.Dir = workDir
-	if branchOutput, err := branchCmd.Output(); err == nil {
-		gitBranch = strings.TrimSpace(string(branchOutput))
-	}
-
-	// Generate UUIDs for message chain
-	caveatUUID := generateUUID()
-	inputUUID := generateUUID()
-	outputUUID := generateUUID()
-
-	// Get parent UUID (use sessionID as parent for now)
-	parentUUID := sessionID
-
-	// Current timestamp
-	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
-
-	// Helper function to marshal JSON without HTML escaping
-	marshalWithoutEscape := func(v interface{}) ([]byte, error) {
-		var buf bytes.Buffer
-		encoder := json.NewEncoder(&buf)
-		encoder.SetEscapeHTML(false)
-		if err := encoder.Encode(v); err != nil {
-			return nil, err
-		}
-		// Encoder.Encode adds a newline, so trim it
-		return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
-	}
-
-	// Write 3 JSONL messages in Claude Code format
-	// Message 1: Caveat
-	caveatMsg := map[string]interface{}{
-		"parentUuid":  parentUUID,
-		"isSidechain": false,
-		"userType":    "external",
-		"cwd":         workDir,
-		"sessionId":   sessionID,
-		"version":     "2.0.71", // Claude Code version
-		"gitBranch":   gitBranch,
-		"type":        "user",
-		"message": map[string]interface{}{
-			"role":    "user",
-			"content": "Caveat: The messages below were generated by the user while running local commands. DO NOT respond to these messages or otherwise consider them in your response unless the user explicitly asks you to.",
-		},
-		"isMeta":    true,
-		"uuid":      caveatUUID,
-		"timestamp": timestamp,
-	}
-	if data, err := marshalWithoutEscape(caveatMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
-	}
-
-	// Message 2: Bash Input
-	inputMsg := map[string]interface{}{
-		"parentUuid":  caveatUUID,
-		"isSidechain": false,
-		"userType":    "external",
-		"cwd":         workDir,
-		"sessionId":   sessionID,
-		"version":     "2.0.71",
-		"gitBranch":   gitBranch,
-		"type":        "user",
-		"message": map[string]interface{}{
-			"role":    "user",
-			"content": fmt.Sprintf("<bash-input>%s</bash-input>", command),
-		},
-		"uuid":      inputUUID,
-		"timestamp": timestamp,
-	}
-	if data, err := marshalWithoutEscape(inputMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
-	}
-
-	// Message 3: Bash Output
-	outputMsg := map[string]interface{}{
-		"parentUuid":  inputUUID,
-		"isSidechain": false,
-		"userType":    "external",
-		"cwd":         workDir,
-		"sessionId":   sessionID,
-		"version":     "2.0.71",
-		"gitBranch":   gitBranch,
-		"type":        "user",
-		"message": map[string]interface{}{
-			"role":    "user",
-			"content": fmt.Sprintf("<bash-stdout>%s</bash-stdout><bash-stderr>%s</bash-stderr>", stdout.String(), stderr.String()),
-		},
-		"uuid":      outputUUID,
-		"timestamp": timestamp,
-	}
-	if data, err := marshalWithoutEscape(outputMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
+	// Append to JSONL session file using the shared helper (correct Claude Code format)
+	if appendErr := AppendBashToSession(workDir, sessionID, command, stdout.String(), stderr.String()); appendErr != nil {
+		log.Warn().Err(appendErr).Str("session_id", sessionID).Msg("failed to append bash command to session file")
 	}
 
 	// Emit claude_message events for bash input and output

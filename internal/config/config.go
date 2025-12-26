@@ -145,30 +145,10 @@ func setDefaults(v *viper.Viper) {
 	// Repository defaults
 	v.SetDefault("repository.path", "")
 
-	// Watcher defaults
+	// Watcher defaults - uses centralized patterns from defaults.go
 	v.SetDefault("watcher.enabled", true)
 	v.SetDefault("watcher.debounce_ms", 100)
-	v.SetDefault("watcher.ignore_patterns", []string{
-		".git",
-		"node_modules",
-		".venv",
-		"venv",
-		"__pycache__",
-		"*.pyc",
-		".DS_Store",
-		"Thumbs.db",
-		"dist",
-		"build",
-		"coverage",
-		".next",
-		".nuxt",
-		"*.log",
-		".idea",
-		".vscode",
-		"*.swp",
-		"*.swo",
-		"*~",
-	})
+	v.SetDefault("watcher.ignore_patterns", DefaultWatcherIgnorePatterns)
 
 	// Claude defaults
 	// Note: Don't use --input-format stream-json when passing prompt as CLI argument
@@ -197,34 +177,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("pairing.token_expiry_secs", 3600)
 	v.SetDefault("pairing.show_qr_in_terminal", true)
 
-	// Indexer defaults
+	// Indexer defaults - uses centralized patterns from defaults.go
 	v.SetDefault("indexer.enabled", true)
-	v.SetDefault("indexer.skip_directories", []string{
-		".git",
-		".svn",
-		".hg",
-		"node_modules",
-		"vendor",
-		"__pycache__",
-		".pytest_cache",
-		".mypy_cache",
-		".tox",
-		".venv",
-		"venv",
-		".idea",
-		".vscode",
-		".vs",
-		"dist",
-		"target",
-		"coverage",
-		".coverage",
-		".nyc_output",
-		".next",
-		".nuxt",
-		".cache",
-		".parcel-cache",
-		".turbo",
-	})
+	v.SetDefault("indexer.skip_directories", DefaultSkipDirectories)
 }
 
 // postProcess applies post-processing to configuration.

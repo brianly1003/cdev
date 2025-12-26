@@ -22,14 +22,16 @@ type SessionStreamer struct {
 	sessionsDir string
 	hub         ports.EventHub
 
-	mu              sync.RWMutex
-	watchedSession  string    // Currently watched session ID
-	watchedFile     string    // Full path to watched file
-	lastOffset      int64     // Last read position in file
-	lastSize        int64     // Last known file size
-	watcher         *fsnotify.Watcher
-	done            chan struct{}
-	running         bool
+	mu               sync.RWMutex
+	watchedSession   string                      // Currently watched session ID
+	watchedFile      string                      // Full path to watched file
+	lastOffset       int64                       // Last read position in file
+	lastSize         int64                       // Last known file size
+	watcher          *fsnotify.Watcher
+	done             chan struct{}
+	running          bool
+	lastMessage      *events.ClaudeMessagePayload // Track last emitted message for stop_reason
+	completionSent   bool                         // Guard against duplicate completion emissions
 }
 
 // NewSessionStreamer creates a new session streamer.
@@ -77,6 +79,8 @@ func (s *SessionStreamer) WatchSession(sessionID string) error {
 	s.lastOffset = info.Size() // Start from end of file (only new content)
 	s.done = make(chan struct{})
 	s.running = true
+	s.lastMessage = nil    // Reset for new session
+	s.completionSent = false // Reset completion flag for new session
 
 	go s.watchLoop()
 
@@ -373,6 +377,15 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		stopReason = raw.Message.StopReason
 	}
 
+	// Debug: log all parsed messages with their stop_reason
+	log.Debug().
+		Str("session_id", sessionID).
+		Str("type", raw.Type).
+		Str("stop_reason_top", raw.StopReason).
+		Str("stop_reason_msg", raw.Message.StopReason).
+		Str("stop_reason_final", stopReason).
+		Msg("parsed JSONL message")
+
 	// Create and emit event
 	payload := &events.ClaudeMessagePayload{
 		SessionID:           sessionID,
@@ -393,7 +406,79 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 
 	s.hub.Publish(events.NewClaudeMessageEventFull(*payload))
 
+	// Track last assistant message for stop_reason emission
+	if payload.Type == "assistant" {
+		s.mu.Lock()
+		s.lastMessage = payload
+		s.mu.Unlock()
+	}
+
 	return payload
+}
+
+// EmitCompletion emits a completion signal with stop_reason: "end_turn".
+// Call this when PTY session finishes to signal completion.
+// This is debounced and guarded against duplicate calls.
+func (s *SessionStreamer) EmitCompletion(sessionID string) {
+	// Wait for JSONL watcher debounce to process any final messages (debounce is 200ms)
+	// This ensures lastMessage is up-to-date before we emit completion
+	time.Sleep(350 * time.Millisecond)
+
+	s.mu.Lock()
+	// Guard against duplicate completion emissions
+	if s.completionSent {
+		s.mu.Unlock()
+		log.Debug().
+			Str("session_id", sessionID).
+			Msg("EmitCompletion: already sent, skipping duplicate")
+		return
+	}
+
+	// Check session match
+	if sessionID != s.watchedSession {
+		s.mu.Unlock()
+		log.Debug().
+			Str("requested_session", sessionID).
+			Str("watched_session", s.watchedSession).
+			Msg("EmitCompletion: session mismatch, skipping")
+		return
+	}
+
+	// Mark as sent and get last message
+	s.completionSent = true
+	lastMsg := s.lastMessage
+	s.lastMessage = nil // Clear to free memory
+	s.mu.Unlock()
+
+	// Emit completion signal
+	// Note: We emit a lightweight message with just stop_reason, not the full content
+	// This avoids duplicate content in iOS UI
+	if lastMsg != nil {
+		// Emit completion with minimal content reference
+		s.hub.Publish(events.NewClaudeMessageEventFull(events.ClaudeMessagePayload{
+			SessionID:  sessionID,
+			Type:       "assistant",
+			Role:       "assistant",
+			StopReason: "end_turn",
+			Content:    lastMsg.Content, // Include last content for context
+		}))
+		log.Info().
+			Str("session_id", sessionID).
+			Int("content_blocks", len(lastMsg.Content)).
+			Msg("emitted claude_message completion with stop_reason:end_turn")
+	} else {
+		// No last message, emit minimal completion signal
+		s.hub.Publish(events.NewClaudeMessageEventFull(events.ClaudeMessagePayload{
+			SessionID:  sessionID,
+			Type:       "assistant",
+			Role:       "assistant",
+			StopReason: "end_turn",
+			Content:    []events.ClaudeMessageContent{},
+		}))
+		log.Info().
+			Str("session_id", sessionID).
+			Msg("emitted minimal claude_message completion (no previous message)")
+	}
 }
 
 // Close stops the streamer and releases resources.

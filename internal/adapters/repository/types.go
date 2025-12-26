@@ -5,6 +5,8 @@ package repository
 import (
 	"context"
 	"time"
+
+	"github.com/brianly1003/cdev/internal/config"
 )
 
 // SearchMode defines the type of search to perform.
@@ -211,37 +213,10 @@ var SensitivePatterns = []string{
 	".pypirc",
 }
 
-// SkipDirectories is the default list of directories to skip during scanning.
-// These are typically dependency, build output, or IDE directories.
-// Users can override this via config.yaml indexer.skip_directories setting.
-var SkipDirectories = []string{
-	".git",
-	".svn",
-	".hg",
-	".cdev",   // cdev logs and cache
-	".claude", // Claude CLI cache
-	"node_modules",
-	"vendor",
-	"__pycache__",
-	".pytest_cache",
-	".mypy_cache",
-	".tox",
-	".venv",
-	"venv",
-	".idea",
-	".vscode",
-	".vs",
-	"dist",
-	"target",
-	"coverage",
-	".coverage",
-	".nyc_output",
-	".next",
-	".nuxt",
-	".cache",
-	".parcel-cache",
-	".turbo",
-}
+// SkipDirectories references the centralized default list from config.
+// This is kept for backwards compatibility - prefer using config.DefaultSkipDirectories directly.
+// Users can override via config.yaml indexer.skip_directories setting.
+var SkipDirectories = config.DefaultSkipDirectories
 
 // Binary file extensions to skip content indexing.
 var BinaryExtensions = []string{

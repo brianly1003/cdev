@@ -1927,7 +1927,24 @@ Sent when git diff is generated (can be triggered by file changes).
 
 ### git_status_changed
 
-Sent after git operations that modify the working tree (stage, unstage, discard, commit, push, pull, checkout).
+Sent when git state changes. This event is emitted in two scenarios:
+
+1. **Real-time git state watcher** (automatic) - Detects changes from external tools (terminal, IDE, SourceTree)
+2. **After git operations** - Emitted after `git/stage`, `git/commit`, `git/push`, etc.
+
+**Real-Time Git State Watcher:**
+
+The server monitors the `.git` directory for state changes, enabling real-time updates when:
+- Files are staged/unstaged (`git add`, `git reset`)
+- Commits are created (`git commit`)
+- Branches are switched (`git checkout`, `git switch`)
+- Remote changes are fetched/pulled (`git fetch`, `git pull`)
+- Merges/rebases occur (`git merge`, `git rebase`)
+
+**Key Features:**
+- **IDE-safe**: Only watches `.git` directory, not working directory (won't conflict with VS Code, IntelliJ, SourceTree)
+- **Debounced**: Uses 500ms debounce + 1 second minimum interval to prevent event spam
+- **Startup delay**: 2 second delay on startup to avoid initial event burst
 
 ```json
 {
@@ -1957,6 +1974,18 @@ Sent after git operations that modify the working tree (stage, unstage, discard,
 | `untracked_count` | number | Number of untracked files |
 | `has_conflicts` | boolean | Whether there are merge conflicts |
 | `changed_files` | array | List of all changed file paths |
+
+**iOS Swift Example:**
+```swift
+func handleGitStatusChanged(_ payload: GitStatusPayload) {
+    // Update git status UI in real-time
+    updateBranchLabel(payload.branch)
+    updateStagedBadge(count: payload.stagedCount)
+
+    // No need to manually refresh - events arrive automatically
+    // when user runs git commands in terminal or IDE
+}
+```
 
 ---
 

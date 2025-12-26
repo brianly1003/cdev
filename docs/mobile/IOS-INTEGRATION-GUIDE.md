@@ -1,7 +1,7 @@
 # iOS Integration Guide
 
-> **Version:** 2.3 (Session Status & Event Context)
-> **Last Updated:** December 2024
+> **Version:** 2.4 (Real-Time Git State Watcher)
+> **Last Updated:** December 2025
 
 This guide helps the iOS team integrate with the new cdev server architecture.
 
@@ -1330,6 +1330,8 @@ All events now include `workspace_id` and `session_id` for filtering.
 | `claude_session_info` | Session ID captured |
 | `claude_log` | Raw Claude CLI output (stream-json format) |
 | `heartbeat` | Connection keepalive |
+| `git_status_changed` | Git state changed (staging, commits, branches) |
+| `file_changed` | File created, modified, deleted, or renamed |
 
 ### `claude_log` Event
 
@@ -1445,6 +1447,90 @@ func handleEvent(_ event: Event) {
   }
 }
 ```
+
+### `git_status_changed` Event (Real-Time Git Watcher)
+
+**Emitted automatically when git state changes.** The server monitors the `.git` directory for changes, enabling real-time updates when users run git commands from terminal, IDE, or tools like SourceTree.
+
+**Triggers:**
+- Files staged/unstaged (`git add`, `git reset`)
+- Commits created (`git commit`)
+- Branches switched (`git checkout`, `git switch`)
+- Remote changes fetched/pulled (`git fetch`, `git pull`)
+- Merges/rebases (`git merge`, `git rebase`)
+
+**Key Features:**
+- **IDE-safe**: Only watches `.git` directory (won't conflict with VS Code, IntelliJ, SourceTree)
+- **Debounced**: 500ms debounce + 1 second minimum interval to prevent spam
+- **No manual refresh needed**: iOS app receives updates automatically
+
+```json
+{
+  "event": "git_status_changed",
+  "timestamp": "2024-12-24T10:35:00Z",
+  "workspace_id": "ws-abc123",
+  "payload": {
+    "branch": "main",
+    "staged_count": 3,
+    "unstaged_count": 1,
+    "untracked_count": 2,
+    "changed_files": ["src/app.ts", "src/utils.ts"]
+  }
+}
+```
+
+**Payload Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `branch` | string | Current branch name |
+| `staged_count` | number | Number of staged files |
+| `unstaged_count` | number | Number of unstaged modified files |
+| `untracked_count` | number | Number of untracked files |
+| `changed_files` | array | List of all changed file paths |
+
+**Swift Example:**
+
+```swift
+func handleGitStatusChanged(_ event: Event) {
+    guard event.event == "git_status_changed",
+          let payload = event.payload as? GitStatusPayload else {
+        return
+    }
+
+    // Update git status badge/indicator
+    updateBranchLabel(payload.branch)
+    updateStagedBadge(count: payload.stagedCount)
+    updateUnstagedBadge(count: payload.unstagedCount)
+
+    // Optionally show toast for significant changes
+    if payload.stagedCount > 0 {
+        showToast("Files staged: \(payload.stagedCount)")
+    }
+}
+
+struct GitStatusPayload: Codable {
+    let branch: String
+    let stagedCount: Int
+    let unstagedCount: Int
+    let untrackedCount: Int
+    let changedFiles: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case branch
+        case stagedCount = "staged_count"
+        case unstagedCount = "unstaged_count"
+        case untrackedCount = "untracked_count"
+        case changedFiles = "changed_files"
+    }
+}
+```
+
+**Use Cases:**
+1. **Real-time git status badge**: Update UI when user stages files in terminal
+2. **Branch indicator**: Show current branch and update when switched
+3. **Commit notification**: Detect when commits are made outside the app
+4. **Pull/fetch detection**: Know when remote changes arrive
 
 ---
 

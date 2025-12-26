@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -17,8 +18,10 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
 	"github.com/brianly1003/cdev/internal/config"
+	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/workspace"
+	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -454,6 +457,11 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 		}
 	}
 
+	// Start git index watcher to detect staging/unstaging changes
+	if m.cfg.Git.Enabled {
+		go m.watchGitIndex(m.ctx, ws.Definition.Path, workspaceID, gitTracker)
+	}
+
 	// Store session
 	m.sessions[sessionID] = session
 	session.SetStatus(StatusRunning)
@@ -822,6 +830,31 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 
 	// Handle interactive mode (PTY) - check before status check since we can restart stopped sessions
 	if permissionMode == "interactive" {
+		// Handle "!" prefix as bash command mode
+		// When prompt starts with "!", execute it as a bash command directly
+		if strings.HasPrefix(prompt, "!") {
+			bashCmd := strings.TrimPrefix(prompt, "!")
+			bashCmd = strings.TrimSpace(bashCmd)
+
+			if bashCmd == "" {
+				return fmt.Errorf("empty bash command after '!'")
+			}
+
+			log.Info().
+				Str("session_id", sessionID).
+				Str("bash_cmd", bashCmd).
+				Msg("executing bash command (! prefix)")
+
+			// Get workspace path for command execution
+			ws, wsErr := m.GetWorkspace(session.WorkspaceID)
+			if wsErr != nil {
+				return fmt.Errorf("failed to get workspace for bash command: %w", wsErr)
+			}
+
+			// Execute bash command and emit output as pty_output event
+			return m.executeBashCommand(session.WorkspaceID, sessionID, ws.Definition.Path, bashCmd)
+		}
+
 		// If session exists but is stopped, restart it for interactive mode
 		if session.GetStatus() != StatusRunning {
 			log.Info().
@@ -871,6 +904,21 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 			claudeSessionID = sessionID
 		}
 
+		// Set up PTY completion callback to emit stop_reason
+		// This is called when PTY streaming finishes
+		watchSessionID := session.ID
+		if claudeSessionID != "" {
+			watchSessionID = claudeSessionID
+		}
+		cm.SetOnPTYComplete(func(sid string) {
+			m.streamerMu.Lock()
+			streamer := m.streamer
+			m.streamerMu.Unlock()
+			if streamer != nil {
+				streamer.EmitCompletion(sid)
+			}
+		})
+
 		// Start the PTY session
 		if err := cm.StartWithPTY(m.ctx, prompt, claudeMode, claudeSessionID); err != nil {
 			return err
@@ -878,10 +926,7 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 
 		// Start watching the JSONL session file for claude_message events
 		// This allows cdev-ios to receive structured messages in addition to pty_output events
-		watchSessionID := session.ID
-		if claudeSessionID != "" {
-			watchSessionID = claudeSessionID
-		}
+		// watchSessionID already set above for the callback
 		if _, err := m.WatchWorkspaceSession(session.WorkspaceID, watchSessionID); err != nil {
 			// Don't fail the whole operation if watch fails - PTY will still work
 			// claude_message events just won't be emitted
@@ -1648,4 +1693,274 @@ func truncateString(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// watchGitState watches ONLY the .git directory for state changes and emits git_status_changed events.
+// This is designed to be lightweight and not conflict with IDEs (VS Code, IntelliJ) or tools (SourceTree).
+//
+// We intentionally DO NOT watch the working directory because:
+// 1. IDEs already watch working directory files - adding another watcher causes contention
+// 2. Working directory changes don't affect git state until staged (git add)
+// 3. The existing file_changed events already notify about working directory changes
+//
+// This covers:
+// - Staging/unstaging: .git/index changes (git add, git reset)
+// - Commits: .git/HEAD, .git/refs/heads/<branch> changes
+// - Branch switches: .git/HEAD changes (git checkout, git switch)
+// - Pull/Fetch: .git/FETCH_HEAD, .git/refs/remotes/* changes
+// - Merges/Rebases: .git/ORIG_HEAD, .git/MERGE_HEAD changes
+func (m *Manager) watchGitIndex(ctx context.Context, repoPath, workspaceID string, tracker *git.Tracker) {
+	gitDir := filepath.Join(repoPath, ".git")
+
+	// Check if .git directory exists
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		m.logger.Debug("No .git directory, skipping git state watcher", "workspace_id", workspaceID)
+		return
+	}
+
+	// Create fsnotify watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		m.logger.Warn("Failed to create git state watcher", "error", err, "workspace_id", workspaceID)
+		return
+	}
+	defer watcher.Close()
+
+	// Watch .git directory for index, HEAD, FETCH_HEAD, ORIG_HEAD, MERGE_HEAD
+	if err := watcher.Add(gitDir); err != nil {
+		m.logger.Warn("Failed to watch .git directory", "error", err, "workspace_id", workspaceID)
+		return
+	}
+
+	// Watch .git/refs/heads for branch commits
+	refsHeads := filepath.Join(gitDir, "refs", "heads")
+	if _, err := os.Stat(refsHeads); err == nil {
+		if err := watcher.Add(refsHeads); err != nil {
+			m.logger.Debug("Failed to watch refs/heads", "error", err, "workspace_id", workspaceID)
+		}
+	}
+
+	// Watch .git/refs/remotes for pull/fetch updates
+	refsRemotes := filepath.Join(gitDir, "refs", "remotes")
+	if _, err := os.Stat(refsRemotes); err == nil {
+		if err := watcher.Add(refsRemotes); err != nil {
+			m.logger.Debug("Failed to watch refs/remotes", "error", err, "workspace_id", workspaceID)
+		}
+		// Also watch subdirectories (e.g., refs/remotes/origin)
+		entries, _ := os.ReadDir(refsRemotes)
+		for _, entry := range entries {
+			if entry.IsDir() {
+				remotePath := filepath.Join(refsRemotes, entry.Name())
+				if err := watcher.Add(remotePath); err != nil {
+					m.logger.Debug("Failed to watch remote", "remote", entry.Name(), "error", err)
+				}
+			}
+		}
+	}
+
+	m.logger.Info("Started git state watcher (watching .git only - IDE/SourceTree safe)",
+		"workspace_id", workspaceID,
+		"git_dir", gitDir,
+	)
+
+	// Wait for startup activity to settle before processing events
+	// This prevents initial burst of events during application startup
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(2 * time.Second):
+		// Drain any pending events from startup
+		for {
+			select {
+			case <-watcher.Events:
+			default:
+				goto startWatching
+			}
+		}
+	}
+
+startWatching:
+	m.logger.Debug("Git state watcher now active", "workspace_id", workspaceID)
+
+	// Files in .git that trigger git_status_changed events
+	gitTriggerFiles := map[string]bool{
+		"index":       true, // Staging/unstaging
+		"HEAD":        true, // Commits, branch switches
+		"FETCH_HEAD":  true, // Fetch/pull
+		"ORIG_HEAD":   true, // Merges, rebases
+		"MERGE_HEAD":  true, // Merge in progress
+		"REBASE_HEAD": true, // Rebase in progress
+	}
+
+	// Throttle + Debounce: emit at most once per minInterval, with debounce for settling
+	const debounceDelay = 500 * time.Millisecond
+	const minInterval = 1 * time.Second // Minimum time between emits
+	var debounceTimer *time.Timer
+	var debounceTimerMu sync.Mutex
+	var lastEmit time.Time
+
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Debug("Git state watcher stopped", "workspace_id", workspaceID)
+			return
+
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+
+			// Only trigger for specific .git files that indicate state changes
+			fileName := filepath.Base(event.Name)
+			relPath, _ := filepath.Rel(gitDir, event.Name)
+
+			// Debug log all events to diagnose issues
+			m.logger.Debug("Git watcher event received",
+				"file", fileName,
+				"path", relPath,
+				"op", event.Op.String(),
+				"workspace_id", workspaceID,
+			)
+
+			shouldTrigger := false
+
+			// Check for specific trigger files in .git root
+			// Also check for index.lock as Git uses atomic rename
+			if gitTriggerFiles[fileName] || fileName == "index.lock" {
+				shouldTrigger = true
+			}
+
+			// Also trigger for any file in refs/heads or refs/remotes
+			if strings.HasPrefix(relPath, "refs/heads") || strings.HasPrefix(relPath, "refs/remotes") {
+				shouldTrigger = true
+			}
+
+			if !shouldTrigger {
+				m.logger.Debug("Git event ignored (not a trigger file)", "file", fileName, "workspace_id", workspaceID)
+				continue
+			}
+
+			m.logger.Info("Git event detected, scheduling status update",
+				"file", fileName,
+				"op", event.Op.String(),
+				"workspace_id", workspaceID,
+			)
+
+			// Throttle + debounce: only schedule emit if not within minInterval of last emit
+			debounceTimerMu.Lock()
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(debounceDelay, func() {
+				debounceTimerMu.Lock()
+				// Check if we're within minInterval of last emit
+				if time.Since(lastEmit) < minInterval {
+					debounceTimerMu.Unlock()
+					return
+				}
+				lastEmit = time.Now()
+				debounceTimerMu.Unlock()
+				m.emitGitStatusChanged(ctx, workspaceID, tracker)
+			})
+			debounceTimerMu.Unlock()
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			m.logger.Warn("Git state watcher error", "error", err, "workspace_id", workspaceID)
+		}
+	}
+}
+
+// emitGitStatusChanged emits a git_status_changed event for a workspace.
+func (m *Manager) emitGitStatusChanged(ctx context.Context, workspaceID string, tracker *git.Tracker) {
+	// Use GetEnhancedStatus which provides all the info we need
+	status, err := tracker.GetEnhancedStatus(ctx)
+	if err != nil {
+		m.logger.Debug("Failed to get git status for event", "error", err, "workspace_id", workspaceID)
+		return
+	}
+
+	// Collect all changed file paths
+	var changedFiles []string
+	for _, f := range status.Staged {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Unstaged {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Untracked {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Conflicted {
+		changedFiles = append(changedFiles, f.Path)
+	}
+
+	payload := events.GitStatusChangedPayload{
+		Branch:         status.Branch,
+		StagedCount:    len(status.Staged),
+		UnstagedCount:  len(status.Unstaged),
+		UntrackedCount: len(status.Untracked),
+		ChangedFiles:   changedFiles,
+	}
+
+	event := events.NewEvent(events.EventTypeGitStatusChanged, payload)
+	event.SetContext(workspaceID, "")
+
+	m.hub.Publish(event)
+	m.logger.Info("Emitted git_status_changed",
+		"workspace_id", workspaceID,
+		"branch", status.Branch,
+		"staged", len(status.Staged),
+		"unstaged", len(status.Unstaged),
+		"untracked", len(status.Untracked),
+	)
+}
+
+// executeBashCommand executes a bash command and writes output to the session JSONL file.
+// This is used for "!" prefix commands in interactive mode.
+// It uses claude.AppendBashToSession to write in the correct Claude Code JSONL format.
+func (m *Manager) executeBashCommand(workspaceID, sessionID, workDir, cmd string) error {
+	// Execute command using bash
+	bashCmd := exec.Command("bash", "-c", cmd)
+	bashCmd.Dir = workDir
+
+	// Capture stdout and stderr separately for correct JSONL format
+	var stdout, stderr strings.Builder
+	bashCmd.Stdout = &stdout
+	bashCmd.Stderr = &stderr
+
+	err := bashCmd.Run()
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+
+	// Append to JSONL session file using the shared helper (correct Claude Code format)
+	if appendErr := claude.AppendBashToSession(workDir, sessionID, cmd, stdout.String(), stderr.String()); appendErr != nil {
+		log.Warn().Err(appendErr).Str("session_id", sessionID).Msg("failed to append bash command to session file")
+	}
+
+	// Emit pty_state event with idle state
+	stateEvent := events.NewEvent(events.EventTypePTYState, events.PTYStatePayload{
+		SessionID:       sessionID,
+		State:           "idle",
+		WaitingForInput: false,
+	})
+	stateEvent.SetContext(workspaceID, sessionID)
+	m.hub.Publish(stateEvent)
+
+	log.Info().
+		Str("session_id", sessionID).
+		Str("workspace_id", workspaceID).
+		Str("cmd", cmd).
+		Int("exit_code", exitCode).
+		Msg("bash command executed")
+
+	return nil
 }

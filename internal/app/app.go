@@ -29,6 +29,7 @@ import (
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/terminal"
 	"github.com/brianly1003/cdev/internal/workspace"
+	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -202,7 +203,6 @@ func (a *App) Start(ctx context.Context) error {
 	// Initialize Session Streamer for real-time session watching
 	// This allows iOS to receive messages when Claude Code runs directly on laptop
 	a.sessionStreamer = sessioncache.NewSessionStreamer(sessionsDir, a.hub)
-	log.Info().Msg("session streamer initialized for real-time watching")
 
 	// Initialize Multi-Workspace Support
 	// Workspace config manager handles workspace CRUD
@@ -447,6 +447,10 @@ func (a *App) Start(ctx context.Context) error {
 			log.Warn().Err(err).Msg("failed to start file watcher")
 		}
 	}
+
+	// NOTE: Git state watcher is NOT started here at app startup.
+	// It is started per-workspace when session/start is called.
+	// This prevents watching directories when no workspaces are active.
 
 	// Publish session start event
 	a.hub.Publish(events.NewSessionStartEvent(
@@ -764,8 +768,8 @@ func (a *App) handleFileChangeForRepoIndex(ctx context.Context, event events.Eve
 		return
 	}
 
-	// Skip files in directories that should not be indexed (reuse SkipDirectories config)
-	for _, skipDir := range repository.SkipDirectories {
+	// Skip files in directories that should not be indexed (use config values)
+	for _, skipDir := range a.cfg.Indexer.SkipDirectories {
 		if strings.HasPrefix(wrapper.Payload.Path, skipDir+"/") {
 			return
 		}
@@ -977,4 +981,233 @@ func (w *wsOutputWriter) Write(p []byte) (n int, err error) {
 		w.app.hub.Publish(event)
 	}
 	return len(p), nil
+}
+
+// watchGitState watches ONLY the .git directory for state changes and emits git_status_changed events.
+// This is designed to be lightweight and not conflict with IDEs (VS Code, IntelliJ) or tools (SourceTree).
+//
+// We intentionally DO NOT watch the working directory because:
+// 1. IDEs already watch working directory files - adding another watcher causes contention
+// 2. Working directory changes don't affect git state until staged (git add)
+// 3. The existing file_changed events already notify about working directory changes
+//
+// This covers:
+// - Staging/unstaging: .git/index changes (git add, git reset)
+// - Commits: .git/HEAD, .git/refs/heads/<branch> changes
+// - Branch switches: .git/HEAD changes (git checkout, git switch)
+// - Pull/Fetch: .git/FETCH_HEAD, .git/refs/remotes/* changes
+// - Merges/Rebases: .git/ORIG_HEAD, .git/MERGE_HEAD changes
+func (a *App) watchGitState(ctx context.Context) {
+	repoPath := a.cfg.Repository.Path
+	gitDir := filepath.Join(repoPath, ".git")
+
+	// Check if .git directory exists
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		log.Debug().Msg("No .git directory, skipping git state watcher")
+		return
+	}
+
+	// Create fsnotify watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to create git state watcher")
+		return
+	}
+	defer watcher.Close()
+
+	// Watch .git directory for index, HEAD, FETCH_HEAD, ORIG_HEAD, MERGE_HEAD
+	if err := watcher.Add(gitDir); err != nil {
+		log.Warn().Err(err).Msg("Failed to watch .git directory")
+		return
+	}
+
+	// Watch .git/refs/heads for branch commits
+	refsHeads := filepath.Join(gitDir, "refs", "heads")
+	if _, err := os.Stat(refsHeads); err == nil {
+		if err := watcher.Add(refsHeads); err != nil {
+			log.Debug().Err(err).Msg("Failed to watch refs/heads")
+		}
+	}
+
+	// Watch .git/refs/remotes for pull/fetch updates
+	refsRemotes := filepath.Join(gitDir, "refs", "remotes")
+	if _, err := os.Stat(refsRemotes); err == nil {
+		if err := watcher.Add(refsRemotes); err != nil {
+			log.Debug().Err(err).Msg("Failed to watch refs/remotes")
+		}
+		// Also watch subdirectories (e.g., refs/remotes/origin)
+		entries, _ := os.ReadDir(refsRemotes)
+		for _, entry := range entries {
+			if entry.IsDir() {
+				remotePath := filepath.Join(refsRemotes, entry.Name())
+				if err := watcher.Add(remotePath); err != nil {
+					log.Debug().Str("remote", entry.Name()).Err(err).Msg("Failed to watch remote")
+				}
+			}
+		}
+	}
+
+	log.Info().
+		Str("git_dir", gitDir).
+		Msg("Started git state watcher (watching .git only - IDE/SourceTree safe)")
+
+	// Wait for startup activity to settle before processing events
+	// This prevents initial burst of events during application startup
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(2 * time.Second):
+		// Drain any pending events from startup
+		for {
+			select {
+			case <-watcher.Events:
+			default:
+				goto startWatching
+			}
+		}
+	}
+
+startWatching:
+	log.Debug().Msg("Git state watcher now active")
+
+	// Files in .git that trigger git_status_changed events
+	gitTriggerFiles := map[string]bool{
+		"index":       true, // Staging/unstaging
+		"HEAD":        true, // Commits, branch switches
+		"FETCH_HEAD":  true, // Fetch/pull
+		"ORIG_HEAD":   true, // Merges, rebases
+		"MERGE_HEAD":  true, // Merge in progress
+		"REBASE_HEAD": true, // Rebase in progress
+	}
+
+	// Throttle + Debounce: emit at most once per minInterval, with debounce for settling
+	const debounceDelay = 500 * time.Millisecond
+	const minInterval = 1 * time.Second // Minimum time between emits
+	var debounceTimer *time.Timer
+	var debounceTimerMu sync.Mutex
+	var lastEmit time.Time
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Debug().Msg("Git state watcher stopped")
+			return
+
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+
+			// Only trigger for specific .git files that indicate state changes
+			fileName := filepath.Base(event.Name)
+			relPath, _ := filepath.Rel(gitDir, event.Name)
+
+			// Debug log all events to diagnose issues
+			log.Debug().
+				Str("file", fileName).
+				Str("path", relPath).
+				Str("op", event.Op.String()).
+				Msg("Git watcher event received")
+
+			shouldTrigger := false
+
+			// Check for specific trigger files in .git root
+			// Also check for index.lock as Git uses atomic rename
+			if gitTriggerFiles[fileName] || fileName == "index.lock" {
+				shouldTrigger = true
+			}
+
+			// Also trigger for any file in refs/heads or refs/remotes
+			if strings.HasPrefix(relPath, "refs/heads") || strings.HasPrefix(relPath, "refs/remotes") {
+				shouldTrigger = true
+			}
+
+			if !shouldTrigger {
+				log.Debug().Str("file", fileName).Msg("Git event ignored (not a trigger file)")
+				continue
+			}
+
+			log.Info().Str("file", fileName).Str("op", event.Op.String()).Msg("Git event detected, scheduling status update")
+
+			// Throttle + debounce: only schedule emit if not within minInterval of last emit
+			debounceTimerMu.Lock()
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(debounceDelay, func() {
+				debounceTimerMu.Lock()
+				// Check if we're within minInterval of last emit
+				if time.Since(lastEmit) < minInterval {
+					debounceTimerMu.Unlock()
+					return
+				}
+				lastEmit = time.Now()
+				debounceTimerMu.Unlock()
+				a.emitGitStatusChanged(ctx)
+			})
+			debounceTimerMu.Unlock()
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Warn().Err(err).Msg("Git state watcher error")
+		}
+	}
+}
+
+// emitGitStatusChanged emits a git_status_changed event.
+func (a *App) emitGitStatusChanged(ctx context.Context) {
+	if a.gitTracker == nil {
+		log.Debug().Msg("Git tracker is nil, skipping emit")
+		return
+	}
+
+	log.Debug().Msg("Fetching git status for event...")
+
+	// Use GetEnhancedStatus which provides all the info we need
+	status, err := a.gitTracker.GetEnhancedStatus(ctx)
+	if err != nil {
+		log.Debug().Err(err).Msg("Failed to get git status for event")
+		return
+	}
+
+	log.Debug().
+		Str("branch", status.Branch).
+		Int("staged", len(status.Staged)).
+		Int("unstaged", len(status.Unstaged)).
+		Msg("Git status fetched")
+
+	// Collect all changed file paths
+	var changedFiles []string
+	for _, f := range status.Staged {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Unstaged {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Untracked {
+		changedFiles = append(changedFiles, f.Path)
+	}
+	for _, f := range status.Conflicted {
+		changedFiles = append(changedFiles, f.Path)
+	}
+
+	payload := events.GitStatusChangedPayload{
+		Branch:         status.Branch,
+		StagedCount:    len(status.Staged),
+		UnstagedCount:  len(status.Unstaged),
+		UntrackedCount: len(status.Untracked),
+		ChangedFiles:   changedFiles,
+	}
+
+	event := events.NewEvent(events.EventTypeGitStatusChanged, payload)
+	a.hub.Publish(event)
+
+	log.Info().
+		Str("branch", status.Branch).
+		Int("staged", len(status.Staged)).
+		Int("unstaged", len(status.Unstaged)).
+		Int("untracked", len(status.Untracked)).
+		Msg("Emitted git_status_changed")
 }
