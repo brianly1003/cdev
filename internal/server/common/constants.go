@@ -17,7 +17,8 @@ const (
 	PingPeriod = (PongWait * 9) / 10 // 81 seconds
 
 	// MaxMessageSize is the maximum message size allowed from peer.
-	MaxMessageSize = 512 * 1024 // 512KB
+	// Must be larger than max_file_size_kb (10MB) to support file transfers.
+	MaxMessageSize = 12 * 1024 * 1024 // 12MB (allows 10MB files + JSON overhead)
 
 	// SendBufferSize is the send buffer size per client.
 	// Increased from 256 to 1024 for handling burst events.
