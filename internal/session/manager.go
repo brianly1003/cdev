@@ -44,6 +44,7 @@ type Manager struct {
 	streamer              *sessioncache.SessionStreamer
 	streamerWorkspaceID   string // Workspace ID of currently watched session
 	streamerSessionID     string // Session ID currently being watched
+	streamerWatcherCount  int    // Number of clients watching (reference counting)
 	streamerMu            sync.Mutex
 
 	// LIVE session support (Claude running in user's terminal)
@@ -1571,8 +1572,8 @@ type WatchInfo struct {
 // This is used by iOS to receive real-time claude_message events when new messages
 // are added to the session file.
 //
-// Only one session can be watched at a time. Calling this while already watching
-// a session will stop the previous watch and start a new one.
+// Multiple clients can watch the same session. The streamer uses reference counting
+// to keep watching until the last client stops watching.
 func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchInfo, error) {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
@@ -1595,13 +1596,30 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 		return nil, fmt.Errorf("failed to access session file: %w", err)
 	}
 
-	// Stop existing streamer if any
+	// Check if already watching the same session
+	if m.streamer != nil && m.streamerWorkspaceID == workspaceID && m.streamerSessionID == sessionID {
+		// Same session - just increment watcher count
+		m.streamerWatcherCount++
+		m.logger.Info("Added watcher to existing session watch",
+			"workspace_id", workspaceID,
+			"session_id", sessionID,
+			"watcher_count", m.streamerWatcherCount,
+		)
+		return &WatchInfo{
+			WorkspaceID: workspaceID,
+			SessionID:   sessionID,
+			Watching:    true,
+		}, nil
+	}
+
+	// Switching to a different session - close existing streamer
 	if m.streamer != nil {
 		m.streamer.Close()
 		m.streamer = nil
-		m.logger.Debug("Stopped previous session watch",
+		m.logger.Debug("Stopped previous session watch (switching sessions)",
 			"workspace_id", m.streamerWorkspaceID,
 			"session_id", m.streamerSessionID,
+			"prev_watcher_count", m.streamerWatcherCount,
 		)
 	}
 
@@ -1616,6 +1634,7 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 
 	m.streamerWorkspaceID = workspaceID
 	m.streamerSessionID = sessionID
+	m.streamerWatcherCount = 1 // First watcher
 
 	// Auto-activate the watched session (uses separate mutex, no deadlock)
 	m.mu.Lock()
@@ -1626,6 +1645,7 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 		"workspace_id", workspaceID,
 		"session_id", sessionID,
 		"sessions_dir", sessionsDir,
+		"watcher_count", m.streamerWatcherCount,
 	)
 
 	return &WatchInfo{
@@ -1635,7 +1655,8 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 	}, nil
 }
 
-// UnwatchWorkspaceSession stops watching the current session.
+// UnwatchWorkspaceSession stops watching the current session for one client.
+// The streamer continues running until all clients have stopped watching.
 func (m *Manager) UnwatchWorkspaceSession() *WatchInfo {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
@@ -1649,12 +1670,31 @@ func (m *Manager) UnwatchWorkspaceSession() *WatchInfo {
 	prevWorkspaceID := m.streamerWorkspaceID
 	prevSessionID := m.streamerSessionID
 
+	// Decrement watcher count
+	m.streamerWatcherCount--
+
+	if m.streamerWatcherCount > 0 {
+		// Other clients still watching - keep the streamer running
+		m.logger.Info("Removed watcher from session (others still watching)",
+			"workspace_id", prevWorkspaceID,
+			"session_id", prevSessionID,
+			"remaining_watchers", m.streamerWatcherCount,
+		)
+		return &WatchInfo{
+			WorkspaceID: prevWorkspaceID,
+			SessionID:   prevSessionID,
+			Watching:    true, // Streamer still active
+		}
+	}
+
+	// Last watcher - close the streamer
 	m.streamer.Close()
 	m.streamer = nil
 	m.streamerWorkspaceID = ""
 	m.streamerSessionID = ""
+	m.streamerWatcherCount = 0
 
-	m.logger.Info("Stopped watching session",
+	m.logger.Info("Stopped watching session (last watcher left)",
 		"workspace_id", prevWorkspaceID,
 		"session_id", prevSessionID,
 	)
