@@ -52,6 +52,12 @@ type SessionFocus struct {
 	FocusedAt   time.Time
 }
 
+// ClientDisconnectHandler handles cleanup when a client disconnects.
+// Called with the client ID and list of workspace IDs they were subscribed to.
+type ClientDisconnectHandler interface {
+	OnClientDisconnect(clientID string, subscribedWorkspaces []string)
+}
+
 // Server is a unified WebSocket server supporting dual protocols.
 type Server struct {
 	addr string
@@ -80,6 +86,9 @@ type Server struct {
 	// Session focus tracking (multi-device awareness)
 	sessionFocusMu sync.RWMutex
 	sessionFocus   map[string]*SessionFocus // keyed by client_id
+
+	// Disconnect handler for cleanup (git watchers, session streamers, etc.)
+	disconnectHandler ClientDisconnectHandler
 
 	// Heartbeat
 	heartbeatDone chan struct{}
@@ -115,6 +124,11 @@ func (s *Server) SetLegacyHandler(h LegacyCommandHandler) {
 // SetStatusProvider sets the status provider for heartbeats.
 func (s *Server) SetStatusProvider(provider common.StatusProvider) {
 	s.statusProvider = provider
+}
+
+// SetDisconnectHandler sets the handler for client disconnect cleanup.
+func (s *Server) SetDisconnectHandler(handler ClientDisconnectHandler) {
+	s.disconnectHandler = handler
 }
 
 // Start starts the unified server with its own HTTP server.
@@ -221,7 +235,12 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 // removeClient removes a client from the server.
 func (s *Server) removeClient(id string) {
+	// Get subscribed workspaces BEFORE removing the filtered subscriber
+	var subscribedWorkspaces []string
 	s.mu.Lock()
+	if filtered, ok := s.filteredClients[id]; ok {
+		subscribedWorkspaces = filtered.GetSubscribedWorkspaces()
+	}
 	delete(s.clients, id)
 	delete(s.filteredClients, id)
 	s.mu.Unlock()
@@ -229,7 +248,15 @@ func (s *Server) removeClient(id string) {
 	// Clear session focus and notify other viewers
 	s.clearClientFocus(id)
 
-	log.Info().Str("client_id", id).Msg("client disconnected")
+	// Call disconnect handler for cleanup (git watchers, session streamers, etc.)
+	if s.disconnectHandler != nil && len(subscribedWorkspaces) > 0 {
+		s.disconnectHandler.OnClientDisconnect(id, subscribedWorkspaces)
+	}
+
+	log.Info().
+		Str("client_id", id).
+		Int("subscribed_workspaces", len(subscribedWorkspaces)).
+		Msg("client disconnected")
 }
 
 // GetFilteredSubscriber returns the filtered subscriber for a client ID.

@@ -406,6 +406,10 @@ func (a *App) Start(ctx context.Context) error {
 	a.unifiedServer.SetStatusProvider(a)
 	// Set subscription provider (unified server manages filtered subscribers)
 	subscriptionService.SetProvider(a.unifiedServer)
+	// Set git watcher manager (session manager starts/stops git watchers on subscribe/unsubscribe)
+	subscriptionService.SetGitWatcherManager(a.sessionManager)
+	// Set disconnect handler for cleanup when clients disconnect (git watchers, session streamers)
+	a.unifiedServer.SetDisconnectHandler(a.sessionManager)
 	// Set client focus provider (unified server tracks multi-device session awareness)
 	clientFocusAdapter := NewClientFocusAdapter(a.unifiedServer)
 	clientService.SetProvider(clientFocusAdapter)
@@ -449,7 +453,7 @@ func (a *App) Start(ctx context.Context) error {
 	}
 
 	// NOTE: Git state watcher is NOT started here at app startup.
-	// It is started per-workspace when session/start is called.
+	// It is started per-workspace when workspace/subscribe is called.
 	// This prevents watching directories when no workspaces are active.
 
 	// Publish session start event

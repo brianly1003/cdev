@@ -50,6 +50,11 @@ type Manager struct {
 	// LIVE session support (Claude running in user's terminal)
 	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
 
+	// Git watchers per workspace (started on workspace/subscribe)
+	gitWatchers      map[string]context.CancelFunc // workspace ID -> cancel function
+	gitWatcherCounts map[string]int                // workspace ID -> subscriber count (reference counting)
+	gitWatchersMu    sync.Mutex
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	mu     sync.RWMutex
@@ -68,6 +73,8 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 		workspaces:              make(map[string]*workspace.Workspace),
 		activeSessions:          make(map[string]string),
 		activeSessionWorkspaces: make(map[string]string),
+		gitWatchers:             make(map[string]context.CancelFunc),
+		gitWatcherCounts:        make(map[string]int),
 		hub:                     hub,
 		cfg:                     cfg,
 		logger:                  logger,
@@ -185,6 +192,135 @@ func (m *Manager) GetWorkspace(workspaceID string) (*workspace.Workspace, error)
 		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
 	}
 	return ws, nil
+}
+
+// StartGitWatcher starts watching git state changes for a workspace.
+// This is called when a client subscribes to a workspace (workspace/subscribe).
+// The watcher emits git_status_changed events when staging/commits/branch changes occur.
+// Uses reference counting - multiple clients can subscribe, watcher starts on first subscriber.
+// Returns nil if git is disabled.
+func (m *Manager) StartGitWatcher(workspaceID string) error {
+	if !m.cfg.Git.Enabled {
+		m.logger.Debug("Git watcher not started (git disabled)", "workspace_id", workspaceID)
+		return nil
+	}
+
+	m.gitWatchersMu.Lock()
+	defer m.gitWatchersMu.Unlock()
+
+	// Increment subscriber count
+	m.gitWatcherCounts[workspaceID]++
+
+	// Check if watcher already running for this workspace
+	if _, exists := m.gitWatchers[workspaceID]; exists {
+		m.logger.Debug("Git watcher already running, added subscriber",
+			"workspace_id", workspaceID,
+			"subscriber_count", m.gitWatcherCounts[workspaceID],
+		)
+		return nil
+	}
+
+	// Get workspace
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
+		m.gitWatcherCounts[workspaceID]-- // Rollback count on error
+		return err
+	}
+
+	// Create git tracker for this workspace
+	gitTracker := git.NewTracker(ws.Definition.Path, m.cfg.Git.Command, m.hub)
+	if !gitTracker.IsGitRepo() {
+		m.logger.Debug("Not a git repository, skipping git watcher", "workspace_id", workspaceID)
+		m.gitWatcherCounts[workspaceID]-- // Rollback count
+		return nil
+	}
+
+	// Create cancellable context for this watcher
+	watchCtx, cancel := context.WithCancel(m.ctx)
+	m.gitWatchers[workspaceID] = cancel
+
+	// Start git watcher in background
+	go m.watchGitIndex(watchCtx, ws.Definition.Path, workspaceID, gitTracker)
+
+	m.logger.Info("Started git watcher for workspace",
+		"workspace_id", workspaceID,
+		"path", ws.Definition.Path,
+		"subscriber_count", m.gitWatcherCounts[workspaceID],
+	)
+
+	return nil
+}
+
+// StopGitWatcher decrements the subscriber count for a workspace's git watcher.
+// The watcher is only stopped when the last subscriber unsubscribes.
+// This is called when a client unsubscribes from a workspace (workspace/unsubscribe).
+func (m *Manager) StopGitWatcher(workspaceID string) {
+	m.gitWatchersMu.Lock()
+	defer m.gitWatchersMu.Unlock()
+
+	// Decrement subscriber count
+	if m.gitWatcherCounts[workspaceID] > 0 {
+		m.gitWatcherCounts[workspaceID]--
+	}
+
+	// If there are still subscribers, keep the watcher running
+	if m.gitWatcherCounts[workspaceID] > 0 {
+		m.logger.Debug("Removed git watcher subscriber (others still watching)",
+			"workspace_id", workspaceID,
+			"remaining_subscribers", m.gitWatcherCounts[workspaceID],
+		)
+		return
+	}
+
+	// Last subscriber - stop the watcher
+	if cancel, exists := m.gitWatchers[workspaceID]; exists {
+		cancel()
+		delete(m.gitWatchers, workspaceID)
+		delete(m.gitWatcherCounts, workspaceID)
+		m.logger.Info("Stopped git watcher for workspace (last subscriber left)",
+			"workspace_id", workspaceID,
+		)
+	}
+}
+
+// OnClientDisconnect handles cleanup when a client disconnects.
+// This is called by the unified server when a WebSocket connection is closed.
+// It decrements git watcher counts and session streamer counts for the disconnected client.
+func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []string) {
+	m.logger.Info("Client disconnected, cleaning up",
+		"client_id", clientID,
+		"subscribed_workspaces", len(subscribedWorkspaces),
+	)
+
+	// Decrement git watcher counts for each subscribed workspace
+	for _, workspaceID := range subscribedWorkspaces {
+		m.StopGitWatcher(workspaceID)
+	}
+
+	// Decrement session streamer watcher count
+	// Note: We decrement once per client disconnect, regardless of which session they were watching
+	m.streamerMu.Lock()
+	if m.streamerWatcherCount > 0 {
+		m.streamerWatcherCount--
+		if m.streamerWatcherCount == 0 && m.streamer != nil {
+			// Last watcher - close the streamer
+			m.streamer.Close()
+			m.streamer = nil
+			prevWorkspaceID := m.streamerWorkspaceID
+			prevSessionID := m.streamerSessionID
+			m.streamerWorkspaceID = ""
+			m.streamerSessionID = ""
+			m.logger.Info("Stopped session streamer (last watcher disconnected)",
+				"workspace_id", prevWorkspaceID,
+				"session_id", prevSessionID,
+			)
+		} else if m.streamerWatcherCount > 0 {
+			m.logger.Debug("Decremented session streamer watcher count (others still watching)",
+				"remaining_watchers", m.streamerWatcherCount,
+			)
+		}
+	}
+	m.streamerMu.Unlock()
 }
 
 // findWorkspaceForSession searches all workspaces to find which one contains the given session.
@@ -458,10 +594,9 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 		}
 	}
 
-	// Start git index watcher to detect staging/unstaging changes
-	if m.cfg.Git.Enabled {
-		go m.watchGitIndex(m.ctx, ws.Definition.Path, workspaceID, gitTracker)
-	}
+	// NOTE: Git index watcher is now started on workspace/subscribe, not session/start.
+	// This allows git_status_changed events to be emitted as soon as a client subscribes
+	// to a workspace, rather than waiting for a session to start.
 
 	// Store session
 	m.sessions[sessionID] = session

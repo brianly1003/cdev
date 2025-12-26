@@ -15,9 +15,16 @@ type FilteredSubscriberProvider interface {
 	GetFilteredSubscriber(clientID string) *hub.FilteredSubscriber
 }
 
+// GitWatcherManager provides the ability to start/stop git watchers for workspaces.
+type GitWatcherManager interface {
+	StartGitWatcher(workspaceID string) error
+	StopGitWatcher(workspaceID string)
+}
+
 // SubscriptionService handles workspace subscription RPC methods.
 type SubscriptionService struct {
-	provider FilteredSubscriberProvider
+	provider          FilteredSubscriberProvider
+	gitWatcherManager GitWatcherManager
 }
 
 // NewSubscriptionService creates a new subscription service.
@@ -29,6 +36,12 @@ func NewSubscriptionService() *SubscriptionService {
 // This is called after the server is created to avoid circular dependencies.
 func (s *SubscriptionService) SetProvider(provider FilteredSubscriberProvider) {
 	s.provider = provider
+}
+
+// SetGitWatcherManager sets the git watcher manager (session manager).
+// This is called to enable git_status_changed events on workspace subscription.
+func (s *SubscriptionService) SetGitWatcherManager(manager GitWatcherManager) {
+	s.gitWatcherManager = manager
 }
 
 // RegisterMethods registers all subscription methods with the handler.
@@ -108,6 +121,14 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, params json.RawMess
 
 	filtered.SubscribeWorkspace(p.WorkspaceID)
 
+	// Start git watcher for this workspace to emit git_status_changed events
+	if s.gitWatcherManager != nil {
+		if err := s.gitWatcherManager.StartGitWatcher(p.WorkspaceID); err != nil {
+			// Log but don't fail the subscription - git watcher is optional
+			// The subscription still succeeds, just without git events
+		}
+	}
+
 	return map[string]interface{}{
 		"success":      true,
 		"workspace_id": p.WorkspaceID,
@@ -144,6 +165,11 @@ func (s *SubscriptionService) Unsubscribe(ctx context.Context, params json.RawMe
 	}
 
 	filtered.UnsubscribeWorkspace(p.WorkspaceID)
+
+	// Stop git watcher for this workspace (uses reference counting)
+	if s.gitWatcherManager != nil {
+		s.gitWatcherManager.StopGitWatcher(p.WorkspaceID)
+	}
 
 	return map[string]interface{}{
 		"success":      true,
