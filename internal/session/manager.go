@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
@@ -20,6 +19,7 @@ import (
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/brianly1003/cdev/internal/workspace"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
@@ -55,6 +55,11 @@ type Manager struct {
 	gitWatcherCounts map[string]int                // workspace ID -> subscriber count (reference counting)
 	gitWatchersMu    sync.Mutex
 
+	// Session file watchers for detecting real session IDs (one per workspace)
+	// Used when starting a new session in a workspace with no existing sessions
+	sessionFileWatchers   map[string]context.CancelFunc // workspaceID -> cancel function
+	sessionFileWatchersMu sync.Mutex
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	mu     sync.RWMutex
@@ -76,6 +81,7 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 		gitWatchers:             make(map[string]context.CancelFunc),
 		gitWatcherCounts:        make(map[string]int),
 		streamerWatchers:        make(map[string]bool),
+		sessionFileWatchers:     make(map[string]context.CancelFunc),
 		hub:                     hub,
 		cfg:                     cfg,
 		logger:                  logger,
@@ -124,6 +130,15 @@ func (m *Manager) Stop() error {
 		m.logger.Debug("Session streamer closed")
 	}
 	m.streamerMu.Unlock()
+
+	// Cancel all session file watchers (prevents goroutine leaks)
+	m.sessionFileWatchersMu.Lock()
+	for workspaceID, cancel := range m.sessionFileWatchers {
+		cancel()
+		m.logger.Debug("Cancelled session file watcher", "workspace_id", workspaceID)
+	}
+	m.sessionFileWatchers = make(map[string]context.CancelFunc)
+	m.sessionFileWatchersMu.Unlock()
 
 	// Cancel the manager context
 	m.cancel()
@@ -616,6 +631,284 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	return session, nil
 }
 
+// WatchForNewSessionFile watches the .claude/projects directory for new session files.
+// When a new .jsonl file is created (after trust folder is accepted), it emits
+// a session_id_resolved event with the real session ID from Claude.
+//
+// Thread-safety: Only one watcher per workspace is allowed. If a watcher already exists
+// for this workspace, this call is a no-op. The watcher is automatically cleaned up
+// on completion, timeout, or cancellation.
+func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, temporaryID, repoPath string) {
+	// Prevent multiple watchers for the same workspace (race condition fix)
+	m.sessionFileWatchersMu.Lock()
+	if _, exists := m.sessionFileWatchers[workspaceID]; exists {
+		m.sessionFileWatchersMu.Unlock()
+		m.logger.Debug("session file watcher already exists for workspace",
+			"workspace_id", workspaceID,
+		)
+		return
+	}
+
+	// Create cancellable context for this watcher
+	watchCtx, watchCancel := context.WithCancel(ctx)
+	m.sessionFileWatchers[workspaceID] = watchCancel
+	m.sessionFileWatchersMu.Unlock()
+
+	sessionsDir := getSessionsDir(repoPath)
+	parentDir := filepath.Dir(sessionsDir)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		m.logger.Error("failed to create session file watcher", "error", err)
+		m.cleanupSessionFileWatcher(workspaceID)
+		return
+	}
+
+	go func() {
+		defer func() {
+			watcher.Close()
+			m.cleanupSessionFileWatcher(workspaceID)
+		}()
+
+		// Track if we've found the session
+		found := false
+		dirExists := false
+
+		// Check if sessions dir already exists
+		if _, err := os.Stat(sessionsDir); err == nil {
+			dirExists = true
+			if err := watcher.Add(sessionsDir); err != nil {
+				m.logger.Error("failed to watch sessions dir", "error", err, "path", sessionsDir)
+				return
+			}
+		} else {
+			// Watch parent for directory creation
+			if err := watcher.Add(parentDir); err != nil {
+				m.logger.Error("failed to watch parent dir", "error", err, "path", parentDir)
+				return
+			}
+		}
+
+		m.logger.Info("watching for new session file",
+			"workspace_id", workspaceID,
+			"temporary_id", temporaryID,
+			"sessions_dir", sessionsDir,
+		)
+
+		// No timeout - watcher runs until:
+		// 1. Session file found (success)
+		// 2. Claude exits (detected via onPTYComplete -> FailSessionIDResolution)
+		// 3. Session stopped or manager shutdown (cancellation)
+		// This avoids race conditions with arbitrary timeouts
+
+		for !found {
+			select {
+			case <-watchCtx.Done():
+				// Watcher was cancelled - don't emit event here
+				// The caller (FailSessionIDResolution or CancelSessionFileWatcher)
+				// will emit the appropriate event if needed
+				m.logger.Debug("session file watcher cancelled", "workspace_id", workspaceID)
+				return
+
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+
+				// If sessions dir was just created, start watching it
+				if !dirExists && event.Op&fsnotify.Create != 0 && event.Name == sessionsDir {
+					dirExists = true
+					if err := watcher.Add(sessionsDir); err != nil {
+						m.logger.Error("failed to watch sessions dir", "error", err, "path", sessionsDir)
+					}
+					m.logger.Debug("sessions directory created, now watching", "path", sessionsDir)
+
+					// RACE CONDITION FIX: Scan for any .jsonl files that might have been
+					// created between the directory creation and when we started watching.
+					// fsnotify won't emit events for files that existed before watching started.
+					if sessionID := m.scanForExistingSessionFile(sessionsDir, temporaryID); sessionID != "" {
+						m.logger.Info("detected existing session file after directory creation",
+							"workspace_id", workspaceID,
+							"temporary_id", temporaryID,
+							"real_id", sessionID,
+						)
+						m.updateSessionID(workspaceID, temporaryID, sessionID)
+						m.hub.Publish(events.NewSessionIDResolvedEvent(
+							temporaryID,
+							sessionID,
+							workspaceID,
+							filepath.Join(sessionsDir, sessionID+".jsonl"),
+						))
+						found = true
+					}
+					continue
+				}
+
+				// Check for new .jsonl files
+				if event.Op&fsnotify.Create != 0 && strings.HasSuffix(event.Name, ".jsonl") {
+					filename := filepath.Base(event.Name)
+
+					// Skip agent sub-sessions (agent-*.jsonl)
+					if strings.HasPrefix(filename, "agent-") {
+						m.logger.Debug("skipping agent sub-session file", "file", filename)
+						continue
+					}
+
+					realSessionID := strings.TrimSuffix(filename, ".jsonl")
+
+					// Skip if this is the same as our temporary ID (unlikely but possible)
+					if realSessionID == temporaryID {
+						continue
+					}
+
+					// Validate UUID format to ensure this is a real session file
+					if _, uuidErr := uuid.Parse(realSessionID); uuidErr != nil {
+						m.logger.Debug("skipping non-UUID session file", "file", filename)
+						continue
+					}
+
+					m.logger.Info("detected new session file",
+						"workspace_id", workspaceID,
+						"temporary_id", temporaryID,
+						"real_id", realSessionID,
+						"file", event.Name,
+					)
+
+					// Update internal state to use real session ID
+					m.updateSessionID(workspaceID, temporaryID, realSessionID)
+
+					// Emit the session_id_resolved event
+					m.hub.Publish(events.NewSessionIDResolvedEvent(
+						temporaryID,
+						realSessionID,
+						workspaceID,
+						event.Name,
+					))
+
+					found = true
+				}
+
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				m.logger.Error("session file watcher error", "error", err)
+			}
+		}
+	}()
+}
+
+// cleanupSessionFileWatcher removes the watcher tracking for a workspace.
+func (m *Manager) cleanupSessionFileWatcher(workspaceID string) {
+	m.sessionFileWatchersMu.Lock()
+	defer m.sessionFileWatchersMu.Unlock()
+	delete(m.sessionFileWatchers, workspaceID)
+}
+
+// CancelSessionFileWatcher cancels an active session file watcher for a workspace.
+// Called when a session is stopped or workspace is removed.
+// Does NOT emit any event - use FailSessionIDResolution if you need to emit an event.
+func (m *Manager) CancelSessionFileWatcher(workspaceID string) {
+	m.sessionFileWatchersMu.Lock()
+	defer m.sessionFileWatchersMu.Unlock()
+	if cancel, exists := m.sessionFileWatchers[workspaceID]; exists {
+		cancel()
+		delete(m.sessionFileWatchers, workspaceID)
+		m.logger.Debug("cancelled session file watcher", "workspace_id", workspaceID)
+	}
+}
+
+// FailSessionIDResolution cancels the session file watcher and emits a session_id_failed event.
+// Called when Claude exits without creating a session (e.g., user declined trust folder).
+// Parameters:
+//   - workspaceID: The workspace ID
+//   - temporaryID: The temporary session ID that was waiting for resolution
+//   - reason: "trust_declined", "claude_exited", or "error"
+//   - message: Optional human-readable message
+func (m *Manager) FailSessionIDResolution(workspaceID, temporaryID, reason, message string) {
+	m.sessionFileWatchersMu.Lock()
+	cancel, exists := m.sessionFileWatchers[workspaceID]
+	if exists {
+		cancel()
+		delete(m.sessionFileWatchers, workspaceID)
+	}
+	m.sessionFileWatchersMu.Unlock()
+
+	if exists {
+		m.logger.Info("session ID resolution failed",
+			"workspace_id", workspaceID,
+			"temporary_id", temporaryID,
+			"reason", reason,
+		)
+		m.hub.Publish(events.NewSessionIDFailedEvent(
+			temporaryID,
+			workspaceID,
+			reason,
+			message,
+		))
+	}
+}
+
+// HasActiveSessionFileWatcher returns true if there's an active watcher for the workspace.
+func (m *Manager) HasActiveSessionFileWatcher(workspaceID string) bool {
+	m.sessionFileWatchersMu.Lock()
+	defer m.sessionFileWatchersMu.Unlock()
+	_, exists := m.sessionFileWatchers[workspaceID]
+	return exists
+}
+
+// PublishEvent publishes an event to the hub.
+// Used by RPC handlers to emit events.
+func (m *Manager) PublishEvent(event *events.BaseEvent) {
+	m.hub.Publish(event)
+}
+
+// scanForExistingSessionFile scans a directory for existing session .jsonl files.
+// Returns the session ID if found, empty string otherwise.
+// Used to handle race condition where file is created before watcher starts.
+func (m *Manager) scanForExistingSessionFile(sessionsDir, temporaryID string) string {
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		m.logger.Debug("failed to scan sessions dir", "error", err, "path", sessionsDir)
+		return ""
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		filename := entry.Name()
+
+		// Skip non-.jsonl files
+		if !strings.HasSuffix(filename, ".jsonl") {
+			continue
+		}
+
+		// Skip agent sub-sessions
+		if strings.HasPrefix(filename, "agent-") {
+			continue
+		}
+
+		sessionID := strings.TrimSuffix(filename, ".jsonl")
+
+		// Skip if same as temporary ID
+		if sessionID == temporaryID {
+			continue
+		}
+
+		// Validate UUID format
+		if _, err := uuid.Parse(sessionID); err != nil {
+			continue
+		}
+
+		// Found a valid session file
+		return sessionID
+	}
+
+	return ""
+}
+
 // startSessionWithID starts a managed session with a specific session ID.
 // This is used when resuming a historical session where we know the exact session ID.
 // Note: This is an internal helper - external callers should use StartSession.
@@ -631,6 +924,19 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 
 	// Check if session already exists
 	if existing, ok := m.sessions[sessionID]; ok {
+		// If workspace_id changed (e.g., workspace was re-added with new ID), update it
+		if existing.WorkspaceID != workspaceID {
+			m.logger.Info("Updating session workspace ID",
+				"session_id", sessionID,
+				"old_workspace_id", existing.WorkspaceID,
+				"new_workspace_id", workspaceID,
+			)
+			existing.WorkspaceID = workspaceID
+			// Also update the reverse mapping
+			delete(m.activeSessionWorkspaces, sessionID)
+			m.activeSessionWorkspaces[sessionID] = workspaceID
+			m.activeSessions[workspaceID] = sessionID
+		}
 		return existing, nil
 	}
 
@@ -740,6 +1046,10 @@ func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *S
 
 	session.SetStatus(StatusStopping)
 
+	// Cancel session file watcher if active (prevents memory leak)
+	// Note: CancelSessionFileWatcher uses its own mutex, safe to call while holding m.mu
+	m.CancelSessionFileWatcher(session.WorkspaceID)
+
 	// Stop Claude manager with the provided context
 	if cm := session.ClaudeManager(); cm != nil {
 		if err := cm.Stop(ctx); err != nil {
@@ -834,6 +1144,63 @@ func (m *Manager) GetActiveSession(workspaceID string) string {
 	defer m.mu.RUnlock()
 
 	return m.activeSessions[workspaceID]
+}
+
+// updateSessionID updates internal state when the real session ID is detected.
+// This is called when Claude creates a new session file with its own UUID.
+// It updates all internal mappings so workspace/list and other APIs return the real ID.
+//
+// Thread-safety: This function is idempotent - calling it multiple times with the same
+// arguments is safe and will only update state on the first call.
+//
+// Lock ordering: Manager.mu is acquired first, then Session.mu via SetSessionID().
+// This is consistent with other methods to avoid deadlocks.
+func (m *Manager) updateSessionID(workspaceID, temporaryID, realID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Idempotency check: if session already exists with realID, skip
+	if _, exists := m.sessions[realID]; exists {
+		m.logger.Debug("Session ID already updated (idempotent skip)",
+			"workspace_id", workspaceID,
+			"real_id", realID,
+		)
+		return
+	}
+
+	// Check if session with temporaryID exists
+	session, ok := m.sessions[temporaryID]
+	if !ok {
+		m.logger.Warn("Session not found for ID update",
+			"workspace_id", workspaceID,
+			"temporary_id", temporaryID,
+			"real_id", realID,
+		)
+		return
+	}
+
+	// Update active session mapping
+	if m.activeSessions[workspaceID] == temporaryID {
+		m.activeSessions[workspaceID] = realID
+	}
+
+	// Update reverse mapping (session ID -> workspace ID)
+	delete(m.activeSessionWorkspaces, temporaryID)
+	m.activeSessionWorkspaces[realID] = workspaceID
+
+	// Update session's internal ID (thread-safe via SetSessionID)
+	// This also updates ClaudeManager's sessionID for PTY events
+	session.SetSessionID(realID)
+
+	// Re-key in sessions map
+	delete(m.sessions, temporaryID)
+	m.sessions[realID] = session
+
+	m.logger.Info("Updated session ID mapping",
+		"workspace_id", workspaceID,
+		"temporary_id", temporaryID,
+		"real_id", realID,
+	)
 }
 
 // CountActiveSessionsForWorkspace returns the count of active sessions for a workspace.
@@ -1041,20 +1408,11 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 			claudeSessionID = sessionID
 		}
 
-		// Set up PTY completion callback to emit stop_reason
-		// This is called when PTY streaming finishes
+		// Determine session ID for watching JSONL
 		watchSessionID := session.ID
 		if claudeSessionID != "" {
 			watchSessionID = claudeSessionID
 		}
-		cm.SetOnPTYComplete(func(sid string) {
-			m.streamerMu.Lock()
-			streamer := m.streamer
-			m.streamerMu.Unlock()
-			if streamer != nil {
-				streamer.EmitCompletion(sid)
-			}
-		})
 
 		// Start the PTY session
 		if err := cm.StartWithPTY(m.ctx, prompt, claudeMode, claudeSessionID); err != nil {
@@ -1266,6 +1624,32 @@ func (m *Manager) SendInput(sessionID string, input string) error {
 
 	session.UpdateLastActive()
 	return cm.SendPTYInput(input)
+}
+
+// EmitPermissionResolved broadcasts a pty_permission_resolved event to all devices.
+// This is called when one device responds to a permission prompt, so other devices
+// can dismiss their permission popup.
+func (m *Manager) EmitPermissionResolved(sessionID, clientID, input string) {
+	// Get workspace ID for the session
+	m.mu.RLock()
+	workspaceID := m.activeSessionWorkspaces[sessionID]
+	m.mu.RUnlock()
+
+	// If not in activeSessionWorkspaces, try to find it
+	if workspaceID == "" {
+		workspaceID = m.findWorkspaceForSession(sessionID)
+	}
+
+	// Emit the event
+	evt := events.NewPTYPermissionResolvedEvent(sessionID, workspaceID, clientID, input)
+	m.hub.Publish(evt)
+
+	m.logger.Info("emitted pty_permission_resolved event",
+		"session_id", sessionID,
+		"workspace_id", workspaceID,
+		"resolved_by", clientID,
+		"input", input,
+	)
 }
 
 // RespondToPermission responds to a permission request in a session.

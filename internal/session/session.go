@@ -2,12 +2,12 @@
 package session
 
 import (
-	"sync"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
+	"github.com/brianly1003/cdev/internal/sync"
 )
 
 // Status represents the current state of a session.
@@ -81,6 +81,26 @@ func (s *Session) UpdateLastActive() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.LastActive = time.Now().UTC()
+}
+
+// GetID returns the session ID (thread-safe).
+func (s *Session) GetID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ID
+}
+
+// SetSessionID updates the session ID (thread-safe).
+// This is used when the real session ID is detected from Claude.
+// Also updates the ClaudeManager's session ID if present.
+func (s *Session) SetSessionID(newID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ID = newID
+	// Update ClaudeManager's session ID for PTY events
+	if s.claudeManager != nil {
+		s.claudeManager.SetSessionID(newID)
+	}
 }
 
 // GetLastActive returns the last active timestamp.

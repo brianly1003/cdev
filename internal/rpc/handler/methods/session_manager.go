@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/config"
+	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
@@ -73,11 +74,12 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("session/send", s.Send, handler.MethodMeta{
 		Summary:     "Send a prompt to a session",
-		Description: "Sends a prompt to the Claude CLI in the specified session.",
+		Description: "Sends a prompt to the Claude CLI. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
 		Params: []handler.OpenRPCParam{
-			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Session ID to send to. If empty, workspace_id must be provided to auto-create a session."}},
+			{Name: "workspace_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Workspace ID. Required when session_id is empty to auto-create a new session."}},
 			{Name: "prompt", Required: true, Schema: map[string]interface{}{"type": "string"}},
-			{Name: "mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}}},
+			{Name: "mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}, "default": "new", "description": "Session mode. 'new' starts fresh conversation (default), 'continue' resumes existing."}},
 			{Name: "permission_mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default", "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all permission checks, 'interactive' to use PTY mode for true terminal-like permission prompts."}},
 		},
 		Result: &handler.OpenRPCResult{
@@ -458,13 +460,125 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 		}, nil
 	}
 
-	// No sessions found in .claude/projects
+	// Check if there's already an active managed session for this workspace
+	// This handles the case where iOS app was closed and reopened while Claude
+	// was still waiting for trust folder approval
+	if activeSessionID := s.manager.GetActiveSession(p.WorkspaceID); activeSessionID != "" {
+		if existingSession, err := s.manager.GetSession(activeSessionID); err == nil {
+			status := existingSession.GetStatus()
+			if status == session.StatusRunning || status == session.StatusStarting {
+				// Check if there's a pending permission (e.g., trust folder prompt)
+				result := map[string]interface{}{
+					"session_id":         activeSessionID,
+					"workspace_id":       p.WorkspaceID,
+					"source":             "managed",
+					"status":             "existing",
+					"message":            "Returning existing active session (Claude still running)",
+					"has_pending_permission": false,
+				}
+
+				// If there's a pending permission, re-emit the pty_permission event
+				// so the reconnecting client can show the permission dialog
+				if cm := existingSession.ClaudeManager(); cm != nil {
+					if pendingPerm := cm.GetPendingPTYPermission(); pendingPerm != nil {
+						result["has_pending_permission"] = true
+						result["pending_permission_type"] = string(pendingPerm.Type)
+						result["pending_permission_target"] = pendingPerm.Target
+
+						// Re-emit the pty_permission event for the reconnecting client
+						options := make([]events.PTYPromptOption, len(pendingPerm.Options))
+						for i, opt := range pendingPerm.Options {
+							options[i] = events.PTYPromptOption{
+								Key:         opt.Key,
+								Label:       opt.Label,
+								Description: opt.Description,
+								Selected:    opt.Selected,
+							}
+						}
+						s.manager.PublishEvent(events.NewPTYPermissionEventWithSession(
+							string(pendingPerm.Type),
+							pendingPerm.Target,
+							pendingPerm.Description,
+							pendingPerm.Preview,
+							activeSessionID,
+							options,
+						))
+					}
+				}
+
+				return result, nil
+			}
+		}
+	}
+
+	// No sessions found in .claude/projects - start a new managed session
+	// This starts Claude in interactive mode (PTY) waiting for user input
+	newSession, err := s.manager.StartSession(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "failed to start session: "+err.Error())
+	}
+
+	// Get workspace for path
+	ws, err := s.manager.GetWorkspace(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
+	}
+
+	// Start watching for new session file creation ONLY if there are no existing sessions
+	// When Claude creates a new session, it generates a new UUID in .claude/projects/
+	// We need to detect this and emit session_id_resolved event so iOS can switch to the real ID
+	sessionsDir := getSessionsDirForWorkspace(ws.Definition.Path)
+	hasExistingSessions := false
+	if entries, dirErr := os.ReadDir(sessionsDir); dirErr == nil {
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".jsonl") {
+				hasExistingSessions = true
+				break
+			}
+		}
+	}
+
+	if !hasExistingSessions {
+		// No existing sessions - watch for new session file creation
+		go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
+	}
+
+	// Start Claude in interactive PTY mode (no initial prompt)
+	claudeManager := newSession.ClaudeManager()
+	if claudeManager != nil {
+		// Set up callback to detect when Claude exits without creating a session
+		// This handles the case where user declines trust folder (clicks "No")
+		temporaryID := newSession.ID
+		workspaceID := p.WorkspaceID
+		claudeManager.SetOnPTYComplete(func(sid string) {
+			// Check if there's still an active watcher - if so, Claude exited
+			// without creating a session file (user likely declined trust)
+			if s.manager.HasActiveSessionFileWatcher(workspaceID) {
+				s.manager.FailSessionIDResolution(
+					workspaceID,
+					temporaryID,
+					"trust_declined",
+					"Claude exited without creating a session. User may have declined trust folder.",
+				)
+			}
+		})
+
+		go func() {
+			// Start Claude with empty prompt for interactive mode
+			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID); err != nil {
+				// Log error but don't fail - session is still created
+				// The user can send a prompt via session/send
+				fmt.Printf("Warning: failed to start Claude in interactive mode: %v\n", err)
+			}
+		}()
+	}
+
 	return map[string]interface{}{
-		"session_id":   "",
+		"session_id":   newSession.ID,
 		"workspace_id": p.WorkspaceID,
-		"source":       "",
-		"status":       "no_sessions",
-		"message":      "No sessions found in .claude/projects for this workspace.",
+		"source":       "managed",
+		"status":       "started",
+		"message":      "New Claude session started in interactive mode",
 	}, nil
 }
 
@@ -492,9 +606,11 @@ func (s *SessionManagerService) Stop(ctx context.Context, params json.RawMessage
 }
 
 // Send sends a prompt to a session.
+// If session_id is empty but workspace_id is provided, auto-creates a new session.
 func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		SessionID      string `json:"session_id"`
+		WorkspaceID    string `json:"workspace_id"`
 		Prompt         string `json:"prompt"`
 		Mode           string `json:"mode"`            // "new" or "continue"
 		PermissionMode string `json:"permission_mode"` // "default", "acceptEdits", "bypassPermissions", "plan", "interactive"
@@ -503,9 +619,6 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
 	}
 
-	if p.SessionID == "" {
-		return nil, message.NewError(message.InvalidParams, "session_id is required")
-	}
 	if p.Prompt == "" {
 		return nil, message.NewError(message.InvalidParams, "prompt is required")
 	}
@@ -518,12 +631,90 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		}
 	}
 
+	// Default mode to "new" if not specified
+	if p.Mode == "" {
+		p.Mode = "new"
+	}
+
+	// Auto-create session if session_id is empty but workspace_id is provided
+	if p.SessionID == "" {
+		if p.WorkspaceID == "" {
+			return nil, message.NewError(message.InvalidParams, "either session_id or workspace_id is required")
+		}
+
+		// Auto-create a new session for this workspace
+		newSession, err := s.manager.StartSession(p.WorkspaceID)
+		if err != nil {
+			return nil, message.NewError(message.InternalError, "failed to auto-create session: "+err.Error())
+		}
+
+		p.SessionID = newSession.ID
+
+		// Get workspace for path (needed for session file watcher)
+		ws, err := s.manager.GetWorkspace(p.WorkspaceID)
+		if err != nil {
+			return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
+		}
+
+		// Start watching for new session file creation (same as session/start)
+		sessionsDir := getSessionsDirForWorkspace(ws.Definition.Path)
+		hasExistingSessions := false
+		if entries, dirErr := os.ReadDir(sessionsDir); dirErr == nil {
+			for _, e := range entries {
+				if strings.HasSuffix(e.Name(), ".jsonl") {
+					hasExistingSessions = true
+					break
+				}
+			}
+		}
+
+		if !hasExistingSessions {
+			go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
+		}
+
+		// Start Claude with the prompt immediately (don't wait for user input)
+		claudeManager := newSession.ClaudeManager()
+		if claudeManager != nil {
+			// Set up callback to detect when Claude exits without creating a session
+			temporaryID := newSession.ID
+			workspaceID := p.WorkspaceID
+			claudeManager.SetOnPTYComplete(func(sid string) {
+				if s.manager.HasActiveSessionFileWatcher(workspaceID) {
+					s.manager.FailSessionIDResolution(
+						workspaceID,
+						temporaryID,
+						"trust_declined",
+						"Claude exited without creating a session. User may have declined trust folder.",
+					)
+				}
+			})
+
+			// Start Claude with PTY and the prompt
+			go func() {
+				if err := claudeManager.StartWithPTY(ctx, p.Prompt, "new", newSession.ID); err != nil {
+					// Log error but session was created
+					fmt.Printf("Warning: failed to start Claude with prompt: %v\n", err)
+				}
+			}()
+		}
+
+		return map[string]interface{}{
+			"status":       "sent",
+			"session_id":   p.SessionID,
+			"workspace_id": p.WorkspaceID,
+			"auto_created": true,
+			"message":      "New session created and prompt sent",
+		}, nil
+	}
+
+	// Session ID provided - send to existing session
 	if err := s.manager.SendPrompt(p.SessionID, p.Prompt, p.Mode, p.PermissionMode); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	return map[string]interface{}{
-		"status": "sent",
+		"status":     "sent",
+		"session_id": p.SessionID,
 	}, nil
 }
 
@@ -562,6 +753,10 @@ func (s *SessionManagerService) Input(ctx context.Context, params json.RawMessag
 			return nil, message.NewError(message.InternalError, err.Error())
 		}
 
+		// Emit pty_permission_resolved event so other devices can dismiss their permission popups
+		clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+		s.manager.EmitPermissionResolved(p.SessionID, clientID, p.Key)
+
 		return map[string]interface{}{
 			"status": "sent",
 			"key":    p.Key,
@@ -573,6 +768,10 @@ func (s *SessionManagerService) Input(ctx context.Context, params json.RawMessag
 		if err := s.manager.SendInput(p.SessionID, p.Input); err != nil {
 			return nil, message.NewError(message.InternalError, err.Error())
 		}
+
+		// Emit pty_permission_resolved event so other devices can dismiss their permission popups
+		clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+		s.manager.EmitPermissionResolved(p.SessionID, clientID, p.Input)
 
 		return map[string]interface{}{
 			"status": "sent",
@@ -1515,6 +1714,20 @@ func isSensitiveFile(name string) bool {
 		}
 	}
 	return false
+}
+
+// getSessionsDirForWorkspace returns the Claude sessions directory for a workspace path.
+// Maps /Users/brianly/Projects/cdev -> ~/.claude/projects/-Users-brianly-Projects-cdev
+func getSessionsDirForWorkspace(repoPath string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "~"
+	}
+
+	repoPath = filepath.Clean(repoPath)
+	encodedPath := strings.ReplaceAll(repoPath, "/", "-")
+
+	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }
 
 // ActivateSession sets the active session for a workspace.

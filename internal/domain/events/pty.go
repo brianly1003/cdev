@@ -3,10 +3,11 @@ package events
 
 // PTY-specific event types
 const (
-	EventTypePTYOutput     EventType = "pty_output"
-	EventTypePTYPermission EventType = "pty_permission"
-	EventTypePTYState      EventType = "pty_state"
-	EventTypePTYSpinner    EventType = "pty_spinner"
+	EventTypePTYOutput             EventType = "pty_output"
+	EventTypePTYPermission         EventType = "pty_permission"
+	EventTypePTYPermissionResolved EventType = "pty_permission_resolved" // Permission was responded to by a device
+	EventTypePTYState              EventType = "pty_state"
+	EventTypePTYSpinner            EventType = "pty_spinner"
 )
 
 // PTYOutputPayload represents processed terminal output.
@@ -120,4 +121,23 @@ func NewPTYSpinnerEventWithSession(text, symbol, message, sessionID string) *Bas
 		Message:   message,
 		SessionID: sessionID,
 	})
+}
+
+// PTYPermissionResolvedPayload represents that a permission prompt was responded to.
+// This is broadcast to all devices so they can dismiss their permission popups.
+type PTYPermissionResolvedPayload struct {
+	SessionID   string `json:"session_id"`
+	WorkspaceID string `json:"workspace_id,omitempty"`
+	ResolvedBy  string `json:"resolved_by,omitempty"` // Client ID that resolved the permission
+	Input       string `json:"input,omitempty"`       // The input that was sent (e.g., "1", "enter")
+}
+
+// NewPTYPermissionResolvedEvent creates a new pty_permission_resolved event.
+func NewPTYPermissionResolvedEvent(sessionID, workspaceID, resolvedBy, input string) *BaseEvent {
+	return NewEventWithContext(EventTypePTYPermissionResolved, PTYPermissionResolvedPayload{
+		SessionID:   sessionID,
+		WorkspaceID: workspaceID,
+		ResolvedBy:  resolvedBy,
+		Input:       input,
+	}, workspaceID, sessionID)
 }

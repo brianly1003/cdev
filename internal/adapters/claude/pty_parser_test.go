@@ -534,6 +534,11 @@ func TestPTYParser_DetectTrustFolderType(t *testing.T) {
 			line:         "trust file in this folder",
 			expectedType: PermissionTypeTrustFolder,
 		},
+		{
+			name:         "work in this folder",
+			line:         "Do you want to work in this folder?",
+			expectedType: PermissionTypeTrustFolder,
+		},
 	}
 
 	for _, tt := range tests {
@@ -547,6 +552,57 @@ func TestPTYParser_DetectTrustFolderType(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPTYParser_WorkInFolderPrompt tests the new "Do you want to work in this folder?" format
+func TestPTYParser_WorkInFolderPrompt(t *testing.T) {
+	parser := NewPTYParser()
+
+	// Simulate actual "work in folder" prompt from Claude Code
+	lines := []string{
+		"Do you want to work in this folder?",
+		"/Users/brianly/Projects/demo1",
+		"In order to work in this folder, we need your permission for Claude Code to read, edit, and execute files.",
+		"If this folder has malicious code or untrusted scripts, Claude Code could run them while trying to help.",
+		"Only continue if this is your code or a project you trust.",
+		"Security details",
+		"❯ 1. Yes, continue",
+		"  2. No, exit",
+		"Enter to confirm · Esc to cancel",
+	}
+
+	var prompt *PTYPermissionPrompt
+	var state PTYState
+
+	for _, line := range lines {
+		prompt, state = parser.ProcessLine(line)
+		if prompt != nil {
+			break
+		}
+	}
+
+	if prompt == nil {
+		t.Fatal("Expected work in folder prompt to be detected")
+	}
+
+	if state != PTYStatePermission {
+		t.Errorf("State = %v, want %v", state, PTYStatePermission)
+	}
+
+	if prompt.Type != PermissionTypeTrustFolder {
+		t.Errorf("Prompt.Type = %v, want %v", prompt.Type, PermissionTypeTrustFolder)
+	}
+
+	if prompt.Target != "/Users/brianly/Projects/demo1" {
+		t.Errorf("Prompt.Target = %q, want %q", prompt.Target, "/Users/brianly/Projects/demo1")
+	}
+
+	// Should detect 2 numbered options
+	if len(prompt.Options) != 2 {
+		t.Errorf("Prompt.Options count = %d, want 2", len(prompt.Options))
+	}
+
+	t.Logf("Work in folder prompt detected: type=%s, target=%s, options=%+v", prompt.Type, prompt.Target, prompt.Options)
 }
 
 // TestPTYParser_PermissionPanelFormat tests the permission panel format with "Bash command" header

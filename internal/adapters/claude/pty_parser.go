@@ -106,14 +106,14 @@ func NewPTYParser() *PTYParser {
 		// Pattern: "Delete hello.txt" or "Remove file"
 		deleteFilePattern: regexp.MustCompile(`(?i)(?:Delete|Remove)\s+(?:file\s+)?([^\s\n]+)`),
 
-		// Pattern: "Bash(npm install)" or "Run command: npm install" or "Bash command" (permission panel header)
-		bashCommandPattern: regexp.MustCompile(`(?i)(?:Bash\s*\(([^\)]+)\)|Run(?:ning)?\s+(?:command)?:?\s*(.+)|^Bash\s+command\s*$)`),
+		// Pattern: "Bash(cmd)" or "Run command: cmd" - must start at line beginning to avoid false positives
+		bashCommandPattern: regexp.MustCompile(`(?i)(?:^Bash\s*\(([^\)]+)\)|^Run(?:ning)?\s+(?:command)?:?\s*(.+)|^Bash\s+command\s*$)`),
 
 		// Pattern: "mcp__server__tool" or "MCP tool"
 		mcpToolPattern: regexp.MustCompile(`(?i)(?:mcp__\w+__\w+|MCP\s+tool)`),
 
-		// Pattern: "trust the files in this folder" for folder trust prompts
-		trustFolderPattern: regexp.MustCompile(`(?i)trust\s+(?:the\s+)?files?\s+in\s+this\s+folder`),
+		// Pattern: "trust the files in this folder" or "work in this folder" for folder trust prompts
+		trustFolderPattern: regexp.MustCompile(`(?i)(?:trust\s+(?:the\s+)?files?\s+in\s+this\s+folder|Do you want to work in this folder)`),
 
 		// Pattern: "Allow?" or "Do you want to" or numbered options
 		allowPattern: regexp.MustCompile(`(?i)(Do you want to|Allow\?|Enter your choice)`),
@@ -223,28 +223,27 @@ func (p *PTYParser) detectPermissionType(line string) {
 		case "read":
 			p.currentPromptType = PermissionTypeUnknown // Read doesn't usually need permission
 		}
-		// Target will be extracted from subsequent lines
-		// Clear any previous target since we found a panel header
 		p.currentPromptTarget = ""
 		return
 	}
 
-	// For trust folder prompts, extract the path before returning
-	// Folder paths start with / and don't contain typical file extensions
+	// Extract folder path for trust folder prompts (paths start with /)
 	if p.currentPromptType == PermissionTypeTrustFolder && p.currentPromptTarget == "" && strings.HasPrefix(line, "/") {
-		// This could be the folder path in a trust prompt
 		p.currentPromptTarget = strings.TrimSpace(line)
 		return
 	}
 
-	// If we already have a permission type, don't let subsequent lines change it
-	// Target extraction from loose text was too error-prone (matched random code with periods)
-	// Target is now only extracted from explicit patterns like "Write(filename.txt)"
+	// Don't override existing permission type
 	if p.currentPromptType != "" {
 		return
 	}
 
-	// Check for Write/Create file (inline format like "Write(hello.txt)")
+	// Check trust folder first (before patterns that might false-positive)
+	if p.trustFolderPattern.MatchString(line) {
+		p.currentPromptType = PermissionTypeTrustFolder
+		return
+	}
+
 	if matches := p.writeFilePattern.FindStringSubmatch(line); len(matches) > 1 {
 		p.currentPromptType = PermissionTypeWriteFile
 		p.currentPromptTarget = strings.TrimSpace(matches[1])
@@ -256,10 +255,8 @@ func (p *PTYParser) detectPermissionType(line string) {
 		return
 	}
 
-	// Check for Edit file (pattern has two capture groups for alternation)
 	if matches := p.editFilePattern.FindStringSubmatch(line); len(matches) > 1 {
 		p.currentPromptType = PermissionTypeEditFile
-		// Get the non-empty capture group (pattern has alternation with 2 groups)
 		if matches[1] != "" {
 			p.currentPromptTarget = strings.TrimSpace(matches[1])
 		} else if len(matches) > 2 && matches[2] != "" {
@@ -268,16 +265,13 @@ func (p *PTYParser) detectPermissionType(line string) {
 		return
 	}
 
-	// Check for Delete file
 	if matches := p.deleteFilePattern.FindStringSubmatch(line); len(matches) > 1 {
 		p.currentPromptType = PermissionTypeDeleteFile
 		p.currentPromptTarget = strings.TrimSpace(matches[1])
 		return
 	}
 
-	// Check for Bash command (inline format like "Bash(npm install)")
 	if matches := p.bashCommandPattern.FindStringSubmatch(line); len(matches) > 1 {
-		// Only set target if we have a capture group (not just the header match)
 		if matches[1] != "" {
 			p.currentPromptType = PermissionTypeBashCommand
 			p.currentPromptTarget = strings.TrimSpace(matches[1])
@@ -289,18 +283,10 @@ func (p *PTYParser) detectPermissionType(line string) {
 		}
 	}
 
-	// Check for MCP tool
 	if p.mcpToolPattern.MatchString(line) {
 		p.currentPromptType = PermissionTypeMCP
 		return
 	}
-
-	// Check for folder trust prompt
-	if p.trustFolderPattern.MatchString(line) {
-		p.currentPromptType = PermissionTypeTrustFolder
-		return
-	}
-
 }
 
 // detectPermissionFromBuffer analyzes the buffer to detect a complete permission prompt.
@@ -311,7 +297,6 @@ func (p *PTYParser) detectPermissionFromBuffer() *PTYPermissionPrompt {
 
 	bufferText := strings.Join(p.buffer, "\n")
 
-	// Check if we have an "Allow?" prompt or option selection
 	hasAllowPattern := p.allowPattern.MatchString(bufferText)
 	hasNumberedOptions := p.hasOptions(bufferText)
 	hasTextOptions := p.hasTextOptions(bufferText)
@@ -321,69 +306,50 @@ func (p *PTYParser) detectPermissionFromBuffer() *PTYPermissionPrompt {
 		return nil
 	}
 
-	// Wait for the prompt to be complete before extracting options
-	// Complete prompt ends with "Esc to cancel" or similar marker
 	hasPromptEnd := p.promptEndPattern.MatchString(bufferText)
 	numberedOptionCount := len(p.optionPattern.FindAllString(bufferText, -1))
 	textOptionCount := len(p.textOptionPattern.FindAllString(bufferText, -1))
 
-	// Debug logging for permission detection
 	if hasAllowPattern || hasAnyOptions {
 		debugLog("PTY parser: allowPattern=%v, numberedOpts=%d, textOpts=%d, hasPromptEnd=%v, bufferLen=%d, type=%s, target=%s",
 			hasAllowPattern, numberedOptionCount, textOptionCount, hasPromptEnd, len(p.buffer), p.currentPromptType, p.currentPromptTarget)
 	}
 
-	// For trust folder prompts, we only need 2 text options (Yes, proceed / No, exit)
 	isTrustFolder := p.currentPromptType == PermissionTypeTrustFolder || p.trustFolderPattern.MatchString(bufferText)
 
-	// Only trigger if:
-	// 1. We see the end marker (Esc to cancel), OR
-	// 2. For trust folder: we have 2 text options, OR
-	// 3. We have at least 3 numbered options AND the allow pattern (e.g., "Do you want to")
-	// The allowPattern check prevents false positives from Claude's numbered list output
+	// Trigger conditions:
+	// - End marker (Esc to cancel), OR
+	// - Trust folder: 2+ options (text or numbered), OR
+	// - Regular: 3+ numbered options AND allow pattern
 	if !hasPromptEnd {
 		if isTrustFolder {
-			// Trust folder needs at least 2 text options
-			if textOptionCount < 2 {
+			if textOptionCount < 2 && numberedOptionCount < 2 {
 				return nil
 			}
 		} else {
-			// Regular prompts need:
-			// - At least 3 numbered options (1. Yes, 2. Yes to all, 3. Type here...)
-			// - AND the allow pattern ("Do you want to", "Allow?", etc.)
-			// This prevents matching Claude's numbered lists as permission options
 			if numberedOptionCount < 3 || !hasAllowPattern {
 				return nil
 			}
 		}
 	}
 
-	// Build the permission prompt
 	prompt := &PTYPermissionPrompt{
 		Type:    p.currentPromptType,
 		Target:  p.currentPromptTarget,
 		Options: []PromptOption{},
 	}
 
-	// Validate target - clear if it looks like garbage (contains code patterns)
-	// Valid targets are: filenames (e.g., "text.md"), commands (e.g., "npm install"), or paths
-	if prompt.Target != "" {
-		// Clear target if it contains code-like patterns (operators, braces, etc.)
-		if strings.ContainsAny(prompt.Target, "{}[]()=|&;") {
-			prompt.Target = ""
-		}
+	// Clear target if it contains code-like patterns
+	if prompt.Target != "" && strings.ContainsAny(prompt.Target, "{}[]()=|&;") {
+		prompt.Target = ""
 	}
 
-	// Reset state for next detection (prevents stale state from carrying over)
 	p.currentPromptType = ""
 	p.currentPromptTarget = ""
 
-	// Set trust folder type if detected from buffer text
 	if isTrustFolder && prompt.Type == "" {
 		prompt.Type = PermissionTypeTrustFolder
 	}
-
-	// Set default if type not detected
 	if prompt.Type == "" {
 		prompt.Type = PermissionTypeUnknown
 	}

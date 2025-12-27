@@ -22,16 +22,14 @@ type SessionStreamer struct {
 	sessionsDir string
 	hub         ports.EventHub
 
-	mu               sync.RWMutex
-	watchedSession   string                      // Currently watched session ID
-	watchedFile      string                      // Full path to watched file
-	lastOffset       int64                       // Last read position in file
-	lastSize         int64                       // Last known file size
-	watcher          *fsnotify.Watcher
-	done             chan struct{}
-	running          bool
-	lastMessage      *events.ClaudeMessagePayload // Track last emitted message for stop_reason
-	completionSent   bool                         // Guard against duplicate completion emissions
+	mu             sync.RWMutex
+	watchedSession string // Currently watched session ID
+	watchedFile    string // Full path to watched file
+	lastOffset     int64  // Last read position in file
+	lastSize       int64  // Last known file size
+	watcher        *fsnotify.Watcher
+	done           chan struct{}
+	running        bool
 }
 
 // NewSessionStreamer creates a new session streamer.
@@ -79,8 +77,6 @@ func (s *SessionStreamer) WatchSession(sessionID string) error {
 	s.lastOffset = info.Size() // Start from end of file (only new content)
 	s.done = make(chan struct{})
 	s.running = true
-	s.lastMessage = nil    // Reset for new session
-	s.completionSent = false // Reset completion flag for new session
 
 	go s.watchLoop()
 
@@ -204,8 +200,20 @@ func (s *SessionStreamer) checkForNewContent() {
 
 	// File hasn't grown
 	if currentSize <= lastOffset {
+		// log.Debug().
+		// 	Str("session_id", sessionID).
+		// 	Int64("current_size", currentSize).
+		// 	Int64("last_offset", lastOffset).
+		// 	Msg("checkForNewContent: no new content")
 		return
 	}
+
+	log.Debug().
+		Str("session_id", sessionID).
+		Int64("current_size", currentSize).
+		Int64("last_offset", lastOffset).
+		Int64("bytes_to_read", currentSize-lastOffset).
+		Msg("checkForNewContent: found new content to read")
 
 	// Read new content
 	file, err := os.Open(filePath)
@@ -247,18 +255,38 @@ func (s *SessionStreamer) checkForNewContent() {
 		log.Warn().Err(scanner.Err()).Msg("error scanning session file")
 	}
 
+	// Log state after reading
+	log.Debug().
+		Str("session_id", sessionID).
+		Int("messages", messagesEmitted).
+		Int64("new_offset", newOffset).
+		Int64("current_size", currentSize).
+		Bool("caught_up", newOffset >= currentSize).
+		Msg("checkForNewContent: finished reading")
+
 	// Update offset
 	s.mu.Lock()
 	s.lastOffset = newOffset
 	s.lastSize = currentSize
 	s.mu.Unlock()
 
-	if messagesEmitted > 0 {
-		log.Debug().
+	// Emit stream_read_complete when we've caught up to current file end
+	// This signals to iOS that we've finished reading all available content
+	if newOffset >= currentSize {
+		log.Info().
 			Str("session_id", sessionID).
 			Int("messages", messagesEmitted).
+			Int64("offset", newOffset).
+			Int64("file_size", currentSize).
+			Msg("emitting stream_read_complete event")
+		s.hub.Publish(events.NewStreamReadCompleteEvent(sessionID, messagesEmitted, newOffset, currentSize))
+	} else {
+		log.Warn().
+			Str("session_id", sessionID).
 			Int64("new_offset", newOffset).
-			Msg("streamed new session messages")
+			Int64("current_size", currentSize).
+			Int64("gap", currentSize-newOffset).
+			Msg("checkForNewContent: NOT caught up - gap between read position and file size")
 	}
 }
 
@@ -267,9 +295,9 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 	// Parse the raw message
 	var raw struct {
 		Type       string `json:"type"`
-		Subtype    string `json:"subtype,omitempty"`    // "compact_boundary" for context compaction marker
-		UserType   string `json:"userType,omitempty"`   // "external" for auto-generated messages
-		Content    string `json:"content,omitempty"`    // For system messages (e.g., "Conversation compacted")
+		Subtype    string `json:"subtype,omitempty"`  // "compact_boundary" for context compaction marker
+		UserType   string `json:"userType,omitempty"` // "external" for auto-generated messages
+		Content    string `json:"content,omitempty"`  // For system messages (e.g., "Conversation compacted")
 		UUID       string `json:"uuid,omitempty"`
 		Timestamp  string `json:"timestamp,omitempty"`
 		StopReason string `json:"stop_reason,omitempty"` // "end_turn", "tool_use", etc.
@@ -406,79 +434,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 
 	s.hub.Publish(events.NewClaudeMessageEventFull(*payload))
 
-	// Track last assistant message for stop_reason emission
-	if payload.Type == "assistant" {
-		s.mu.Lock()
-		s.lastMessage = payload
-		s.mu.Unlock()
-	}
-
 	return payload
-}
-
-// EmitCompletion emits a completion signal with stop_reason: "end_turn".
-// Call this when PTY session finishes to signal completion.
-// This is debounced and guarded against duplicate calls.
-func (s *SessionStreamer) EmitCompletion(sessionID string) {
-	// Wait for JSONL watcher debounce to process any final messages (debounce is 200ms)
-	// This ensures lastMessage is up-to-date before we emit completion
-	time.Sleep(350 * time.Millisecond)
-
-	s.mu.Lock()
-	// Guard against duplicate completion emissions
-	if s.completionSent {
-		s.mu.Unlock()
-		log.Debug().
-			Str("session_id", sessionID).
-			Msg("EmitCompletion: already sent, skipping duplicate")
-		return
-	}
-
-	// Check session match
-	if sessionID != s.watchedSession {
-		s.mu.Unlock()
-		log.Debug().
-			Str("requested_session", sessionID).
-			Str("watched_session", s.watchedSession).
-			Msg("EmitCompletion: session mismatch, skipping")
-		return
-	}
-
-	// Mark as sent and get last message
-	s.completionSent = true
-	lastMsg := s.lastMessage
-	s.lastMessage = nil // Clear to free memory
-	s.mu.Unlock()
-
-	// Emit completion signal
-	// Note: We emit a lightweight message with just stop_reason, not the full content
-	// This avoids duplicate content in iOS UI
-	if lastMsg != nil {
-		// Emit completion with minimal content reference
-		s.hub.Publish(events.NewClaudeMessageEventFull(events.ClaudeMessagePayload{
-			SessionID:  sessionID,
-			Type:       "assistant",
-			Role:       "assistant",
-			StopReason: "end_turn",
-			Content:    lastMsg.Content, // Include last content for context
-		}))
-		log.Info().
-			Str("session_id", sessionID).
-			Int("content_blocks", len(lastMsg.Content)).
-			Msg("emitted claude_message completion with stop_reason:end_turn")
-	} else {
-		// No last message, emit minimal completion signal
-		s.hub.Publish(events.NewClaudeMessageEventFull(events.ClaudeMessagePayload{
-			SessionID:  sessionID,
-			Type:       "assistant",
-			Role:       "assistant",
-			StopReason: "end_turn",
-			Content:    []events.ClaudeMessageContent{},
-		}))
-		log.Info().
-			Str("session_id", sessionID).
-			Msg("emitted minimal claude_message completion (no previous message)")
-	}
 }
 
 // Close stops the streamer and releases resources.

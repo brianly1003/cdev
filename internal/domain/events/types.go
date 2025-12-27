@@ -32,6 +32,9 @@ const (
 	EventTypeSessionWatchChanged EventType = "session_watch_changed"
 	EventTypeSessionJoined       EventType = "session_joined"
 	EventTypeSessionLeft         EventType = "session_left"
+	EventTypeSessionIDResolved   EventType = "session_id_resolved" // Real session ID from .claude/projects
+	EventTypeSessionIDTimeout    EventType = "session_id_timeout"  // Timeout waiting for real session ID
+	EventTypeSessionIDFailed     EventType = "session_id_failed"   // Failed to get real session ID (user declined trust)
 
 	// Workspace events
 	EventTypeWorkspaceRemoved EventType = "workspace_removed"
@@ -43,6 +46,9 @@ const (
 
 	// Connection events
 	EventTypeHeartbeat EventType = "heartbeat"
+
+	// Stream events
+	EventTypeStreamReadComplete EventType = "stream_read_complete" // JSONL file reader caught up to end
 )
 
 // Event is the base interface for all events.
@@ -179,4 +185,25 @@ func NewWorkspaceRemovedEvent(id, name, path string) *BaseEvent {
 		Name: name,
 		Path: path,
 	}, id, "") // workspace_id = id, session_id = empty
+}
+
+// --- Stream Event Payloads ---
+
+// StreamReadCompletePayload represents the payload for stream_read_complete events.
+// This is emitted when the JSONL file reader catches up to the current end of the file.
+type StreamReadCompletePayload struct {
+	SessionID       string `json:"session_id"`
+	MessagesEmitted int    `json:"messages_emitted"` // Number of messages read in this batch
+	FileOffset      int64  `json:"file_offset"`      // Current position in file
+	FileSize        int64  `json:"file_size"`        // Total file size when read
+}
+
+// NewStreamReadCompleteEvent creates a new stream_read_complete event.
+func NewStreamReadCompleteEvent(sessionID string, messagesEmitted int, fileOffset, fileSize int64) *BaseEvent {
+	return NewEventWithContext(EventTypeStreamReadComplete, StreamReadCompletePayload{
+		SessionID:       sessionID,
+		MessagesEmitted: messagesEmitted,
+		FileOffset:      fileOffset,
+		FileSize:        fileSize,
+	}, "", sessionID)
 }

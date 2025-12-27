@@ -11,13 +11,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/domain"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/creack/pty"
 	"github.com/rs/zerolog/log"
 )
@@ -62,8 +63,9 @@ type Manager struct {
 	ptyParser *PTYParser // Parser for PTY output
 
 	// PTY state tracking
-	ptyState      PTYState       // Current PTY interaction state
-	ptyPromptType PermissionType // Type of permission being requested
+	ptyState         PTYState            // Current PTY interaction state
+	ptyPromptType    PermissionType      // Type of permission being requested
+	lastPTYPermission *PTYPermissionPrompt // Last detected permission prompt (for reconnect)
 
 	// Session tracking
 	claudeSessionID string // Session ID from Claude CLI output
@@ -129,7 +131,18 @@ func (m *Manager) WorkspaceID() string {
 
 // SessionID returns the session ID for this manager.
 func (m *Manager) SessionID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.sessionID
+}
+
+// SetSessionID updates the session ID for this manager.
+// This is called when the real session ID is detected from Claude's session file.
+// Thread-safe: uses mutex to protect concurrent access.
+func (m *Manager) SetSessionID(newID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sessionID = newID
 }
 
 // publishEvent publishes an event with workspace/session context.
@@ -420,16 +433,12 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 // StartWithPTY spawns Claude CLI with a pseudo-terminal for true interactive support.
 // This allows permission prompts to work interactively from remote clients.
 // The PTY makes Claude think it's running in a real terminal.
+// If prompt is empty, Claude starts in interactive mode waiting for user input.
 func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
 	m.mu.Lock()
 	if m.state == events.ClaudeStateRunning {
 		m.mu.Unlock()
 		return domain.ErrClaudeAlreadyRunning
-	}
-
-	if prompt == "" {
-		m.mu.Unlock()
-		return domain.ErrInvalidPrompt
 	}
 
 	// Create cancellable context with timeout
@@ -631,126 +640,140 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 			break
 		}
 
-		lineCount++
 		line = strings.TrimSuffix(line, "\n")
 		line = strings.TrimSuffix(line, "\r") // Remove CRLF from PTY
 
-		// Parse line with PTY parser (strips ANSI, detects prompts)
-		parsedLine := parser.ansi.ParseLine(line)
-		permissionPrompt, ptyState := parser.ProcessLine(line)
+		m.processPTYLine(line, parser, &lastState, &lineCount)
+	}
 
-		// Update manager state
+	m.finishPTYStreaming(parser, lineCount)
+}
+
+// processPTYLine handles a single line of PTY output.
+func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYState, lineCount *int) {
+	*lineCount++
+
+	// Parse line with PTY parser (strips ANSI, detects prompts)
+	parsedLine := parser.ansi.ParseLine(line)
+
+	// Log session_id detection attempts
+	cleanText := parsedLine.CleanText
+	if strings.Contains(cleanText, "session") || strings.Contains(line, "session") {
+		log.Info().
+			Str("raw", truncatePrompt(line, 200)).
+			Str("clean", truncatePrompt(cleanText, 200)).
+			Msg("PTY: possible session_id in output")
+	}
+	// Also check for UUID patterns (8-4-4-4-12 format)
+	if matched, _ := regexp.MatchString(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`, strings.ToLower(cleanText)); matched {
+		log.Info().
+			Str("clean", truncatePrompt(cleanText, 200)).
+			Msg("PTY: UUID pattern detected in output")
+	}
+	permissionPrompt, ptyState := parser.ProcessLine(line)
+
+	// Update manager state
+	m.mu.Lock()
+	m.ptyState = ptyState
+	if permissionPrompt != nil {
+		m.waitingForInput = true
+		m.ptyPromptType = permissionPrompt.Type
+	}
+	m.mu.Unlock()
+
+	// Emit pty_permission event when a prompt is detected
+	if permissionPrompt != nil {
+		// Store the permission for reconnect scenarios
 		m.mu.Lock()
-		m.ptyState = ptyState
-		if permissionPrompt != nil {
-			m.waitingForInput = true
-			m.ptyPromptType = permissionPrompt.Type
-		}
+		m.lastPTYPermission = permissionPrompt
 		m.mu.Unlock()
 
-		// NOTE: pty_output event disabled - too verbose for cdev-ios
-		// cdev-ios should use pty_permission and claude_message events instead
-		// if parsedLine.CleanText != "" {
-		// 	m.publishEvent(events.NewPTYOutputEventWithSession(
-		// 		parsedLine.CleanText,
-		// 		parsedLine.RawText,
-		// 		string(ptyState),
-		// 		m.sessionID,
-		// 	))
-		// }
-
-		// Emit pty_permission event when a prompt is detected
-		if permissionPrompt != nil {
-			// Convert options to event format
-			options := make([]events.PTYPromptOption, len(permissionPrompt.Options))
-			for i, opt := range permissionPrompt.Options {
-				options[i] = events.PTYPromptOption{
-					Key:         opt.Key,
-					Label:       opt.Label,
-					Description: opt.Description,
-					Selected:    opt.Selected,
-				}
+		// Convert options to event format
+		options := make([]events.PTYPromptOption, len(permissionPrompt.Options))
+		for i, opt := range permissionPrompt.Options {
+			options[i] = events.PTYPromptOption{
+				Key:         opt.Key,
+				Label:       opt.Label,
+				Description: opt.Description,
+				Selected:    opt.Selected,
 			}
+		}
 
-			m.publishEvent(events.NewPTYPermissionEventWithSession(
-				string(permissionPrompt.Type),
-				permissionPrompt.Target,
-				permissionPrompt.Description,
-				permissionPrompt.Preview,
+		m.publishEvent(events.NewPTYPermissionEventWithSession(
+			string(permissionPrompt.Type),
+			permissionPrompt.Target,
+			permissionPrompt.Description,
+			permissionPrompt.Preview,
+			m.sessionID,
+			options,
+		))
+
+		log.Info().
+			Str("type", string(permissionPrompt.Type)).
+			Str("target", permissionPrompt.Target).
+			Int("options", len(permissionPrompt.Options)).
+			Msg("PTY permission prompt detected")
+	}
+
+	// Emit pty_state event only when state becomes idle (reduces noise)
+	// Other state changes (thinking, permission, question) are too frequent
+	if ptyState != *lastState {
+		if ptyState == PTYStateIdle {
+			m.publishEvent(events.NewPTYStateEventWithSession(
+				string(ptyState),
+				parser.IsWaitingForInput(),
+				string(m.ptyPromptType),
 				m.sessionID,
-				options,
 			))
-
-			log.Info().
-				Str("type", string(permissionPrompt.Type)).
-				Str("target", permissionPrompt.Target).
-				Int("options", len(permissionPrompt.Options)).
-				Msg("PTY permission prompt detected")
 		}
+		*lastState = ptyState
+	}
 
-		// Emit pty_state event only when state becomes idle (reduces noise)
-		// Other state changes (thinking, permission, question) are too frequent
-		if ptyState != lastState {
-			if ptyState == PTYStateIdle {
-				m.publishEvent(events.NewPTYStateEventWithSession(
-					string(ptyState),
-					parser.IsWaitingForInput(),
-					string(m.ptyPromptType),
-					m.sessionID,
-				))
-			}
-			lastState = ptyState
-		}
-
-		// Detect spinner patterns and emit debounced pty_spinner events
-		// Spinner characters: ✳ ✶ ✻ ✽ ✢ · (used in Claude's "Vibing…" animation)
-		cleanText := parsedLine.CleanText
-		if symbol, message, ok := detectSpinner(cleanText); ok {
-			m.mu.Lock()
-			now := time.Now()
-			// Debounce: only emit if message changed or 150ms passed
-			shouldEmit := message != m.lastSpinnerText || now.Sub(m.lastSpinnerTime) > 150*time.Millisecond
-			if shouldEmit {
-				m.lastSpinnerText = message
-				m.lastSpinnerTime = now
-				m.mu.Unlock()
-
-				m.publishEvent(events.NewPTYSpinnerEventWithSession(
-					cleanText, // Full text like "✶ Vibing…"
-					symbol,    // Just "✶"
-					message,   // Just "Vibing…"
-					m.sessionID,
-				))
-			} else {
-				m.mu.Unlock()
-			}
-		}
-
-		// NOTE: claude_log event disabled for interactive mode - too verbose for cdev-ios
-		// cdev-ios should use pty_permission and claude_message events instead
-		// m.publishEvent(events.NewClaudeLogEvent(line, events.StreamStdout))
-
-		// Write to log file if enabled
-		m.mu.RLock()
-		if m.logFile != nil {
-			m.logFile.WriteString(line + "\n")
-		}
-		m.mu.RUnlock()
-
-		// Log PTY output, but filter duplicate lines to reduce noise
+	// Detect spinner patterns and emit debounced pty_spinner events
+	if symbol, message, ok := detectSpinner(cleanText); ok {
 		m.mu.Lock()
-		isDuplicate := cleanText == m.lastLogLine
-		m.lastLogLine = cleanText
-		m.mu.Unlock()
+		now := time.Now()
+		// Debounce: only emit if message changed or 150ms passed
+		shouldEmit := message != m.lastSpinnerText || now.Sub(m.lastSpinnerTime) > 150*time.Millisecond
+		if shouldEmit {
+			m.lastSpinnerText = message
+			m.lastSpinnerTime = now
+			m.mu.Unlock()
 
-		if !isDuplicate && cleanText != "" {
-			log.Debug().
-				Str("clean", truncatePrompt(cleanText, 80)).
-				Str("state", string(ptyState)).
-				Msg("PTY output")
+			m.publishEvent(events.NewPTYSpinnerEventWithSession(
+				cleanText, // Full text like "✶ Vibing…"
+				symbol,    // Just "✶"
+				message,   // Just "Vibing…"
+				m.sessionID,
+			))
+		} else {
+			m.mu.Unlock()
 		}
 	}
 
+	// Write to log file if enabled
+	m.mu.RLock()
+	if m.logFile != nil {
+		m.logFile.WriteString(line + "\n")
+	}
+	m.mu.RUnlock()
+
+	// Log PTY output, but filter duplicate lines to reduce noise
+	m.mu.Lock()
+	isDuplicate := cleanText == m.lastLogLine
+	m.lastLogLine = cleanText
+	m.mu.Unlock()
+
+	if !isDuplicate && cleanText != "" {
+		log.Debug().
+			Str("clean", truncatePrompt(cleanText, 80)).
+			Str("state", string(ptyState)).
+			Msg("PTY output")
+	}
+}
+
+// finishPTYStreaming handles cleanup when PTY streaming ends.
+func (m *Manager) finishPTYStreaming(parser *PTYParser, lineCount int) {
 	// Clean up parser reference
 	m.mu.Lock()
 	m.ptyParser = nil
@@ -766,6 +789,7 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 	))
 
 	// Call completion callback if set (to emit claude_message with stop_reason)
+	// This is only called when PTY streaming actually ends (Claude exits)
 	m.mu.RLock()
 	callback := m.onPTYComplete
 	m.mu.RUnlock()
@@ -827,8 +851,10 @@ func (m *Manager) SendPTYInput(input string) error {
 	}
 
 	// Reset waiting state after user responds
+	// Note: we already hold m.mu from the function entry, no need to lock again
 	m.waitingForInput = false
 	m.ptyPromptType = ""
+	m.lastPTYPermission = nil // Clear pending permission
 
 	// Reset parser state if available
 	if m.ptyParser != nil {
@@ -848,6 +874,21 @@ func (m *Manager) IsPTYMode() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.usePTY
+}
+
+// GetPendingPTYPermission returns the pending PTY permission prompt if any.
+// Used when client reconnects to re-show the permission dialog.
+func (m *Manager) GetPendingPTYPermission() *PTYPermissionPrompt {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastPTYPermission
+}
+
+// HasPendingPermission returns true if there's a pending permission request.
+func (m *Manager) HasPendingPermission() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastPTYPermission != nil
 }
 
 // Stop gracefully terminates the running Claude process.

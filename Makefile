@@ -39,7 +39,7 @@ GARBLE_FLAGS := -literals -tiny -seed=random
 SWAG := $(shell go env GOPATH)/bin/swag
 
 # Targets
-.PHONY: all build build-release build-obfuscated build-all build-all-release build-all-obfuscated clean test test-race fmt vet lint tidy run run-headless run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
+.PHONY: all build build-release build-obfuscated build-all build-all-release build-all-obfuscated clean test test-race test-deadlock fmt vet lint tidy run run-headless run-bg run-debug stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start build-debug
 
 # Default target
 all: build
@@ -49,6 +49,14 @@ build:
 	@echo "Building $(BINARY_NAME) (development)..."
 	@mkdir -p $(BINARY_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/cdev
+
+# Build with deadlock detection (development + go-deadlock)
+# Use this to detect potential deadlocks during development
+build-debug:
+	@echo "Building $(BINARY_NAME) with DEADLOCK DETECTION..."
+	@mkdir -p $(BINARY_DIR)
+	$(GOBUILD) -tags deadlock $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/cdev
+	@echo "Deadlock detection build complete. Mutexes will report potential deadlocks."
 
 # Build for current platform (release - stripped, protected)
 build-release:
@@ -150,6 +158,16 @@ else
 	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
 endif
 
+# Run with DEADLOCK DETECTION enabled
+# Usage: make run-debug or make run-debug REPO=/path/to/repo
+run-debug: build-debug
+	@echo "Starting cdev with DEADLOCK DETECTION enabled..."
+ifneq ($(REPO),)
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
+else
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
+endif
+
 # Run the application in HEADLESS mode (Claude runs as background subprocess)
 # Usage: make run-headless or make run-headless REPO=/path/to/repo
 run-headless: build
@@ -203,6 +221,11 @@ test:
 # Run tests with race detection
 test-race:
 	$(GOTEST) -race -v ./...
+
+# Run tests with deadlock detection
+test-deadlock:
+	@echo "Running tests with DEADLOCK DETECTION..."
+	$(GOTEST) -tags deadlock -v ./...
 
 # Run tests with coverage (standard HTML)
 test-coverage:
@@ -352,6 +375,7 @@ help:
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  make build                Build for current platform (development)"
+	@echo "  make build-debug          Build with DEADLOCK DETECTION (go-deadlock)"
 	@echo "  make build-release        Build with stripped symbols (basic protection)"
 	@echo "  make build-obfuscated     Build with garble obfuscation (maximum protection)"
 	@echo ""
@@ -378,10 +402,15 @@ help:
 	@echo "    make run-bg            Run server in background (always headless)"
 	@echo "    make stop              Stop the server"
 	@echo ""
+	@echo "  DEBUG MODE (deadlock detection):"
+	@echo "    make run-debug         Run with go-deadlock to detect potential deadlocks"
+	@echo "    make run-debug REPO=/path  Run debug mode with specific repo"
+	@echo ""
 	@echo "Testing:"
 	@echo "  make test                  Run tests"
 	@echo "  make test-verbose          Run tests with verbose output"
 	@echo "  make test-race             Run tests with race detection"
+	@echo "  make test-deadlock         Run tests with deadlock detection"
 	@echo "  make test-pkg PKG=./path   Run tests for specific package"
 	@echo "  make bench                 Run all benchmarks"
 	@echo "  make bench-pkg PKG=./path  Run benchmarks for specific package"
