@@ -6,6 +6,7 @@ const (
 	EventTypePTYOutput     EventType = "pty_output"
 	EventTypePTYPermission EventType = "pty_permission"
 	EventTypePTYState      EventType = "pty_state"
+	EventTypePTYSpinner    EventType = "pty_spinner"
 )
 
 // PTYOutputPayload represents processed terminal output.
@@ -40,6 +41,14 @@ type PTYStatePayload struct {
 	WaitingForInput bool   `json:"waiting_for_input"`
 	PromptType      string `json:"prompt_type,omitempty"` // "write_file", "bash_command", etc.
 	SessionID       string `json:"session_id,omitempty"`
+}
+
+// PTYSpinnerPayload represents spinner animation state (e.g., "✶ Vibing…").
+type PTYSpinnerPayload struct {
+	Text      string `json:"text"`                 // Full spinner text (e.g., "✶ Vibing…")
+	Symbol    string `json:"symbol"`               // Just the spinner symbol (e.g., "✶")
+	Message   string `json:"message"`              // Just the message (e.g., "Vibing…")
+	SessionID string `json:"session_id,omitempty"`
 }
 
 // NewPTYOutputEvent creates a new PTY output event.
@@ -100,5 +109,15 @@ func NewPTYStateEventWithSession(state string, waitingForInput bool, promptType,
 		WaitingForInput: waitingForInput,
 		PromptType:      promptType,
 		SessionID:       sessionID,
+	})
+}
+
+// NewPTYSpinnerEventWithSession creates a new PTY spinner event with session ID.
+func NewPTYSpinnerEventWithSession(text, symbol, message, sessionID string) *BaseEvent {
+	return NewEvent(EventTypePTYSpinner, PTYSpinnerPayload{
+		Text:      text,
+		Symbol:    symbol,
+		Message:   message,
+		SessionID: sessionID,
 	})
 }

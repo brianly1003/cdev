@@ -229,6 +229,14 @@ func (p *PTYParser) detectPermissionType(line string) {
 		return
 	}
 
+	// For trust folder prompts, extract the path before returning
+	// Folder paths start with / and don't contain typical file extensions
+	if p.currentPromptType == PermissionTypeTrustFolder && p.currentPromptTarget == "" && strings.HasPrefix(line, "/") {
+		// This could be the folder path in a trust prompt
+		p.currentPromptTarget = strings.TrimSpace(line)
+		return
+	}
+
 	// If we already have a permission type, don't let subsequent lines change it
 	// Target extraction from loose text was too error-prone (matched random code with periods)
 	// Target is now only extracted from explicit patterns like "Write(filename.txt)"
@@ -293,13 +301,6 @@ func (p *PTYParser) detectPermissionType(line string) {
 		return
 	}
 
-	// Check if line looks like a folder path (for trust folder target extraction)
-	// Folder paths start with / and don't contain typical file extensions
-	if p.currentPromptType == PermissionTypeTrustFolder && strings.HasPrefix(line, "/") {
-		// This could be the folder path in a trust prompt
-		p.currentPromptTarget = strings.TrimSpace(line)
-		return
-	}
 }
 
 // detectPermissionFromBuffer analyzes the buffer to detect a complete permission prompt.

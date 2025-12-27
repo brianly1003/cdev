@@ -75,6 +75,11 @@ type Manager struct {
 
 	// Callback when PTY completes (for emitting stop_reason)
 	onPTYComplete func(sessionID string)
+
+	// Spinner tracking for deduplication and debouncing
+	lastSpinnerText string    // Last spinner text to avoid duplicates
+	lastSpinnerTime time.Time // Time of last spinner event for debouncing
+	lastLogLine     string    // Last log line to filter duplicates
 }
 
 // NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
@@ -697,6 +702,30 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 			lastState = ptyState
 		}
 
+		// Detect spinner patterns and emit debounced pty_spinner events
+		// Spinner characters: ✳ ✶ ✻ ✽ ✢ · (used in Claude's "Vibing…" animation)
+		cleanText := parsedLine.CleanText
+		if symbol, message, ok := detectSpinner(cleanText); ok {
+			m.mu.Lock()
+			now := time.Now()
+			// Debounce: only emit if message changed or 150ms passed
+			shouldEmit := message != m.lastSpinnerText || now.Sub(m.lastSpinnerTime) > 150*time.Millisecond
+			if shouldEmit {
+				m.lastSpinnerText = message
+				m.lastSpinnerTime = now
+				m.mu.Unlock()
+
+				m.publishEvent(events.NewPTYSpinnerEventWithSession(
+					cleanText, // Full text like "✶ Vibing…"
+					symbol,    // Just "✶"
+					message,   // Just "Vibing…"
+					m.sessionID,
+				))
+			} else {
+				m.mu.Unlock()
+			}
+		}
+
 		// NOTE: claude_log event disabled for interactive mode - too verbose for cdev-ios
 		// cdev-ios should use pty_permission and claude_message events instead
 		// m.publishEvent(events.NewClaudeLogEvent(line, events.StreamStdout))
@@ -708,10 +737,18 @@ func (m *Manager) streamPTYOutput(ptmx *os.File) {
 		}
 		m.mu.RUnlock()
 
-		log.Debug().
-			Str("clean", truncatePrompt(parsedLine.CleanText, 80)).
-			Str("state", string(ptyState)).
-			Msg("PTY output")
+		// Log PTY output, but filter duplicate lines to reduce noise
+		m.mu.Lock()
+		isDuplicate := cleanText == m.lastLogLine
+		m.lastLogLine = cleanText
+		m.mu.Unlock()
+
+		if !isDuplicate && cleanText != "" {
+			log.Debug().
+				Str("clean", truncatePrompt(cleanText, 80)).
+				Str("state", string(ptyState)).
+				Msg("PTY output")
+		}
 	}
 
 	// Clean up parser reference
@@ -1063,6 +1100,28 @@ func truncatePrompt(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// spinnerSymbols are the characters used in Claude's thinking animation
+var spinnerSymbols = []string{"✳", "✶", "✻", "✽", "✢", "·"}
+
+// detectSpinner checks if a line contains a spinner pattern and extracts the symbol and message.
+// Returns (symbol, message, true) if spinner detected, or ("", "", false) otherwise.
+// Example: "✶ Vibing…" -> ("✶", "Vibing…", true)
+func detectSpinner(line string) (symbol, message string, ok bool) {
+	line = strings.TrimSpace(line)
+	if len(line) == 0 {
+		return "", "", false
+	}
+
+	for _, sym := range spinnerSymbols {
+		if strings.HasPrefix(line, sym) {
+			// Extract the message after the symbol
+			msg := strings.TrimSpace(strings.TrimPrefix(line, sym))
+			return sym, msg, true
+		}
+	}
+	return "", "", false
 }
 
 // claudeMessage represents a parsed Claude output message.
