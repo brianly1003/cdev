@@ -33,6 +33,9 @@ const (
 	EventTypeSessionJoined       EventType = "session_joined"
 	EventTypeSessionLeft         EventType = "session_left"
 
+	// Workspace events
+	EventTypeWorkspaceRemoved EventType = "workspace_removed"
+
 	// Response events
 	EventTypeStatusResponse EventType = "status_response"
 	EventTypeFileContent    EventType = "file_content"
@@ -158,4 +161,22 @@ type GitOperationCompletedPayload struct {
 	CommitsPushed  int      `json:"commits_pushed,omitempty"`  // for push
 	CommitsPulled  int      `json:"commits_pulled,omitempty"`  // for pull
 	ConflictedFiles []string `json:"conflicted_files,omitempty"` // for pull with conflicts
+}
+
+// --- Workspace Event Payloads ---
+
+// WorkspaceRemovedPayload represents the payload for workspace_removed events.
+type WorkspaceRemovedPayload struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// NewWorkspaceRemovedEvent creates a new workspace_removed event.
+func NewWorkspaceRemovedEvent(id, name, path string) *BaseEvent {
+	return NewEventWithContext(EventTypeWorkspaceRemoved, WorkspaceRemovedPayload{
+		ID:   id,
+		Name: name,
+		Path: path,
+	}, id, "") // workspace_id = id, session_id = empty
 }

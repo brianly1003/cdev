@@ -1025,17 +1025,17 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	info, err := s.manager.WatchWorkspaceSession(p.WorkspaceID, p.SessionID)
+	// Get client ID for tracking watchers
+	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+
+	info, err := s.manager.WatchWorkspaceSession(clientID, p.WorkspaceID, p.SessionID)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	// Also update focus tracking so this client appears in the session's viewers list
-	if s.focusProvider != nil {
-		clientID, _ := ctx.Value(handler.ClientIDKey).(string)
-		if clientID != "" {
-			s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
-		}
+	if s.focusProvider != nil && clientID != "" {
+		s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
 	}
 
 	return map[string]interface{}{
@@ -1049,7 +1049,10 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 // UnwatchSession stops watching the current session.
 // Returns the previous watch info.
 func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-	info := s.manager.UnwatchWorkspaceSession()
+	// Get client ID for tracking watchers
+	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+
+	info := s.manager.UnwatchWorkspaceSession(clientID)
 
 	return map[string]interface{}{
 		"status":       "unwatched",

@@ -18,26 +18,52 @@ BINARY_NAME := cdev
 BINARY_DIR := bin
 DIST_DIR := dist
 
-# Build flags
+# Build flags (development - includes debug symbols)
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
+
+# Build flags (release - stripped symbols for protection against reverse engineering)
+# -s: Strip symbol table (removes function/variable names)
+# -w: Strip DWARF debugging info (removes source file references)
+# -trimpath: Remove file system paths from compiled executable
+LDFLAGS_RELEASE := -trimpath -ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
+
+# Garble settings (advanced obfuscation)
+# Requires: go install mvdan.cc/garble@latest
+GARBLE := $(shell go env GOPATH)/bin/garble
+# -literals: Obfuscate string literals
+# -tiny: Produce smaller binaries by removing extra info
+# -seed=random: Use random seed for each build (different obfuscation each time)
+GARBLE_FLAGS := -literals -tiny -seed=random
 
 # Swag settings
 SWAG := $(shell go env GOPATH)/bin/swag
 
 # Targets
-.PHONY: all build build-all clean test test-race fmt vet lint tidy run run-headless run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
+.PHONY: all build build-release build-obfuscated build-all build-all-release build-all-obfuscated clean test test-race fmt vet lint tidy run run-headless run-bg stop run-manager run-manager-bg stop-manager help swagger openrpc openrpc-start
 
 # Default target
 all: build
 
-# Build for current platform
+# Build for current platform (development - with debug symbols)
 build:
-	@echo "Building $(BINARY_NAME)..."
+	@echo "Building $(BINARY_NAME) (development)..."
 	@mkdir -p $(BINARY_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/cdev
 
-# Build for all platforms
+# Build for current platform (release - stripped, protected)
+build-release:
+	@echo "Building $(BINARY_NAME) (release - protected)..."
+	@mkdir -p $(BINARY_DIR)
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS_RELEASE) -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/cdev
+	@echo "Release build complete. Symbols stripped for protection."
+
+# Build for all platforms (development)
 build-all: build-darwin-arm64 build-darwin-amd64 build-windows-amd64 build-linux-amd64
+
+# Build for all platforms (release - stripped, protected)
+build-all-release: build-darwin-arm64-release build-darwin-amd64-release build-windows-amd64-release build-linux-amd64-release
+	@echo ""
+	@echo "All release builds complete. Binaries are protected against reverse engineering."
 
 build-darwin-arm64:
 	@echo "Building for macOS ARM64..."
@@ -58,6 +84,60 @@ build-linux-amd64:
 	@echo "Building for Linux AMD64..."
 	@mkdir -p $(DIST_DIR)
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/cdev
+
+# Release builds (stripped symbols for protection)
+build-darwin-arm64-release:
+	@echo "Building for macOS ARM64 (release)..."
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/cdev
+
+build-darwin-amd64-release:
+	@echo "Building for macOS AMD64 (release)..."
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/cdev
+
+build-windows-amd64-release:
+	@echo "Building for Windows AMD64 (release)..."
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/cdev
+
+build-linux-amd64-release:
+	@echo "Building for Linux AMD64 (release)..."
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/cdev
+
+# Obfuscated builds (maximum protection using garble)
+# Hides: function names, module paths, package names, string literals
+build-obfuscated:
+	@echo "Building $(BINARY_NAME) (obfuscated - maximum protection)..."
+	@which $(GARBLE) > /dev/null || (echo "garble not installed. Run: go install mvdan.cc/garble@latest" && exit 1)
+	@mkdir -p $(BINARY_DIR)
+	CGO_ENABLED=0 $(GARBLE) $(GARBLE_FLAGS) build $(LDFLAGS_RELEASE) -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/cdev
+	@echo "Obfuscated build complete. Module paths and literals are hidden."
+
+# Build all platforms with obfuscation (maximum protection)
+build-all-obfuscated: build-darwin-arm64-obfuscated build-darwin-amd64-obfuscated build-linux-amd64-obfuscated
+	@echo ""
+	@echo "All obfuscated builds complete. Maximum protection against reverse engineering."
+	@echo "Note: Windows obfuscated build requires Windows or cross-compilation setup."
+
+build-darwin-arm64-obfuscated:
+	@echo "Building for macOS ARM64 (obfuscated)..."
+	@which $(GARBLE) > /dev/null || (echo "garble not installed. Run: go install mvdan.cc/garble@latest" && exit 1)
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GARBLE) $(GARBLE_FLAGS) build $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/cdev
+
+build-darwin-amd64-obfuscated:
+	@echo "Building for macOS AMD64 (obfuscated)..."
+	@which $(GARBLE) > /dev/null || (echo "garble not installed. Run: go install mvdan.cc/garble@latest" && exit 1)
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GARBLE) $(GARBLE_FLAGS) build $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/cdev
+
+build-linux-amd64-obfuscated:
+	@echo "Building for Linux AMD64 (obfuscated)..."
+	@which $(GARBLE) > /dev/null || (echo "garble not installed. Run: go install mvdan.cc/garble@latest" && exit 1)
+	@mkdir -p $(DIST_DIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GARBLE) $(GARBLE_FLAGS) build $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/cdev
 
 # Run the application in TERMINAL mode (default, Claude runs in current terminal)
 # Usage: make run or make run REPO=/path/to/repo
@@ -270,10 +350,19 @@ checksums:
 help:
 	@echo "cdev Makefile"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make              Build for current platform"
-	@echo "  make build        Build for current platform"
-	@echo "  make build-all    Build for all platforms (macOS, Windows, Linux)"
+	@echo "Build Commands:"
+	@echo "  make build                Build for current platform (development)"
+	@echo "  make build-release        Build with stripped symbols (basic protection)"
+	@echo "  make build-obfuscated     Build with garble obfuscation (maximum protection)"
+	@echo ""
+	@echo "  make build-all            Build all platforms (development)"
+	@echo "  make build-all-release    Build all platforms (basic protection)"
+	@echo "  make build-all-obfuscated Build all platforms (maximum protection)"
+	@echo ""
+	@echo "Protection Levels:"
+	@echo "  Development:  Full debug symbols, all paths visible"
+	@echo "  Release:      Stripped symbols, no absolute paths"
+	@echo "  Obfuscated:   Garble obfuscation, hidden module paths & literals"
 	@echo ""
 	@echo "Run Server (port 8766):"
 	@echo ""

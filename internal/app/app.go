@@ -330,7 +330,7 @@ func (a *App) Start(ctx context.Context) error {
 	sessionService.RegisterMethods(rpcRegistry)
 
 	// Workspace config service (workspace/list, workspace/add, etc.)
-	workspaceConfigService := methods.NewWorkspaceConfigService(a.sessionManager, a.workspaceConfigManager)
+	workspaceConfigService := methods.NewWorkspaceConfigService(a.sessionManager, a.workspaceConfigManager, a.hub)
 	workspaceConfigService.RegisterMethods(rpcRegistry)
 
 	// Session manager service (session/start, session/stop, session/send, etc.)

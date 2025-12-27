@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/brianly1003/cdev/internal/domain/events"
+	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
@@ -24,13 +26,15 @@ type WorkspaceConfigService struct {
 	sessionManager *session.Manager
 	configManager  *workspace.ConfigManager
 	viewerProvider SessionViewerProvider
+	hub            ports.EventHub
 }
 
 // NewWorkspaceConfigService creates a new workspace config service.
-func NewWorkspaceConfigService(sessionManager *session.Manager, configManager *workspace.ConfigManager) *WorkspaceConfigService {
+func NewWorkspaceConfigService(sessionManager *session.Manager, configManager *workspace.ConfigManager, hub ports.EventHub) *WorkspaceConfigService {
 	return &WorkspaceConfigService{
 		sessionManager: sessionManager,
 		configManager:  configManager,
+		hub:            hub,
 	}
 }
 
@@ -203,11 +207,24 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 				continue
 			}
 
-			// Determine status: "running" if this is the active LIVE session, otherwise "historical"
+			// Check if this session has viewers
+			var viewers []string
+			hasViewers := false
+			if sessionViewers != nil {
+				if v, ok := sessionViewers[hist.SessionID]; ok && len(v) > 0 {
+					viewers = v
+					hasViewers = true
+				}
+			}
+
+			// Determine status:
+			// - "running" if this is the active LIVE session
+			// - "running" if there are viewers watching the session
+			// - "historical" otherwise
 			status := "historical"
-			if hist.SessionID == activeSessionID {
+			if hist.SessionID == activeSessionID || hasViewers {
 				status = "running"
-				runningCount++ // Count LIVE sessions as active too
+				runningCount++ // Count as active
 			}
 
 			sessInfo := map[string]interface{}{
@@ -219,10 +236,8 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 				"last_updated":  hist.LastUpdated,
 			}
 			// Add viewers for this session
-			if sessionViewers != nil {
-				if viewers, ok := sessionViewers[hist.SessionID]; ok {
-					sessInfo["viewers"] = viewers
-				}
+			if len(viewers) > 0 {
+				sessInfo["viewers"] = viewers
 			}
 			allSessions = append(allSessions, sessInfo)
 		}
@@ -335,6 +350,12 @@ func (s *WorkspaceConfigService) Remove(ctx context.Context, params json.RawMess
 		return nil, message.NewError(message.InvalidParams, "id is required")
 	}
 
+	// Get workspace details before removal (for the event)
+	ws, err := s.configManager.GetWorkspace(p.ID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
 	// Check for active sessions
 	activeCount := s.sessionManager.CountActiveSessionsForWorkspace(p.ID)
 	if activeCount > 0 {
@@ -349,6 +370,12 @@ func (s *WorkspaceConfigService) Remove(ctx context.Context, params json.RawMess
 	// Remove from config
 	if err := s.configManager.RemoveWorkspace(p.ID); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Broadcast workspace_removed event to all clients
+	if s.hub != nil {
+		event := events.NewWorkspaceRemovedEvent(ws.Definition.ID, ws.Definition.Name, ws.Definition.Path)
+		s.hub.Publish(event)
 	}
 
 	return map[string]interface{}{

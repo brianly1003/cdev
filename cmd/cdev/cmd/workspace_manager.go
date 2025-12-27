@@ -154,7 +154,7 @@ func runWorkspaceManagerStart(cmd *cobra.Command, args []string) error {
 	dispatcher := handler.NewDispatcher(registry)
 
 	// 7. Register workspace config service (CRUD)
-	workspaceConfigService := methods.NewWorkspaceConfigService(sessionManager, configManager)
+	workspaceConfigService := methods.NewWorkspaceConfigService(sessionManager, configManager, eventHub)
 	workspaceConfigService.RegisterMethods(registry)
 
 	// 8. Register session manager service (lifecycle)

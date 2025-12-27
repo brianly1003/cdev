@@ -41,11 +41,11 @@ type Manager struct {
 	idleTimeout time.Duration
 
 	// Session streaming for live message updates
-	streamer              *sessioncache.SessionStreamer
-	streamerWorkspaceID   string // Workspace ID of currently watched session
-	streamerSessionID     string // Session ID currently being watched
-	streamerWatcherCount  int    // Number of clients watching (reference counting)
-	streamerMu            sync.Mutex
+	streamer             *sessioncache.SessionStreamer
+	streamerWorkspaceID  string          // Workspace ID of currently watched session
+	streamerSessionID    string          // Session ID currently being watched
+	streamerWatchers     map[string]bool // Client IDs currently watching (for proper cleanup)
+	streamerMu           sync.Mutex
 
 	// LIVE session support (Claude running in user's terminal)
 	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
@@ -75,6 +75,7 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 		activeSessionWorkspaces: make(map[string]string),
 		gitWatchers:             make(map[string]context.CancelFunc),
 		gitWatcherCounts:        make(map[string]int),
+		streamerWatchers:        make(map[string]bool),
 		hub:                     hub,
 		cfg:                     cfg,
 		logger:                  logger,
@@ -297,12 +298,11 @@ func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []str
 		m.StopGitWatcher(workspaceID)
 	}
 
-	// Decrement session streamer watcher count
-	// Note: We decrement once per client disconnect, regardless of which session they were watching
+	// Remove client from session streamer watchers (only if they were watching)
 	m.streamerMu.Lock()
-	if m.streamerWatcherCount > 0 {
-		m.streamerWatcherCount--
-		if m.streamerWatcherCount == 0 && m.streamer != nil {
+	if m.streamerWatchers[clientID] {
+		delete(m.streamerWatchers, clientID)
+		if len(m.streamerWatchers) == 0 && m.streamer != nil {
 			// Last watcher - close the streamer
 			m.streamer.Close()
 			m.streamer = nil
@@ -314,9 +314,10 @@ func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []str
 				"workspace_id", prevWorkspaceID,
 				"session_id", prevSessionID,
 			)
-		} else if m.streamerWatcherCount > 0 {
-			m.logger.Debug("Decremented session streamer watcher count (others still watching)",
-				"remaining_watchers", m.streamerWatcherCount,
+		} else if len(m.streamerWatchers) > 0 {
+			m.logger.Debug("Removed client from session streamer watchers (others still watching)",
+				"client_id", clientID,
+				"remaining_watchers", len(m.streamerWatchers),
 			)
 		}
 	}
@@ -1063,7 +1064,8 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 		// Start watching the JSONL session file for claude_message events
 		// This allows cdev-ios to receive structured messages in addition to pty_output events
 		// watchSessionID already set above for the callback
-		if _, err := m.WatchWorkspaceSession(session.WorkspaceID, watchSessionID); err != nil {
+		// Use internal client ID for server-initiated watches (won't be removed by client disconnect)
+		if _, err := m.WatchWorkspaceSession("internal:pty-session", session.WorkspaceID, watchSessionID); err != nil {
 			// Don't fail the whole operation if watch fails - PTY will still work
 			// claude_message events just won't be emitted
 			log.Warn().
@@ -1707,9 +1709,10 @@ type WatchInfo struct {
 // This is used by iOS to receive real-time claude_message events when new messages
 // are added to the session file.
 //
-// Multiple clients can watch the same session. The streamer uses reference counting
+// Multiple clients can watch the same session. The streamer uses client tracking
 // to keep watching until the last client stops watching.
-func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchInfo, error) {
+// The clientID parameter identifies the client making this request.
+func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string) (*WatchInfo, error) {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
@@ -1733,12 +1736,13 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 
 	// Check if already watching the same session
 	if m.streamer != nil && m.streamerWorkspaceID == workspaceID && m.streamerSessionID == sessionID {
-		// Same session - just increment watcher count
-		m.streamerWatcherCount++
+		// Same session - just add this client to watchers
+		m.streamerWatchers[clientID] = true
 		m.logger.Info("Added watcher to existing session watch",
+			"client_id", clientID,
 			"workspace_id", workspaceID,
 			"session_id", sessionID,
-			"watcher_count", m.streamerWatcherCount,
+			"watcher_count", len(m.streamerWatchers),
 		)
 		return &WatchInfo{
 			WorkspaceID: workspaceID,
@@ -1754,8 +1758,10 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 		m.logger.Debug("Stopped previous session watch (switching sessions)",
 			"workspace_id", m.streamerWorkspaceID,
 			"session_id", m.streamerSessionID,
-			"prev_watcher_count", m.streamerWatcherCount,
+			"prev_watcher_count", len(m.streamerWatchers),
 		)
+		// Clear all watchers since we're switching sessions
+		m.streamerWatchers = make(map[string]bool)
 	}
 
 	// Create new streamer for this workspace's sessions directory
@@ -1769,7 +1775,7 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 
 	m.streamerWorkspaceID = workspaceID
 	m.streamerSessionID = sessionID
-	m.streamerWatcherCount = 1 // First watcher
+	m.streamerWatchers[clientID] = true // First watcher
 
 	// Auto-activate the watched session (uses separate mutex, no deadlock)
 	m.mu.Lock()
@@ -1777,10 +1783,11 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 	m.mu.Unlock()
 
 	m.logger.Info("Started watching session for live updates",
+		"client_id", clientID,
 		"workspace_id", workspaceID,
 		"session_id", sessionID,
 		"sessions_dir", sessionsDir,
-		"watcher_count", m.streamerWatcherCount,
+		"watcher_count", len(m.streamerWatchers),
 	)
 
 	return &WatchInfo{
@@ -1792,7 +1799,8 @@ func (m *Manager) WatchWorkspaceSession(workspaceID, sessionID string) (*WatchIn
 
 // UnwatchWorkspaceSession stops watching the current session for one client.
 // The streamer continues running until all clients have stopped watching.
-func (m *Manager) UnwatchWorkspaceSession() *WatchInfo {
+// The clientID parameter identifies the client making this request.
+func (m *Manager) UnwatchWorkspaceSession(clientID string) *WatchInfo {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
@@ -1805,15 +1813,24 @@ func (m *Manager) UnwatchWorkspaceSession() *WatchInfo {
 	prevWorkspaceID := m.streamerWorkspaceID
 	prevSessionID := m.streamerSessionID
 
-	// Decrement watcher count
-	m.streamerWatcherCount--
+	// Remove this client from watchers (if they were watching)
+	if !m.streamerWatchers[clientID] {
+		// Client wasn't watching - nothing to do
+		return &WatchInfo{
+			WorkspaceID: prevWorkspaceID,
+			SessionID:   prevSessionID,
+			Watching:    len(m.streamerWatchers) > 0,
+		}
+	}
+	delete(m.streamerWatchers, clientID)
 
-	if m.streamerWatcherCount > 0 {
+	if len(m.streamerWatchers) > 0 {
 		// Other clients still watching - keep the streamer running
 		m.logger.Info("Removed watcher from session (others still watching)",
+			"client_id", clientID,
 			"workspace_id", prevWorkspaceID,
 			"session_id", prevSessionID,
-			"remaining_watchers", m.streamerWatcherCount,
+			"remaining_watchers", len(m.streamerWatchers),
 		)
 		return &WatchInfo{
 			WorkspaceID: prevWorkspaceID,
@@ -1827,9 +1844,9 @@ func (m *Manager) UnwatchWorkspaceSession() *WatchInfo {
 	m.streamer = nil
 	m.streamerWorkspaceID = ""
 	m.streamerSessionID = ""
-	m.streamerWatcherCount = 0
 
 	m.logger.Info("Stopped watching session (last watcher left)",
+		"client_id", clientID,
 		"workspace_id", prevWorkspaceID,
 		"session_id", prevSessionID,
 	)
