@@ -644,7 +644,7 @@
             "description": "Unregisters a workspace configuration.",
             "params": [
                 {
-                    "name": "id",
+                    "name": "workspace_id",
                     "required": true,
                     "schema": {
                         "type": "string"
@@ -1438,7 +1438,7 @@
             "description": "Returns detailed information about a specific workspace.",
             "params": [
                 {
-                    "name": "id",
+                    "name": "workspace_id",
                     "required": true,
                     "schema": {
                         "type": "string"

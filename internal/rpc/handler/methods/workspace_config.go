@@ -60,7 +60,7 @@ func (s *WorkspaceConfigService) RegisterMethods(registry *handler.Registry) {
 		Summary:     "Get workspace details",
 		Description: "Returns detailed information about a specific workspace.",
 		Params: []handler.OpenRPCParam{
-			{Name: "id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "workspace",
@@ -86,7 +86,7 @@ func (s *WorkspaceConfigService) RegisterMethods(registry *handler.Registry) {
 		Summary:     "Remove a workspace",
 		Description: "Unregisters a workspace configuration.",
 		Params: []handler.OpenRPCParam{
-			{Name: "id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -258,17 +258,17 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 // Get returns details of a specific workspace.
 func (s *WorkspaceConfigService) Get(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		ID string `json:"id"`
+		WorkspaceID string `json:"workspace_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
 	}
 
-	if p.ID == "" {
-		return nil, message.NewError(message.InvalidParams, "id is required")
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
 
-	ws, err := s.configManager.GetWorkspace(p.ID)
+	ws, err := s.configManager.GetWorkspace(p.WorkspaceID)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
@@ -281,23 +281,92 @@ func (s *WorkspaceConfigService) Get(ctx context.Context, params json.RawMessage
 		"created_at": ws.Definition.CreatedAt,
 	}
 
-	// Get all sessions for this workspace
-	sessions := s.sessionManager.GetSessionsForWorkspace(ws.Definition.ID)
-	sessionInfos := make([]*session.Info, 0, len(sessions))
-	activeCount := 0
-	for _, sess := range sessions {
-		sessionInfos = append(sessionInfos, sess.ToInfo())
-		if sess.GetStatus() == session.StatusRunning {
-			activeCount++
-		}
+	// Get session viewers for this workspace (if provider is available)
+	var sessionViewers map[string][]string
+	if s.viewerProvider != nil {
+		sessionViewers = s.viewerProvider.GetSessionViewers(ws.Definition.ID)
 	}
-	info["sessions"] = sessionInfos
-	info["active_session_count"] = activeCount
-	info["has_active_session"] = activeCount > 0
 
-	// Include the activated session ID (set via workspace/session/activate)
+	// Track running session IDs to avoid duplicates
+	runningSessionIDs := make(map[string]bool)
+
+	// Get the active (LIVE attached) session for this workspace
 	activeSessionID := s.sessionManager.GetActiveSession(ws.Definition.ID)
-	info["active_session_id"] = activeSessionID
+
+	// Get running sessions for this workspace (managed by cdev)
+	runningSessions := s.sessionManager.GetSessionsForWorkspace(ws.Definition.ID)
+	allSessions := make([]map[string]interface{}, 0)
+	runningCount := 0
+
+	for _, sess := range runningSessions {
+		// Only include sessions that are actually running
+		if sess.GetStatus() != session.StatusRunning {
+			continue
+		}
+		runningSessionIDs[sess.ID] = true
+		runningCount++
+		sessInfo := map[string]interface{}{
+			"id":           sess.ID,
+			"workspace_id": sess.WorkspaceID,
+			"status":       "running",
+			"started_at":   sess.StartedAt,
+			"last_active":  sess.LastActive,
+		}
+		// Add viewers for this session
+		if sessionViewers != nil {
+			if viewers, ok := sessionViewers[sess.ID]; ok {
+				sessInfo["viewers"] = viewers
+			}
+		}
+		allSessions = append(allSessions, sessInfo)
+	}
+
+	// Get historical sessions from ~/.claude/projects/
+	historicalSessions, _ := s.sessionManager.ListHistory(ws.Definition.ID, 50)
+	for _, hist := range historicalSessions {
+		// Skip if this session is already running (managed by cdev)
+		if runningSessionIDs[hist.SessionID] {
+			continue
+		}
+
+		// Check if this session has viewers
+		var viewers []string
+		hasViewers := false
+		if sessionViewers != nil {
+			if v, ok := sessionViewers[hist.SessionID]; ok && len(v) > 0 {
+				viewers = v
+				hasViewers = true
+			}
+		}
+
+		// Determine status:
+		// - "running" if this is the active LIVE session
+		// - "running" if there are viewers watching the session
+		// - "historical" otherwise
+		status := "historical"
+		if hist.SessionID == activeSessionID || hasViewers {
+			status = "running"
+			runningCount++
+		}
+
+		sessInfo := map[string]interface{}{
+			"id":            hist.SessionID,
+			"workspace_id":  ws.Definition.ID,
+			"status":        status,
+			"summary":       hist.Summary,
+			"message_count": hist.MessageCount,
+			"last_updated":  hist.LastUpdated,
+		}
+		// Add viewers for this session
+		if len(viewers) > 0 {
+			sessInfo["viewers"] = viewers
+		}
+		allSessions = append(allSessions, sessInfo)
+	}
+
+	info["sessions"] = allSessions
+	info["active_session_count"] = runningCount
+	info["has_active_session"] = runningCount > 0
 
 	return info, nil
 }
@@ -340,35 +409,35 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 // Remove unregisters a workspace.
 func (s *WorkspaceConfigService) Remove(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		ID string `json:"id"`
+		WorkspaceID string `json:"workspace_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
 	}
 
-	if p.ID == "" {
-		return nil, message.NewError(message.InvalidParams, "id is required")
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
 
 	// Get workspace details before removal (for the event)
-	ws, err := s.configManager.GetWorkspace(p.ID)
+	ws, err := s.configManager.GetWorkspace(p.WorkspaceID)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	// Check for active sessions
-	activeCount := s.sessionManager.CountActiveSessionsForWorkspace(p.ID)
+	activeCount := s.sessionManager.CountActiveSessionsForWorkspace(p.WorkspaceID)
 	if activeCount > 0 {
 		return nil, message.NewError(message.InternalError, fmt.Sprintf("cannot remove workspace with %d active session(s)", activeCount))
 	}
 
 	// Unregister from session manager
-	if err := s.sessionManager.UnregisterWorkspace(p.ID); err != nil {
+	if err := s.sessionManager.UnregisterWorkspace(p.WorkspaceID); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	// Remove from config
-	if err := s.configManager.RemoveWorkspace(p.ID); err != nil {
+	if err := s.configManager.RemoveWorkspace(p.WorkspaceID); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
@@ -518,11 +587,11 @@ func (s *WorkspaceConfigService) Status(ctx context.Context, params json.RawMess
 
 	return map[string]interface{}{
 		// Workspace info
-		"workspace_id":         ws.Definition.ID,
-		"workspace_name":       ws.Definition.Name,
-		"path":                 ws.Definition.Path,
-		"auto_start":           ws.Definition.AutoStart,
-		"created_at":           ws.Definition.CreatedAt,
+		"workspace_id":   ws.Definition.ID,
+		"workspace_name": ws.Definition.Name,
+		"path":           ws.Definition.Path,
+		"auto_start":     ws.Definition.AutoStart,
+		"created_at":     ws.Definition.CreatedAt,
 
 		// Session info
 		"sessions":             sessionInfos,
@@ -531,14 +600,14 @@ func (s *WorkspaceConfigService) Status(ctx context.Context, params json.RawMess
 		"active_session_id":    activeSessionID,
 
 		// Git tracker info
-		"git_tracker_state":    gitTrackerState,
-		"git_repo_name":        gitRepoName,
-		"is_git_repo":          isGitRepo,
-		"git_last_error":       gitLastError,
+		"git_tracker_state": gitTrackerState,
+		"git_repo_name":     gitRepoName,
+		"is_git_repo":       isGitRepo,
+		"git_last_error":    gitLastError,
 
 		// Watch status
-		"is_being_watched":     isBeingWatched,
-		"watched_session_id":   func() string {
+		"is_being_watched": isBeingWatched,
+		"watched_session_id": func() string {
 			if isBeingWatched {
 				return watchInfo.SessionID
 			}

@@ -751,7 +751,7 @@ For iOS to connect over network:
 | Method | Purpose | Params |
 |--------|---------|--------|
 | `workspace/list` | List all workspaces | None |
-| `workspace/get` | Get workspace details | `{id}` |
+| `workspace/get` | Get workspace details | `{workspace_id}` |
 | `workspace/start` | Start workspace | `{id}` |
 | `workspace/stop` | Stop workspace | `{id}` |
 | `workspace/discover` | Find Git repos | `{paths}` (optional) |

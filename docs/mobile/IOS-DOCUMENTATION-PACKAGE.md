@@ -184,7 +184,7 @@ newWorkspaceWS.connect(to: url)
 | Method | Purpose | Required Params |
 |--------|---------|-----------------|
 | `workspace/list` | Get all workspaces | None |
-| `workspace/get` | Get workspace details | `id` |
+| `workspace/get` | Get workspace details | `workspace_id` |
 | `workspace/start` | Start a workspace | `id` |
 | `workspace/stop` | Stop a workspace | `id` |
 | `workspace/restart` | Restart a workspace | `id` |

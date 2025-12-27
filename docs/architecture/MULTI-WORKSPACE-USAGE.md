@@ -408,9 +408,9 @@ All methods follow the JSON-RPC 2.0 specification over WebSocket at `ws://127.0.
 | Method | Description | Parameters |
 |--------|-------------|------------|
 | `workspace/list` | List all workspaces | None |
-| `workspace/get` | Get workspace details | `{"id": "ws-xxx"}` |
+| `workspace/get` | Get workspace details | `{"workspace_id": "ws-xxx"}` |
 | `workspace/add` | Add new workspace | `{"name": "...", "path": "...", "auto_start": bool, "port": int}` |
-| `workspace/remove` | Remove workspace | `{"id": "ws-xxx"}` |
+| `workspace/remove` | Remove workspace | `{"workspace_id": "ws-xxx"}` |
 | `workspace/start` | Start workspace server | `{"id": "ws-xxx"}` |
 | `workspace/stop` | Stop workspace server | `{"id": "ws-xxx"}` |
 | `workspace/restart` | Restart workspace server | `{"id": "ws-xxx"}` |

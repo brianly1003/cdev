@@ -344,7 +344,7 @@ WebSocket: wss://abc123x4-8765.asse.devtunnels.ms/ws
 | Method | Description | Parameters |
 |--------|-------------|------------|
 | `workspace/list` | List all workspaces | None |
-| `workspace/get` | Get workspace details | `{"id": "ws-xxx"}` |
+| `workspace/get` | Get workspace details | `{"workspace_id": "ws-xxx"}` |
 | `workspace/start` | Start a workspace | `{"id": "ws-xxx"}` |
 | `workspace/stop` | Stop a workspace | `{"id": "ws-xxx"}` |
 | `workspace/discover` | Find Git repositories | `{"paths": [...]}` (optional) |

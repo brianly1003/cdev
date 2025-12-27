@@ -46,7 +46,7 @@ func (wc *WorkspaceClient) List(ctx context.Context) ([]workspace.WorkspaceInfo,
 
 // Get returns a specific workspace by ID.
 func (wc *WorkspaceClient) Get(ctx context.Context, id string) (*workspace.WorkspaceInfo, error) {
-	params := map[string]string{"id": id}
+	params := map[string]string{"workspace_id": id}
 	resp, err := wc.client.Call(ctx, "workspace/get", params)
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (wc *WorkspaceClient) Add(ctx context.Context, name, path string, autoStart
 
 // Remove deletes a workspace.
 func (wc *WorkspaceClient) Remove(ctx context.Context, id string) error {
-	params := map[string]string{"id": id}
+	params := map[string]string{"workspace_id": id}
 	resp, err := wc.client.Call(ctx, "workspace/remove", params)
 	if err != nil {
 		return err

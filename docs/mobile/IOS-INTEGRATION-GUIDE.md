@@ -279,7 +279,7 @@ class WebSocketManager {
 
 ```json
 // Request
-{"jsonrpc": "2.0", "id": 2, "method": "workspace/get", "params": {"id": "ws-abc123"}}
+{"jsonrpc": "2.0", "id": 2, "method": "workspace/get", "params": {"workspace_id": "ws-abc123"}}
 ```
 
 #### `workspace/add` - Register a new workspace
@@ -297,7 +297,7 @@ class WebSocketManager {
 
 ```json
 // Request
-{"jsonrpc": "2.0", "id": 4, "method": "workspace/remove", "params": {"id": "ws-abc123"}}
+{"jsonrpc": "2.0", "id": 4, "method": "workspace/remove", "params": {"workspace_id": "ws-abc123"}}
 ```
 
 #### `workspace/status` - Get workspace status
