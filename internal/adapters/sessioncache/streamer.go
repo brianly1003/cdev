@@ -30,6 +30,18 @@ type SessionStreamer struct {
 	watcher        *fsnotify.Watcher
 	done           chan struct{}
 	running        bool
+
+	// For delayed stream_read_complete event
+	completeTimer       *time.Timer   // Timer for 3-second delay before emitting complete
+	pendingCompleteInfo *completeInfo // Info to include in the complete event
+}
+
+// completeInfo stores info for the pending stream_read_complete event
+type completeInfo struct {
+	sessionID     string
+	messagesCount int
+	offset        int64
+	fileSize      int64
 }
 
 // NewSessionStreamer creates a new session streamer.
@@ -109,6 +121,13 @@ func (s *SessionStreamer) stopWatchingLocked() {
 		s.watcher = nil
 	}
 
+	// Cancel pending complete timer
+	if s.completeTimer != nil {
+		s.completeTimer.Stop()
+		s.completeTimer = nil
+	}
+	s.pendingCompleteInfo = nil
+
 	log.Info().
 		Str("session_id", s.watchedSession).
 		Msg("stopped watching session")
@@ -138,6 +157,9 @@ func (s *SessionStreamer) watchLoop() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	// Channel to receive complete timer signals
+	completeChan := make(chan *completeInfo, 1)
+
 	for {
 		select {
 		case <-s.done:
@@ -154,13 +176,20 @@ func (s *SessionStreamer) watchLoop() {
 				// This ensures Claude has finished writing the line
 				lastEvent = time.Now()
 				debounceTimer.Reset(200 * time.Millisecond)
+
+				// Cancel pending complete timer since new content is being written
+				s.cancelPendingComplete()
 			}
 
 		case <-debounceTimer.C:
 			// Only read if no new events in last 200ms
 			if time.Since(lastEvent) >= 200*time.Millisecond {
-				s.checkForNewContent()
+				s.checkForNewContent(completeChan)
 			}
+
+		case info := <-completeChan:
+			// Complete timer fired - emit the event
+			s.emitStreamReadComplete(info)
 
 		case err, ok := <-s.watcher.Errors:
 			if !ok {
@@ -172,14 +201,73 @@ func (s *SessionStreamer) watchLoop() {
 			// Periodic check in case fsnotify misses events
 			// Only check if no recent fsnotify events (avoid duplicate reads)
 			if time.Since(lastEvent) >= 500*time.Millisecond {
-				s.checkForNewContent()
+				s.checkForNewContent(completeChan)
 			}
 		}
 	}
 }
 
+// cancelPendingComplete cancels any pending stream_read_complete event.
+func (s *SessionStreamer) cancelPendingComplete() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.completeTimer != nil {
+		s.completeTimer.Stop()
+		s.completeTimer = nil
+		s.pendingCompleteInfo = nil
+		log.Debug().Msg("cancelled pending stream_read_complete due to new content")
+	}
+}
+
+// schedulePendingComplete schedules a stream_read_complete event after 3 seconds.
+func (s *SessionStreamer) schedulePendingComplete(info *completeInfo, completeChan chan<- *completeInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Cancel any existing timer
+	if s.completeTimer != nil {
+		s.completeTimer.Stop()
+	}
+
+	s.pendingCompleteInfo = info
+	s.completeTimer = time.AfterFunc(3*time.Second, func() {
+		s.mu.Lock()
+		pending := s.pendingCompleteInfo
+		s.completeTimer = nil
+		s.pendingCompleteInfo = nil
+		s.mu.Unlock()
+
+		if pending != nil {
+			// Send to channel to be handled in watchLoop
+			select {
+			case completeChan <- pending:
+			default:
+				// Channel full, skip (shouldn't happen with buffer of 1)
+			}
+		}
+	})
+
+	log.Debug().
+		Str("session_id", info.sessionID).
+		Int64("offset", info.offset).
+		Int64("file_size", info.fileSize).
+		Msg("scheduled stream_read_complete in 3 seconds")
+}
+
+// emitStreamReadComplete emits the stream_read_complete event.
+func (s *SessionStreamer) emitStreamReadComplete(info *completeInfo) {
+	log.Info().
+		Str("session_id", info.sessionID).
+		Int("messages", info.messagesCount).
+		Int64("offset", info.offset).
+		Int64("file_size", info.fileSize).
+		Msg("emitting stream_read_complete event (after 3s delay)")
+	s.hub.Publish(events.NewStreamReadCompleteEvent(info.sessionID, info.messagesCount, info.offset, info.fileSize))
+}
+
 // checkForNewContent checks if the file has grown and reads new lines.
-func (s *SessionStreamer) checkForNewContent() {
+func (s *SessionStreamer) checkForNewContent(completeChan chan<- *completeInfo) {
 	s.mu.Lock()
 	filePath := s.watchedFile
 	sessionID := s.watchedSession
@@ -207,6 +295,9 @@ func (s *SessionStreamer) checkForNewContent() {
 		// 	Msg("checkForNewContent: no new content")
 		return
 	}
+
+	// New content found - cancel any pending complete timer
+	s.cancelPendingComplete()
 
 	log.Debug().
 		Str("session_id", sessionID).
@@ -270,16 +361,17 @@ func (s *SessionStreamer) checkForNewContent() {
 	s.lastSize = currentSize
 	s.mu.Unlock()
 
-	// Emit stream_read_complete when we've caught up to current file end
+	// Schedule stream_read_complete when we've caught up to current file end
+	// Wait 3 seconds before emitting to ensure no more content is written
 	// This signals to iOS that we've finished reading all available content
 	if newOffset >= currentSize {
-		log.Info().
-			Str("session_id", sessionID).
-			Int("messages", messagesEmitted).
-			Int64("offset", newOffset).
-			Int64("file_size", currentSize).
-			Msg("emitting stream_read_complete event")
-		s.hub.Publish(events.NewStreamReadCompleteEvent(sessionID, messagesEmitted, newOffset, currentSize))
+		info := &completeInfo{
+			sessionID:     sessionID,
+			messagesCount: messagesEmitted,
+			offset:        newOffset,
+			fileSize:      currentSize,
+		}
+		s.schedulePendingComplete(info, completeChan)
 	} else {
 		log.Warn().
 			Str("session_id", sessionID).

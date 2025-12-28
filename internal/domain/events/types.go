@@ -29,6 +29,7 @@ const (
 	// Session events
 	EventTypeSessionStart        EventType = "session_start"
 	EventTypeSessionEnd          EventType = "session_end"
+	EventTypeSessionStopped      EventType = "session_stopped" // Session stopped (for multi-device sync)
 	EventTypeSessionWatchChanged EventType = "session_watch_changed"
 	EventTypeSessionJoined       EventType = "session_joined"
 	EventTypeSessionLeft         EventType = "session_left"

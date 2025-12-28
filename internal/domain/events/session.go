@@ -127,6 +127,22 @@ func NewSessionLeftEvent(leavingClientID, workspaceID, sessionID string, remaini
 	return event
 }
 
+// SessionStoppedPayload is the payload for session_stopped events.
+// Emitted when a session is stopped - allows all connected devices to sync their UI.
+type SessionStoppedPayload struct {
+	WorkspaceID string `json:"workspace_id"`
+	SessionID   string `json:"session_id"`
+}
+
+// NewSessionStoppedEvent creates a new session_stopped event.
+// This is broadcast to all connected clients so they can update their UI (e.g., show "idle" instead of "active").
+func NewSessionStoppedEvent(workspaceID, sessionID string) *BaseEvent {
+	return NewEventWithContext(EventTypeSessionStopped, SessionStoppedPayload{
+		WorkspaceID: workspaceID,
+		SessionID:   sessionID,
+	}, workspaceID, sessionID)
+}
+
 // SessionIDResolvedPayload is the payload for session_id_resolved events.
 // Emitted when the real Claude session ID is detected from .claude/projects.
 type SessionIDResolvedPayload struct {

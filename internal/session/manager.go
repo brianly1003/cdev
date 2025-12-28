@@ -960,6 +960,22 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 	gitTracker := git.NewTracker(ws.Definition.Path, m.cfg.Git.Command, m.hub)
 	session.SetGitTracker(gitTracker)
 
+	// Create file watcher (same as StartSession)
+	if m.cfg.Watcher.Enabled {
+		fileWatcher := watcher.NewWatcher(
+			ws.Definition.Path,
+			m.hub,
+			m.cfg.Watcher.DebounceMS,
+			m.cfg.Watcher.IgnorePatterns,
+		)
+		session.SetFileWatcher(fileWatcher)
+
+		// Start file watcher
+		if err := fileWatcher.Start(m.ctx); err != nil {
+			m.logger.Warn("Failed to start file watcher", "error", err, "workspace_id", workspaceID)
+		}
+	}
+
 	// Store session
 	m.sessions[sessionID] = session
 	session.SetStatus(StatusRunning)
@@ -1063,6 +1079,19 @@ func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *S
 	}
 
 	session.SetStatus(StatusStopped)
+
+	// Clear active session mapping for this workspace
+	// This ensures workspace/list doesn't show the stopped session as "running"
+	if m.activeSessions[session.WorkspaceID] == session.ID {
+		delete(m.activeSessions, session.WorkspaceID)
+	}
+	delete(m.activeSessionWorkspaces, session.ID)
+
+	// Emit session_stopped event for multi-device sync
+	// All connected clients will receive this notification
+	if m.hub != nil {
+		m.hub.Publish(events.NewSessionStoppedEvent(session.WorkspaceID, session.ID))
+	}
 
 	m.logger.Info("Stopped session", "session_id", session.ID, "workspace_id", session.WorkspaceID)
 

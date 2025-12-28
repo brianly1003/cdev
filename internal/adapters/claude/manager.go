@@ -738,15 +738,26 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 		if shouldEmit {
 			m.lastSpinnerText = message
 			m.lastSpinnerTime = now
+			sessionID := m.sessionID
 			m.mu.Unlock()
+
+			log.Info().
+				Str("symbol", symbol).
+				Str("message", message).
+				Str("session_id", sessionID).
+				Msg("emitting pty_spinner event")
 
 			m.publishEvent(events.NewPTYSpinnerEventWithSession(
 				cleanText, // Full text like "✶ Vibing…"
 				symbol,    // Just "✶"
 				message,   // Just "Vibing…"
-				m.sessionID,
+				sessionID,
 			))
 		} else {
+			log.Debug().
+				Str("symbol", symbol).
+				Str("message", message).
+				Msg("pty_spinner debounced (same message within 150ms)")
 			m.mu.Unlock()
 		}
 	}
@@ -1155,6 +1166,8 @@ func detectSpinner(line string) (symbol, message string, ok bool) {
 		return "", "", false
 	}
 
+	// Check for spinner patterns: symbol followed by space and text ending with "…"
+	// This covers patterns like "✳ Thinking…", "· Unravelling…", etc.
 	for _, sym := range spinnerSymbols {
 		if strings.HasPrefix(line, sym) {
 			// Extract the message after the symbol
@@ -1162,6 +1175,27 @@ func detectSpinner(line string) (symbol, message string, ok bool) {
 			return sym, msg, true
 		}
 	}
+
+	// Also check for spinner patterns by looking for common spinner messages
+	// Claude uses patterns like "Thinking…", "Unravelling…", "Vibing…"
+	spinnerMessages := []string{"Thinking", "Unravelling", "Vibing", "Processing"}
+	for _, msg := range spinnerMessages {
+		if strings.Contains(line, msg+"…") || strings.Contains(line, msg+"...") {
+			// Extract the first rune as the symbol
+			runes := []rune(line)
+			if len(runes) > 0 {
+				sym := string(runes[0])
+				rest := strings.TrimSpace(string(runes[1:]))
+				log.Debug().
+					Str("line", line).
+					Str("detected_symbol", sym).
+					Str("first_char_hex", fmt.Sprintf("%X", runes[0])).
+					Msg("spinner detected via message pattern")
+				return sym, rest, true
+			}
+		}
+	}
+
 	return "", "", false
 }
 
