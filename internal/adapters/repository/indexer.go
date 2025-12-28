@@ -92,7 +92,7 @@ func NewIndexer(repoPath string, skipDirs []string) (*SQLiteIndexer, error) {
 	// Create scanner with custom skip directories
 	scanner, err := NewScanner(absPath, skipDirs)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to create scanner: %w", err)
 	}
 
@@ -112,13 +112,13 @@ func NewIndexer(repoPath string, skipDirs []string) (*SQLiteIndexer, error) {
 
 	// Initialize schema
 	if err := indexer.initSchema(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
 	// Prepare statements
 	if err := indexer.prepareStatements(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to prepare statements: %w", err)
 	}
 
@@ -150,7 +150,7 @@ func (idx *SQLiteIndexer) initSchema() error {
 			"metadata",
 		}
 		for _, table := range tables {
-			idx.db.Exec("DROP TABLE IF EXISTS " + table)
+			_, _ = idx.db.Exec("DROP TABLE IF EXISTS " + table)
 		}
 	}
 
@@ -348,22 +348,22 @@ func (idx *SQLiteIndexer) Stop() error {
 
 	// Close prepared statements
 	if idx.stmtInsertFile != nil {
-		idx.stmtInsertFile.Close()
+		_ = idx.stmtInsertFile.Close()
 	}
 	if idx.stmtUpdateFile != nil {
-		idx.stmtUpdateFile.Close()
+		_ = idx.stmtUpdateFile.Close()
 	}
 	if idx.stmtDeleteFile != nil {
-		idx.stmtDeleteFile.Close()
+		_ = idx.stmtDeleteFile.Close()
 	}
 	if idx.stmtGetFile != nil {
-		idx.stmtGetFile.Close()
+		_ = idx.stmtGetFile.Close()
 	}
 	if idx.stmtSearchFuzzy != nil {
-		idx.stmtSearchFuzzy.Close()
+		_ = idx.stmtSearchFuzzy.Close()
 	}
 	if idx.stmtFindByFileID != nil {
-		idx.stmtFindByFileID.Close()
+		_ = idx.stmtFindByFileID.Close()
 	}
 
 	// Close database
@@ -412,7 +412,7 @@ func (idx *SQLiteIndexer) FullScan(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Clear existing data
 	if _, err := tx.Exec("DELETE FROM repository_files"); err != nil {
@@ -430,7 +430,7 @@ func (idx *SQLiteIndexer) FullScan(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare insert: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	// Insert files in batches
 	var totalSize int64

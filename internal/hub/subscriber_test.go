@@ -97,8 +97,8 @@ func TestChannelSubscriber_Send_BufferFull(t *testing.T) {
 	sub := NewChannelSubscriber("test", 2)
 
 	// Fill the buffer
-	sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
-	sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
+	_ = sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
+	_ = sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
 
 	// Next send should fail (buffer full)
 	err := sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
@@ -109,7 +109,7 @@ func TestChannelSubscriber_Send_BufferFull(t *testing.T) {
 
 func TestChannelSubscriber_Send_AfterClose(t *testing.T) {
 	sub := NewChannelSubscriber("test", 10)
-	sub.Close()
+	_ = sub.Close()
 
 	err := sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
 	if err != domain.ErrSubscriberClosed {
@@ -153,7 +153,7 @@ func TestChannelSubscriber_Done(t *testing.T) {
 	}
 
 	// Close subscriber
-	sub.Close()
+	_ = sub.Close()
 
 	// Done channel should be closed now
 	select {
@@ -174,7 +174,7 @@ func TestChannelSubscriber_Events(t *testing.T) {
 
 	// Send an event and verify it's on the Events channel
 	event := events.NewEvent(events.EventTypeFileChanged, nil)
-	sub.Send(event)
+	_ = sub.Send(event)
 
 	select {
 	case received := <-eventsChan:
@@ -200,7 +200,7 @@ func TestChannelSubscriber_Concurrent(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < eventsPerSender; j++ {
 				event := events.NewEvent(events.EventTypeClaudeLog, map[string]int{"sender": senderID, "seq": j})
-				sub.Send(event)
+				_ = sub.Send(event)
 			}
 		}(i)
 	}
@@ -287,7 +287,7 @@ func TestLogSubscriber_Send_NilLogFn(t *testing.T) {
 
 func TestLogSubscriber_Send_AfterClose(t *testing.T) {
 	sub := NewLogSubscriber("log", func(e events.Event) {})
-	sub.Close()
+	_ = sub.Close()
 
 	err := sub.Send(events.NewEvent(events.EventTypeHeartbeat, nil))
 	if err != domain.ErrSubscriberClosed {
@@ -331,7 +331,7 @@ func TestLogSubscriber_Done(t *testing.T) {
 	}
 
 	// Close subscriber
-	sub.Close()
+	_ = sub.Close()
 
 	// Done channel should be closed now
 	select {
@@ -354,7 +354,7 @@ func TestLogSubscriber_Send_Multiple(t *testing.T) {
 	sub := NewLogSubscriber("log", logFn)
 
 	for i := 0; i < 100; i++ {
-		sub.Send(events.NewEvent(events.EventTypeClaudeLog, nil))
+		_ = sub.Send(events.NewEvent(events.EventTypeClaudeLog, nil))
 	}
 
 	if count != 100 {
@@ -370,7 +370,7 @@ func BenchmarkChannelSubscriber_Send(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sub.Send(event)
+		_ = sub.Send(event)
 	}
 }
 
@@ -380,6 +380,6 @@ func BenchmarkLogSubscriber_Send(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sub.Send(event)
+		_ = sub.Send(event)
 	}
 }

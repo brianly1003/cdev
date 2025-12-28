@@ -276,7 +276,7 @@ func (s *Server) handleRepositoryRebuild(w http.ResponseWriter, r *http.Request)
 
 	// Start rebuild in background
 	go func() {
-		s.repoIndexer.FullScan(r.Context())
+		_ = s.repoIndexer.FullScan(r.Context())
 	}()
 
 	writeJSON(w, http.StatusOK, map[string]string{

@@ -131,16 +131,16 @@ func (c *Client) Close() {
 func (c *Client) readPump() {
 	defer func() {
 		c.Close()
-		c.conn.Close()
+		_ = c.conn.Close()
 		if c.onClose != nil {
 			c.onClose(c.id)
 		}
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
@@ -167,9 +167,9 @@ func (c *Client) writePump() {
 	defer func() {
 		ticker.Stop()
 		// Send close frame with deadline to prevent blocking on laggy connections
-		c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-		c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-		c.conn.Close()
+		_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+		_ = c.conn.Close()
 	}()
 
 	for {
@@ -184,7 +184,7 @@ func (c *Client) writePump() {
 				return
 			}
 
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 
 			// Send each message as a separate WebSocket frame
 			// This prevents JSON corruption from batching multiple objects
@@ -194,7 +194,7 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				log.Debug().Err(err).Str("client_id", c.id).Msg("ping error")
 				return

@@ -523,8 +523,8 @@ func (t *Tracker) getBranchInfo(ctx context.Context) (branch, upstream string, a
 		if err == nil {
 			parts := strings.Fields(strings.TrimSpace(string(output)))
 			if len(parts) == 2 {
-				fmt.Sscanf(parts[0], "%d", &ahead)
-				fmt.Sscanf(parts[1], "%d", &behind)
+				_, _ = fmt.Sscanf(parts[0], "%d", &ahead)
+				_, _ = fmt.Sscanf(parts[1], "%d", &behind)
 			}
 		}
 	}
@@ -550,8 +550,8 @@ func (t *Tracker) getDiffStats(ctx context.Context, path string, staged bool) (a
 	line := strings.TrimSpace(string(output))
 	parts := strings.Fields(line)
 	if len(parts) >= 2 {
-		fmt.Sscanf(parts[0], "%d", &additions)
-		fmt.Sscanf(parts[1], "%d", &deletions)
+		_, _ = fmt.Sscanf(parts[0], "%d", &additions)
+		_, _ = fmt.Sscanf(parts[1], "%d", &deletions)
 	}
 
 	return
@@ -1793,7 +1793,7 @@ func (t *Tracker) Init(ctx context.Context, initialBranch string, initialCommit 
 	if initialCommit {
 		stageCmd := exec.CommandContext(ctx, t.command, "add", "-A")
 		stageCmd.Dir = t.repoPath
-		stageCmd.CombinedOutput()
+		_, _ = stageCmd.CombinedOutput()
 
 		statusCmd := exec.CommandContext(ctx, t.command, "diff", "--cached", "--name-only")
 		statusCmd.Dir = t.repoPath
@@ -1907,7 +1907,7 @@ func (t *Tracker) RemoteAdd(ctx context.Context, name string, url string, fetch 
 	if fetch {
 		fetchCmd := exec.CommandContext(ctx, t.command, "fetch", name)
 		fetchCmd.Dir = t.repoRoot
-		fetchCmd.CombinedOutput()
+		_, _ = fetchCmd.CombinedOutput()
 
 		branchCmd := exec.CommandContext(ctx, t.command, "branch", "-r", "--list", fmt.Sprintf("%s/*", name))
 		branchCmd.Dir = t.repoRoot

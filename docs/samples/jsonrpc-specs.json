@@ -1949,7 +1949,7 @@
         {
             "name": "workspace/add",
             "summary": "Add a new workspace",
-            "description": "Registers a new workspace (git repository) configuration.",
+            "description": "Registers a new workspace configuration. Can be any folder, not just git repositories. Set create_if_missing to true to create the directory if it doesn't exist.",
             "params": [
                 {
                     "name": "name",
@@ -1971,12 +1971,29 @@
                     "schema": {
                         "type": "boolean"
                     }
+                },
+                {
+                    "name": "create_if_missing",
+                    "required": false,
+                    "description": "Create the directory if it doesn't exist",
+                    "schema": {
+                        "type": "boolean"
+                    }
                 }
             ],
             "result": {
                 "name": "workspace",
                 "schema": {
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                        "id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "path": { "type": "string" },
+                        "auto_start": { "type": "boolean" },
+                        "is_git_repo": { "type": "boolean" },
+                        "git_state": { "type": "string", "enum": ["no_git", "git_initialized", "no_remote", "no_push", "synced", "diverged", "conflict"] },
+                        "sessions": { "type": "array" }
+                    }
                 }
             }
         },

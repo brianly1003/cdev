@@ -248,8 +248,8 @@ func TestServer_RemoveClient(t *testing.T) {
 
 func TestServer_WebSocketConnection(t *testing.T) {
 	hub := testutil.NewMockEventHub()
-	hub.Start()
-	defer hub.Stop()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
 
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
 
@@ -277,7 +277,7 @@ func TestServer_WebSocketConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Give server time to register client
 	time.Sleep(100 * time.Millisecond)
@@ -289,8 +289,8 @@ func TestServer_WebSocketConnection(t *testing.T) {
 
 func TestServer_LegacyCommandWithDeprecationWarning(t *testing.T) {
 	hub := testutil.NewMockEventHub()
-	hub.Start()
-	defer hub.Stop()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
 
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
 
@@ -312,7 +312,7 @@ func TestServer_LegacyCommandWithDeprecationWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -324,7 +324,7 @@ func TestServer_LegacyCommandWithDeprecationWarning(t *testing.T) {
 	}
 
 	// Read the deprecation warning response
-	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg, err := ws.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read message: %v", err)
@@ -368,8 +368,8 @@ func TestServer_LegacyCommandWithDeprecationWarning(t *testing.T) {
 
 func TestServer_JSONRPCCommand(t *testing.T) {
 	hub := testutil.NewMockEventHub()
-	hub.Start()
-	defer hub.Stop()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
 
 	registry := handler.NewRegistry()
 	// Register a test method
@@ -389,7 +389,7 @@ func TestServer_JSONRPCCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -401,7 +401,7 @@ func TestServer_JSONRPCCommand(t *testing.T) {
 	}
 
 	// Read the response
-	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg, err := ws.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read message: %v", err)
@@ -447,7 +447,7 @@ func TestUnifiedClient_SendRaw(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -461,7 +461,7 @@ func TestUnifiedClient_SendRaw(t *testing.T) {
 	server.Broadcast(testMsg)
 
 	// Read it on the client side
-	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg, err := ws.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read broadcast message: %v", err)
@@ -486,7 +486,7 @@ func TestUnifiedClient_Send_LegacyFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -509,7 +509,7 @@ func TestUnifiedClient_Send_LegacyFormat(t *testing.T) {
 	}
 
 	// Read the message
-	ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, msg, err := ws.ReadMessage()
 	if err != nil {
 		t.Fatalf("Failed to read message: %v", err)

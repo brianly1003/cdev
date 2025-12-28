@@ -284,14 +284,51 @@ class WebSocketManager {
 
 #### `workspace/add` - Register a new workspace
 
+Registers a new workspace configuration. Can be any folder, not just git repositories.
+Set `create_if_missing` to `true` to create the directory if it doesn't exist.
+
 ```json
-// Request
+// Request - existing folder
 {"jsonrpc": "2.0", "id": 3, "method": "workspace/add", "params": {
   "name": "my-project",
   "path": "/Users/dev/my-project",
   "auto_start": false
 }}
+
+// Request - create new folder
+{"jsonrpc": "2.0", "id": 3, "method": "workspace/add", "params": {
+  "name": "new-project",
+  "path": "/Users/dev/new-project",
+  "auto_start": false,
+  "create_if_missing": true
+}}
+
+// Response
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "id": "ws-abc123",
+    "name": "new-project",
+    "path": "/Users/dev/new-project",
+    "auto_start": false,
+    "is_git_repo": false,
+    "git_state": "no_git",
+    "sessions": []
+  }
+}
 ```
+
+**Git State Values:**
+| State | Description |
+|-------|-------------|
+| `no_git` | Folder has no `.git` directory |
+| `git_initialized` | Has `.git` but no commits |
+| `no_remote` | Has commits but no remote configured |
+| `no_push` | Has remote but no upstream tracking |
+| `synced` | Fully configured with upstream |
+| `diverged` | Has unpushed/unpulled commits |
+| `conflict` | Has merge conflicts |
 
 #### `workspace/remove` - Unregister a workspace
 

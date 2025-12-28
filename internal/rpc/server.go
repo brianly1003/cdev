@@ -86,7 +86,7 @@ func (s *Server) Stop() error {
 	defer s.clientsMu.Unlock()
 
 	for _, client := range s.clients {
-		client.Close()
+		_ = client.Close()
 	}
 	s.clients = make(map[string]*Client)
 

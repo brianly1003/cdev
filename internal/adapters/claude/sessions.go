@@ -228,7 +228,7 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 	if err != nil {
 		return SessionInfo{}, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info := SessionInfo{
 		SessionID: sessionID,
@@ -334,7 +334,7 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var messages []SessionMessage
 
@@ -359,7 +359,7 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 		// Get the type
 		var msgType string
 		if typeRaw, ok := raw["type"]; ok {
-			json.Unmarshal(typeRaw, &msgType)
+			_ = json.Unmarshal(typeRaw, &msgType)
 		}
 
 		// Only include user and assistant messages (skip summary, file-history-snapshot, etc.)
@@ -371,14 +371,7 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 				continue
 			}
 			// Convert to API response format (snake_case)
-			msg := SessionMessage{
-				Type:      rawMsg.Type,
-				UUID:      rawMsg.UUID,
-				SessionID: rawMsg.SessionID,
-				Timestamp: rawMsg.Timestamp,
-				GitBranch: rawMsg.GitBranch,
-				Message:   rawMsg.Message,
-			}
+			msg := SessionMessage(rawMsg)
 			messages = append(messages, msg)
 		}
 	}
@@ -464,7 +457,7 @@ func AppendBashToSession(workDir, sessionID, command, stdout, stderr string) err
 	if err != nil {
 		return fmt.Errorf("failed to open session file: %w", err)
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 
 	// Get git branch for logging
 	gitBranch := "main" // Default
@@ -517,7 +510,7 @@ func AppendBashToSession(workDir, sessionID, command, stdout, stderr string) err
 		"timestamp": timestamp,
 	}
 	if data, err := marshalWithoutEscape(caveatMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
+		_, _ = logFile.WriteString(string(data) + "\n")
 	}
 
 	// Message 2: Bash Input
@@ -538,7 +531,7 @@ func AppendBashToSession(workDir, sessionID, command, stdout, stderr string) err
 		"timestamp": timestamp,
 	}
 	if data, err := marshalWithoutEscape(inputMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
+		_, _ = logFile.WriteString(string(data) + "\n")
 	}
 
 	// Message 3: Bash Output
@@ -559,7 +552,7 @@ func AppendBashToSession(workDir, sessionID, command, stdout, stderr string) err
 		"timestamp": timestamp,
 	}
 	if data, err := marshalWithoutEscape(outputMsg); err == nil {
-		logFile.WriteString(string(data) + "\n")
+		_, _ = logFile.WriteString(string(data) + "\n")
 	}
 
 	log.Debug().

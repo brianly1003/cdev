@@ -96,6 +96,7 @@ func TestApp_GetConfig(t *testing.T) {
 
 	if result == nil {
 		t.Error("GetConfig() should return non-nil config")
+		return
 	}
 	if result != cfg {
 		t.Error("GetConfig() should return the same config")
@@ -285,7 +286,7 @@ func TestApp_shutdown_NilComponents(t *testing.T) {
 	// All components are nil by default
 
 	// Start the hub so shutdown can stop it
-	app.hub.Start()
+	_ = app.hub.Start()
 
 	err := app.shutdown()
 

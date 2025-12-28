@@ -123,10 +123,8 @@ func (s *SubscriptionService) Subscribe(ctx context.Context, params json.RawMess
 
 	// Start git watcher for this workspace to emit git_status_changed events
 	if s.gitWatcherManager != nil {
-		if err := s.gitWatcherManager.StartGitWatcher(p.WorkspaceID); err != nil {
-			// Log but don't fail the subscription - git watcher is optional
-			// The subscription still succeeds, just without git events
-		}
+		// Log but don't fail the subscription - git watcher is optional
+		_ = s.gitWatcherManager.StartGitWatcher(p.WorkspaceID)
 	}
 
 	return map[string]interface{}{

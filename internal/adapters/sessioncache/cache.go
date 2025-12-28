@@ -75,13 +75,13 @@ func New(repoPath string) (*Cache, error) {
 
 	// Enable WAL mode for better concurrency
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
 	// Create schema
 	if err := createSchema(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func createSchema(db *sql.DB) error {
 			Msg("schema version changed, rebuilding session cache")
 
 		// Drop existing sessions table to force rebuild
-		db.Exec("DROP TABLE IF EXISTS sessions")
+		_, _ = db.Exec("DROP TABLE IF EXISTS sessions")
 	}
 
 	// Create sessions table
@@ -193,7 +193,7 @@ func (c *Cache) Stop() error {
 	c.mu.Unlock()
 
 	if c.watcher != nil {
-		c.watcher.Close()
+		_ = c.watcher.Close()
 	}
 
 	return c.db.Close()
@@ -211,7 +211,7 @@ func (c *Cache) ListSessions() ([]SessionInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []SessionInfo
 	for rows.Next() {
@@ -256,7 +256,7 @@ func (c *Cache) fullSync() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(`
 		INSERT OR REPLACE INTO sessions
@@ -266,7 +266,7 @@ func (c *Cache) fullSync() error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	fileCount := 0
 	for _, entry := range entries {
@@ -291,7 +291,7 @@ func (c *Cache) fullSync() error {
 
 		// Check if we need to re-parse (file changed)
 		var cachedMtime int64
-		c.db.QueryRow("SELECT file_mtime FROM sessions WHERE session_id = ?", sessionID).Scan(&cachedMtime)
+		_ = c.db.QueryRow("SELECT file_mtime FROM sessions WHERE session_id = ?", sessionID).Scan(&cachedMtime)
 		if cachedMtime == mtime {
 			existingIDs[sessionID] = true
 			continue // File unchanged, skip parsing
@@ -335,15 +335,15 @@ func (c *Cache) fullSync() error {
 		var toDelete []string
 		for rows.Next() {
 			var id string
-			rows.Scan(&id)
+			_ = rows.Scan(&id)
 			if !existingIDs[id] {
 				toDelete = append(toDelete, id)
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 
 		for _, id := range toDelete {
-			c.db.Exec("DELETE FROM sessions WHERE session_id = ?", id)
+			_, _ = c.db.Exec("DELETE FROM sessions WHERE session_id = ?", id)
 			log.Debug().Str("session_id", id).Msg("removed deleted session from cache")
 		}
 	}
@@ -368,7 +368,7 @@ func (c *Cache) startWatcher() error {
 	// Ensure sessions directory exists before watching
 	if _, err := os.Stat(c.sessionsDir); os.IsNotExist(err) {
 		// Create directory so we can watch it
-		os.MkdirAll(c.sessionsDir, 0755)
+		_ = os.MkdirAll(c.sessionsDir, 0755)
 	}
 
 	if err := watcher.Add(c.sessionsDir); err != nil {
@@ -458,7 +458,7 @@ func (c *Cache) syncFile(filePath string) {
 	info, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		// File deleted, remove from cache
-		c.db.Exec("DELETE FROM sessions WHERE session_id = ?", sessionID)
+		_, _ = c.db.Exec("DELETE FROM sessions WHERE session_id = ?", sessionID)
 		log.Debug().Str("session_id", sessionID).Msg("removed deleted session")
 		return
 	}
@@ -581,7 +581,7 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 	if err != nil {
 		return SessionInfo{}, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info := SessionInfo{
 		SessionID: sessionID,
@@ -716,7 +716,7 @@ func (c *Cache) ForceSync() error {
 // Stats returns cache statistics.
 func (c *Cache) Stats() map[string]interface{} {
 	var count int
-	c.db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&count)
+	_ = c.db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&count)
 
 	return map[string]interface{}{
 		"sessions_cached": count,
@@ -752,7 +752,7 @@ func (c *Cache) ListSessionsPaginated(limit, offset int) ([]SessionInfo, int, er
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []SessionInfo
 	for rows.Next() {
@@ -831,7 +831,7 @@ func (c *Cache) DeleteAllSessions() (int, error) {
 			filePaths = append(filePaths, filePath)
 		}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	// Delete all from database
 	result, err := c.db.Exec("DELETE FROM sessions")

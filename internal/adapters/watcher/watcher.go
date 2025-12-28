@@ -79,7 +79,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 
 	// Add watches recursively
 	if err := w.addWatchRecursive(w.rootPath); err != nil {
-		w.Stop()
+		_ = w.Stop()
 		return err
 	}
 
@@ -262,7 +262,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 		changeType = events.FileChangeCreated
 		// If a directory was created, add watch to it
 		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			w.addWatchRecursive(event.Name)
+			_ = w.addWatchRecursive(event.Name)
 		}
 	case event.Op&fsnotify.Write == fsnotify.Write:
 		changeType = events.FileChangeModified

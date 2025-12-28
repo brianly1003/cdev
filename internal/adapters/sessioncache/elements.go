@@ -427,7 +427,7 @@ func createThinkingElement(id, timestamp, text string) Element {
 
 func createToolCallElement(id, timestamp, toolName, toolID string, input json.RawMessage) Element {
 	var params map[string]interface{}
-	json.Unmarshal(input, &params)
+	_ = json.Unmarshal(input, &params)
 
 	display := formatToolDisplay(toolName, params)
 
@@ -573,7 +573,7 @@ func createDiffElementFromResponse(id, timestamp, toolCallID string, params map[
 		DurationMS int64  `json:"duration_ms"`
 		Result     string `json:"result"`
 	}
-	json.Unmarshal([]byte(respContent), &respData)
+	_ = json.Unmarshal([]byte(respContent), &respData)
 
 	// Parse diff from result or generate summary
 	added, removed := countDiffLines(respData.Result)
@@ -681,8 +681,8 @@ func parseDiffHunks(diff string) []DiffHunk {
 				Header: line,
 				Lines:  []DiffLine{},
 			}
-			fmt.Sscanf(matches[1], "%d", &currentHunk.OldStart)
-			fmt.Sscanf(matches[3], "%d", &currentHunk.NewStart)
+			_, _ = fmt.Sscanf(matches[1], "%d", &currentHunk.OldStart)
+			_, _ = fmt.Sscanf(matches[3], "%d", &currentHunk.NewStart)
 			oldLine = currentHunk.OldStart
 			newLine = currentHunk.NewStart
 			continue

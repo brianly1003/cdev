@@ -188,10 +188,8 @@ func (s *LifecycleService) Initialize(ctx context.Context, params json.RawMessag
 		}
 	}
 
-	// Log client info
-	if p.ClientInfo != nil {
-		// We could validate client version here if needed
-	}
+	// Log client info (validation could be added here if needed)
+	_ = p.ClientInfo
 
 	// Get client ID from context (assigned by WebSocket handler on connection)
 	clientID, _ := ctx.Value(handler.ClientIDKey).(string)

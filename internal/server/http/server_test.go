@@ -40,7 +40,7 @@ func TestServer_HandleHealth(t *testing.T) {
 	server.handleHealth(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -69,7 +69,7 @@ func TestServer_HandleHealth_MethodNotAllowed(t *testing.T) {
 	server.handleHealth(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -94,7 +94,7 @@ func TestServer_HandleStatus(t *testing.T) {
 	server.handleStatus(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -123,7 +123,7 @@ func TestServer_HandleStatus_MethodNotAllowed(t *testing.T) {
 	server.handleStatus(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -139,7 +139,7 @@ func TestServer_HandleGetFile_MissingPath(t *testing.T) {
 	server.handleGetFile(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -147,7 +147,7 @@ func TestServer_HandleGetFile_MissingPath(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
-	json.Unmarshal(body, &result)
+	_ = json.Unmarshal(body, &result)
 
 	if result["error"] == nil {
 		t.Error("expected error field in response")
@@ -163,7 +163,7 @@ func TestServer_HandleGetFile_MethodNotAllowed(t *testing.T) {
 	server.handleGetFile(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -179,7 +179,7 @@ func TestServer_HandleGetFile_NoGitTracker(t *testing.T) {
 	server.handleGetFile(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("expected status 503, got %d", resp.StatusCode)
@@ -192,12 +192,12 @@ func TestServer_HandleFilesList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create test files
-	os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content1"), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "file2.go"), []byte("content2"), 0644)
-	os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755)
+	_ = os.WriteFile(filepath.Join(tmpDir, "file1.txt"), []byte("content1"), 0644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "file2.go"), []byte("content2"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755)
 
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, tmpDir)
 
@@ -207,7 +207,7 @@ func TestServer_HandleFilesList(t *testing.T) {
 	server.handleFilesList(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -234,12 +234,12 @@ func TestServer_HandleFilesList_SubPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create subdirectory with files
 	subDir := filepath.Join(tmpDir, "subdir")
-	os.Mkdir(subDir, 0755)
-	os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644)
+	_ = os.Mkdir(subDir, 0755)
+	_ = os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644)
 
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, tmpDir)
 
@@ -249,7 +249,7 @@ func TestServer_HandleFilesList_SubPath(t *testing.T) {
 	server.handleFilesList(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
@@ -257,7 +257,7 @@ func TestServer_HandleFilesList_SubPath(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var result DirectoryListingResponse
-	json.Unmarshal(body, &result)
+	_ = json.Unmarshal(body, &result)
 
 	if result.Path != "subdir" {
 		t.Errorf("expected path subdir, got %s", result.Path)
@@ -272,7 +272,7 @@ func TestServer_HandleFilesList_PathTraversal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, tmpDir)
 
@@ -283,7 +283,7 @@ func TestServer_HandleFilesList_PathTraversal(t *testing.T) {
 	server.handleFilesList(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected status 403 for path traversal, got %d", resp.StatusCode)
@@ -295,9 +295,9 @@ func TestServer_HandleFilesList_NotADirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("content"), 0644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("content"), 0644)
 
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, tmpDir)
 
@@ -307,7 +307,7 @@ func TestServer_HandleFilesList_NotADirectory(t *testing.T) {
 	server.handleFilesList(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400 for file path, got %d", resp.StatusCode)
@@ -323,7 +323,7 @@ func TestServer_HandleFilesList_MethodNotAllowed(t *testing.T) {
 	server.handleFilesList(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -339,7 +339,7 @@ func TestServer_HandleClaudeRun_MethodNotAllowed(t *testing.T) {
 	server.handleClaudeRun(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -355,7 +355,7 @@ func TestServer_HandleClaudeRun_InvalidJSON(t *testing.T) {
 	server.handleClaudeRun(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -371,7 +371,7 @@ func TestServer_HandleClaudeRun_EmptyPrompt(t *testing.T) {
 	server.handleClaudeRun(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -387,7 +387,7 @@ func TestServer_HandleClaudeRun_NoManager(t *testing.T) {
 	server.handleClaudeRun(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("expected status 503, got %d", resp.StatusCode)
@@ -403,7 +403,7 @@ func TestServer_HandleClaudeStop_MethodNotAllowed(t *testing.T) {
 	server.handleClaudeStop(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -419,7 +419,7 @@ func TestServer_HandleClaudeStop_NoManager(t *testing.T) {
 	server.handleClaudeStop(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("expected status 503, got %d", resp.StatusCode)
@@ -435,7 +435,7 @@ func TestServer_HandleClaudeRespond_MethodNotAllowed(t *testing.T) {
 	server.handleClaudeRespond(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -451,7 +451,7 @@ func TestServer_HandleClaudeRespond_InvalidJSON(t *testing.T) {
 	server.handleClaudeRespond(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -467,7 +467,7 @@ func TestServer_HandleClaudeRespond_MissingToolUseID(t *testing.T) {
 	server.handleClaudeRespond(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -483,7 +483,7 @@ func TestServer_HandleClaudeSessions_MethodNotAllowed(t *testing.T) {
 	server.handleClaudeSessions(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected status 405, got %d", resp.StatusCode)
@@ -499,7 +499,7 @@ func TestServer_HandleClaudeSessionMessages_MissingSessionID(t *testing.T) {
 	server.handleClaudeSessionMessages(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
@@ -515,7 +515,7 @@ func TestServer_HandleGitStatus_NoTracker(t *testing.T) {
 	server.handleGitStatus(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status 404, got %d", resp.StatusCode)
@@ -531,7 +531,7 @@ func TestServer_HandleGitDiff_NoTracker(t *testing.T) {
 	server.handleGitDiff(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected status 404, got %d", resp.StatusCode)
@@ -623,7 +623,7 @@ func TestCorsMiddleware(t *testing.T) {
 	wrapped.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
 		t.Error("expected CORS header Access-Control-Allow-Origin: *")
@@ -636,7 +636,7 @@ func TestCorsMiddleware(t *testing.T) {
 func TestCorsMiddleware_Options(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("should not see this"))
+		_, _ = w.Write([]byte("should not see this"))
 	})
 
 	wrapped := corsMiddleware(handler)
@@ -647,7 +647,7 @@ func TestCorsMiddleware_Options(t *testing.T) {
 	wrapped.ServeHTTP(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200 for OPTIONS, got %d", resp.StatusCode)

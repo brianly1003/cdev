@@ -104,7 +104,7 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 	}
 	r.ptmx = ptmx
 	defer func() {
-		r.ptmx.Close()
+		_ = r.ptmx.Close()
 		r.ptmx = nil
 	}()
 
@@ -114,7 +114,7 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 		log.Warn().Err(err).Msg("failed to set terminal to raw mode")
 	} else {
 		r.oldState = oldState
-		defer term.Restore(int(os.Stdin.Fd()), oldState)
+		defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
 	}
 
 	// Handle window size changes
@@ -150,11 +150,11 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 			}
 			if n > 0 {
 				// Write to local stdout
-				os.Stdout.Write(buf[:n])
+				_, _ = os.Stdout.Write(buf[:n])
 
 				// Write to WebSocket if configured
 				if outputWriter != nil {
-					outputWriter.Write(buf[:n])
+					_, _ = outputWriter.Write(buf[:n])
 				}
 			}
 		}
@@ -175,7 +175,7 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 			if n > 0 {
 				r.mu.Lock()
 				if r.ptmx != nil {
-					r.ptmx.Write(buf[:n])
+					_, _ = r.ptmx.Write(buf[:n])
 				}
 				r.mu.Unlock()
 			}
@@ -189,7 +189,7 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 			case data := <-r.inputChan:
 				r.mu.Lock()
 				if r.ptmx != nil {
-					r.ptmx.Write(data)
+					_, _ = r.ptmx.Write(data)
 				}
 				r.mu.Unlock()
 			case <-done:
@@ -206,7 +206,7 @@ func (r *Runner) Run(ctx context.Context, prompt string) error {
 	case <-ctx.Done():
 		// Context cancelled, kill the process
 		if r.cmd.Process != nil {
-			r.cmd.Process.Kill()
+			_ = r.cmd.Process.Kill()
 		}
 		return ctx.Err()
 	}
@@ -243,12 +243,12 @@ func (r *Runner) Stop() error {
 
 	// Restore terminal state first
 	if r.oldState != nil {
-		term.Restore(int(os.Stdin.Fd()), r.oldState)
+		_ = term.Restore(int(os.Stdin.Fd()), r.oldState)
 		r.oldState = nil
 	}
 
 	// Send SIGTERM, then SIGKILL if needed
-	r.cmd.Process.Signal(syscall.SIGTERM)
+	_ = r.cmd.Process.Signal(syscall.SIGTERM)
 
 	return nil
 }

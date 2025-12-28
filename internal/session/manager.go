@@ -166,7 +166,7 @@ func (m *Manager) Stop() error {
 	// Stop all active sessions
 	for _, session := range m.sessions {
 		if session.GetStatus() == StatusRunning || session.GetStatus() == StatusStarting {
-			m.stopSessionInternalWithContext(stopCtx, session)
+			_ = m.stopSessionInternalWithContext(stopCtx, session)
 		}
 	}
 
@@ -518,7 +518,7 @@ func (m *Manager) sessionHasUserRole(sessionPath string) bool {
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Read first 32KB to check for user role (avoid reading entire large files)
 	buf := make([]byte, 32*1024)
@@ -666,7 +666,7 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 
 	go func() {
 		defer func() {
-			watcher.Close()
+			_ = watcher.Close()
 			m.cleanupSessionFileWatcher(workspaceID)
 		}()
 
@@ -1008,7 +1008,7 @@ func (m *Manager) getMostRecentHistoricalSessionID(workspacePath string) string 
 		)
 		return ""
 	}
-	defer cache.Stop()
+	defer func() { _ = cache.Stop() }()
 
 	// Force sync to ensure we have fresh data from disk
 	if err := cache.ForceSync(); err != nil {
@@ -1138,7 +1138,7 @@ func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *S
 
 	// Stop file watcher
 	if fw := session.FileWatcher(); fw != nil {
-		fw.Stop()
+		_ = fw.Stop()
 	}
 
 	session.SetStatus(StatusStopped)
@@ -1834,7 +1834,7 @@ func (m *Manager) checkIdleSessions() {
 					"workspace_id", session.WorkspaceID,
 					"idle_duration", now.Sub(session.GetLastActive()),
 				)
-				m.stopSessionInternal(session)
+				_ = m.stopSessionInternal(session)
 			}
 		}
 	}
@@ -2184,7 +2184,7 @@ func (m *Manager) ListHistory(workspaceID string, limit int) ([]HistoryInfo, err
 		)
 		return []HistoryInfo{}, nil // Return empty list on error
 	}
-	defer cache.Stop()
+	defer func() { _ = cache.Stop() }()
 
 	// Force sync to ensure we have fresh data from disk
 	if err := cache.ForceSync(); err != nil {
@@ -2278,7 +2278,7 @@ func (m *Manager) GetSessionMessages(workspaceID, sessionID string, limit, offse
 		)
 		return nil, fmt.Errorf("failed to create message cache: %w", err)
 	}
-	defer messageCache.Close()
+	defer func() { _ = messageCache.Close() }()
 
 	// Get messages
 	page, err := messageCache.GetMessages(sessionID, limit, offset, order)
@@ -2547,7 +2547,7 @@ func (m *Manager) watchGitIndex(ctx context.Context, repoPath, workspaceID strin
 		m.logger.Warn("Failed to create git state watcher", "error", err, "workspace_id", workspaceID)
 		return
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	// Watch .git directory for index, HEAD, FETCH_HEAD, ORIG_HEAD, MERGE_HEAD
 	if err := watcher.Add(gitDir); err != nil {

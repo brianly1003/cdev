@@ -72,8 +72,8 @@ func TestMockSubscriber_SendWithCustomFunc(t *testing.T) {
 	})
 
 	event := events.NewEvent(events.EventTypeHeartbeat, nil)
-	sub.Send(event)
-	sub.Send(event)
+	_ = sub.Send(event)
+	_ = sub.Send(event)
 
 	if callCount != 2 {
 		t.Errorf("expected sendFunc called 2 times, got %d", callCount)
@@ -109,7 +109,7 @@ func TestMockSubscriber_Done(t *testing.T) {
 		// Expected
 	}
 
-	sub.Close()
+	_ = sub.Close()
 
 	// Done channel should be closed after Close()
 	select {
@@ -124,9 +124,9 @@ func TestMockSubscriber_ClearEvents(t *testing.T) {
 	sub := NewMockSubscriber("test-sub")
 
 	event := events.NewEvent(events.EventTypeHeartbeat, nil)
-	sub.Send(event)
-	sub.Send(event)
-	sub.Send(event)
+	_ = sub.Send(event)
+	_ = sub.Send(event)
+	_ = sub.Send(event)
 
 	if sub.EventCount() != 3 {
 		t.Fatalf("expected 3 events, got %d", sub.EventCount())

@@ -79,7 +79,7 @@ func NewWebSocketTransport(conn *websocket.Conn, opts ...WebSocketOption) *WebSo
 
 	// Setup ping/pong handlers for keepalive
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(DefaultPongTimeout))
+		_ = conn.SetReadDeadline(time.Now().Add(DefaultPongTimeout))
 		return nil
 	})
 
@@ -104,7 +104,7 @@ func (t *WebSocketTransport) pingLoop() {
 				t.mu.Unlock()
 				return
 			}
-			t.conn.SetWriteDeadline(time.Now().Add(DefaultWriteTimeout))
+			_ = t.conn.SetWriteDeadline(time.Now().Add(DefaultWriteTimeout))
 			if err := t.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				t.mu.Unlock()
 				return
@@ -133,7 +133,7 @@ func (t *WebSocketTransport) Read(ctx context.Context) ([]byte, error) {
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}
-	t.conn.SetReadDeadline(deadline)
+	_ = t.conn.SetReadDeadline(deadline)
 
 	// Read message
 	messageType, message, err := t.conn.ReadMessage()
@@ -167,7 +167,7 @@ func (t *WebSocketTransport) Write(ctx context.Context, data []byte) error {
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}
-	t.conn.SetWriteDeadline(deadline)
+	_ = t.conn.SetWriteDeadline(deadline)
 
 	return t.conn.WriteMessage(websocket.TextMessage, data)
 }
@@ -184,8 +184,8 @@ func (t *WebSocketTransport) Close() error {
 	close(t.done)
 
 	// Send close frame before closing
-	t.conn.SetWriteDeadline(time.Now().Add(time.Second))
-	t.conn.WriteMessage(websocket.CloseMessage,
+	_ = t.conn.SetWriteDeadline(time.Now().Add(time.Second))
+	_ = t.conn.WriteMessage(websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 
 	return t.conn.Close()

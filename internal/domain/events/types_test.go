@@ -237,6 +237,6 @@ func BenchmarkEvent_ToJSON(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		event.ToJSON()
+		_, _ = event.ToJSON()
 	}
 }

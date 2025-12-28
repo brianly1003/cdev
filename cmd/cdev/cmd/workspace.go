@@ -126,8 +126,8 @@ func runWorkspaceList(cmd *cobra.Command, args []string) error {
 
 	// Create table writer
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tPATH\tPORT\tAUTO-START\tSTATUS")
-	fmt.Fprintln(w, "--\t----\t----\t----\t----------\t------")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tPATH\tPORT\tAUTO-START\tSTATUS")
+	_, _ = fmt.Fprintln(w, "--\t----\t----\t----\t----------\t------")
 
 	// Get status from workspace manager if running
 	statuses := getWorkspaceStatuses()
@@ -143,7 +143,7 @@ func runWorkspaceList(cmd *cobra.Command, args []string) error {
 			autoStart = "yes"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
 			ws.ID,
 			ws.Name,
 			truncatePath(ws.Path, 40),
@@ -153,7 +153,7 @@ func runWorkspaceList(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
@@ -279,7 +279,7 @@ func runWorkspaceStart(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to workspace manager: %w\nStart it with: cdev workspace-manager start", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -327,7 +327,7 @@ func runWorkspaceStop(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to workspace manager: %w\nStart it with: cdev workspace-manager start", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -399,7 +399,7 @@ func runWorkspaceDiscover(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to workspace manager: %w\nStart it with: cdev workspace-manager start", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -436,8 +436,8 @@ func runWorkspaceDiscover(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "NAME\tPATH\tREMOTE\tSTATUS")
-	fmt.Fprintln(w, "----\t----\t------\t------")
+	_, _ = fmt.Fprintln(w, "NAME\tPATH\tREMOTE\tSTATUS")
+	_, _ = fmt.Fprintln(w, "----\t----\t------\t------")
 
 	for _, repo := range result.Repositories {
 		status := "not configured"
@@ -450,14 +450,14 @@ func runWorkspaceDiscover(cmd *cobra.Command, args []string) error {
 			remote = remote[:47] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			repo.Name,
 			repo.Path,
 			remote,
 			status,
 		)
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	fmt.Println("\nTo add a repository as a workspace:")
 	fmt.Println("  cdev workspace add <path> --name <name>")

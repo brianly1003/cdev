@@ -69,8 +69,8 @@ func TestHub_StartStop(t *testing.T) {
 
 func TestHub_Subscribe(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	// Give hub time to start
 	time.Sleep(10 * time.Millisecond)
@@ -88,8 +88,8 @@ func TestHub_Subscribe(t *testing.T) {
 
 func TestHub_Unsubscribe(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -117,8 +117,8 @@ func TestHub_Unsubscribe(t *testing.T) {
 
 func TestHub_Publish(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -146,8 +146,8 @@ func TestHub_Publish(t *testing.T) {
 
 func TestHub_PublishToMultipleSubscribers(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -183,8 +183,8 @@ func TestHub_PublishToMultipleSubscribers(t *testing.T) {
 
 func TestHub_FailedSendRemovesSubscriber(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -218,8 +218,8 @@ func TestHub_FailedSendRemovesSubscriber(t *testing.T) {
 
 func TestHub_ConcurrentOperations(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -263,7 +263,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 
 func TestHub_StopClosesAllSubscribers(t *testing.T) {
 	h := New()
-	h.Start()
+	_ = h.Start()
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -275,7 +275,7 @@ func TestHub_StopClosesAllSubscribers(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	h.Stop()
+	_ = h.Stop()
 
 	// All subscribers should be closed
 	if !sub1.IsClosed() {
@@ -288,8 +288,8 @@ func TestHub_StopClosesAllSubscribers(t *testing.T) {
 
 func TestHub_SubscriberCount(t *testing.T) {
 	h := New()
-	h.Start()
-	defer h.Stop()
+	_ = h.Start()
+	defer func() { _ = h.Stop() }()
 
 	time.Sleep(10 * time.Millisecond)
 

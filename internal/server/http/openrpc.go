@@ -47,11 +47,11 @@ func (s *Server) handleOpenRPCDiscover(w http.ResponseWriter, r *http.Request) {
 		)
 		data, err := spec.ToJSON()
 		if err == nil {
-			w.Write(data)
+			_, _ = w.Write(data)
 			return
 		}
 	}
 
 	// Fall back to static spec
-	w.Write(fallbackOpenRPCSpec)
+	_, _ = w.Write(fallbackOpenRPCSpec)
 }

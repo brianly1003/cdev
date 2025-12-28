@@ -74,18 +74,18 @@ func NewMessageCache(sessionsDir string) (*MessageCache, error) {
 
 	// Enable WAL mode for better concurrency
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
 	// Optimize for read-heavy workload
-	db.Exec("PRAGMA synchronous=NORMAL")
-	db.Exec("PRAGMA cache_size=-64000") // 64MB cache
-	db.Exec("PRAGMA temp_store=MEMORY")
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL")
+	_, _ = db.Exec("PRAGMA cache_size=-64000") // 64MB cache
+	_, _ = db.Exec("PRAGMA temp_store=MEMORY")
 
 	// Create schema
 	if err := createMessageSchema(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -106,9 +106,9 @@ func createMessageSchema(db *sql.DB) error {
 	if existingVersion != 0 && existingVersion != messageSchemaVersion {
 		// Schema changed - drop and recreate
 		log.Info().Int("old_version", existingVersion).Int("new_version", messageSchemaVersion).Msg("message cache schema changed, recreating")
-		db.Exec("DROP TABLE IF EXISTS messages")
-		db.Exec("DROP TABLE IF EXISTS session_files")
-		db.Exec("DROP TABLE IF EXISTS message_metadata")
+		_, _ = db.Exec("DROP TABLE IF EXISTS messages")
+		_, _ = db.Exec("DROP TABLE IF EXISTS session_files")
+		_, _ = db.Exec("DROP TABLE IF EXISTS message_metadata")
 	}
 
 	schema := `
@@ -215,7 +215,7 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var messages []CachedMessage
 	for rows.Next() {
@@ -290,14 +290,14 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Begin transaction
 	tx, err := mc.db.Begin()
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing messages for this session
 	_, err = tx.Exec("DELETE FROM messages WHERE session_id = ?", sessionID)
@@ -313,7 +313,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
@@ -440,8 +440,8 @@ func (mc *MessageCache) InvalidateSession(sessionID string) error {
 // GetStats returns cache statistics.
 func (mc *MessageCache) GetStats() map[string]interface{} {
 	var sessionCount, messageCount int
-	mc.db.QueryRow("SELECT COUNT(*) FROM session_files").Scan(&sessionCount)
-	mc.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	_ = mc.db.QueryRow("SELECT COUNT(*) FROM session_files").Scan(&sessionCount)
+	_ = mc.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount)
 
 	return map[string]interface{}{
 		"sessions_cached": sessionCount,

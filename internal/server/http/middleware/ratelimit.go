@@ -282,7 +282,7 @@ func RateLimitMiddleware(limiter *RateLimiter, keyExtractor KeyExtractor) func(h
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Retry-After", "60")
 				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"error":"rate limit exceeded","message":"Too many requests. Please wait before trying again."}`))
+				_, _ = w.Write([]byte(`{"error":"rate limit exceeded","message":"Too many requests. Please wait before trying again."}`))
 				return
 			}
 

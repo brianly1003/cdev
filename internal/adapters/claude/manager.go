@@ -313,7 +313,7 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	// Always close stdin after starting Claude.
 	// Claude CLI waits for stdin EOF when stdin is a pipe before processing.
 	// For permission responses, we'll need a different approach (TBD).
-	stdin.Close()
+	_ = stdin.Close()
 	m.stdin = nil
 	log.Debug().Msg("closed stdin to trigger EOF")
 
@@ -400,13 +400,13 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 
 		// Close log file
 		if m.logFile != nil {
-			m.logFile.Close()
+			_ = m.logFile.Close()
 			m.logFile = nil
 		}
 
 		// Close stdin
 		if m.stdin != nil {
-			m.stdin.Close()
+			_ = m.stdin.Close()
 			m.stdin = nil
 		}
 
@@ -421,7 +421,7 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 
 		// Close PTY if used
 		if m.ptmx != nil {
-			m.ptmx.Close()
+			_ = m.ptmx.Close()
 			m.ptmx = nil
 		}
 		m.usePTY = false
@@ -547,14 +547,14 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 		if prompt != "" {
 			log.Info().Str("prompt", truncatePrompt(prompt, 50)).Msg("sending initial prompt to PTY")
 			// First send the prompt text
-			ptmx.Write([]byte(prompt))
+			_, _ = ptmx.Write([]byte(prompt))
 
 			// Wait a moment for Claude's TUI to process the input
 			time.Sleep(200 * time.Millisecond)
 
 			// Then send Enter (carriage return) to submit the prompt
 			log.Debug().Msg("sending Enter key to submit prompt")
-			ptmx.Write([]byte("\r"))
+			_, _ = ptmx.Write([]byte("\r"))
 		}
 	}()
 
@@ -593,11 +593,11 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 
 		// Cleanup
 		if m.logFile != nil {
-			m.logFile.Close()
+			_ = m.logFile.Close()
 			m.logFile = nil
 		}
 		if m.ptmx != nil {
-			m.ptmx.Close()
+			_ = m.ptmx.Close()
 			m.ptmx = nil
 		}
 
@@ -765,7 +765,7 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 	// Write to log file if enabled
 	m.mu.RLock()
 	if m.logFile != nil {
-		m.logFile.WriteString(line + "\n")
+		_, _ = m.logFile.WriteString(line + "\n")
 	}
 	m.mu.RUnlock()
 
@@ -1027,7 +1027,7 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 		if m.logFile != nil {
 			if stream == events.StreamStdout {
 				// Write raw JSON line as-is for stdout (Claude's stream-json output)
-				m.logFile.WriteString(line + "\n")
+				_, _ = m.logFile.WriteString(line + "\n")
 			} else {
 				// Wrap stderr in JSON for consistent parsing
 				stderrEntry := map[string]interface{}{
@@ -1037,7 +1037,7 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 					"_timestamp": time.Now().UTC().Format(time.RFC3339),
 				}
 				if stderrJSON, err := json.Marshal(stderrEntry); err == nil {
-					m.logFile.WriteString(string(stderrJSON) + "\n")
+					_, _ = m.logFile.WriteString(string(stderrJSON) + "\n")
 				}
 			}
 		}
@@ -1114,7 +1114,7 @@ func (m *Manager) SendResponse(toolUseID string, response string, isError bool) 
 			"_timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 		if stdinJSON, err := json.Marshal(stdinEntry); err == nil {
-			m.logFile.WriteString(string(stdinJSON) + "\n")
+			_, _ = m.logFile.WriteString(string(stdinJSON) + "\n")
 		}
 	}
 

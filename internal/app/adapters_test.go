@@ -324,7 +324,7 @@ func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(sessionsDir)
+	defer func() { _ = os.RemoveAll(sessionsDir) }()
 
 	// Create a session file
 	sessionID := "test-session-1"
@@ -357,10 +357,10 @@ func TestClaudeSessionAdapter_GetSessionMessages_Integration(t *testing.T) {
 
 	for _, msg := range messages {
 		data, _ := json.Marshal(msg)
-		f.Write(data)
-		f.WriteString("\n")
+		_, _ = f.Write(data)
+		_, _ = f.WriteString("\n")
 	}
-	f.Close()
+	_ = f.Close()
 
 	// Initialize MessageCache
 	msgCache, err := sessioncache.NewMessageCache(sessionsDir)

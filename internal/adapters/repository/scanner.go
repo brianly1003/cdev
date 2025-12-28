@@ -320,7 +320,7 @@ func (s *Scanner) hashAndCountLines(path string) (hash string, lines int, err er
 	if err != nil {
 		return "", 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	lineCount := 0

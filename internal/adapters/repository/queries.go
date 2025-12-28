@@ -72,7 +72,7 @@ func (idx *SQLiteIndexer) searchFuzzy(ctx context.Context, query SearchQuery) ([
 	if err != nil {
 		return nil, 0, fmt.Errorf("search query failed: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []FileInfo
 	for rows.Next() {
@@ -108,7 +108,7 @@ func (idx *SQLiteIndexer) searchFuzzy(ctx context.Context, query SearchQuery) ([
 	if query.ExcludeBinaries {
 		countQuery += " AND f.is_binary = 0"
 	}
-	idx.db.QueryRowContext(ctx, countQuery, ftsQuery).Scan(&total)
+	_ = idx.db.QueryRowContext(ctx, countQuery, ftsQuery).Scan(&total)
 
 	return results, total, nil
 }
@@ -147,14 +147,14 @@ func (idx *SQLiteIndexer) searchExact(ctx context.Context, query SearchQuery) ([
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := idx.scanFileRows(rows)
 
 	// Get total count
 	countSQL := `SELECT COUNT(*) FROM repository_files WHERE path_normalized LIKE ?`
 	var total int
-	idx.db.QueryRowContext(ctx, countSQL, searchTerm).Scan(&total)
+	_ = idx.db.QueryRowContext(ctx, countSQL, searchTerm).Scan(&total)
 
 	return results, total, nil
 }
@@ -182,13 +182,13 @@ func (idx *SQLiteIndexer) searchPrefix(ctx context.Context, query SearchQuery) (
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := idx.scanFileRows(rows)
 
 	// Get total count
 	var total int
-	idx.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM repository_files WHERE name LIKE ? OR path_normalized LIKE ?`,
+	_ = idx.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM repository_files WHERE name LIKE ? OR path_normalized LIKE ?`,
 		searchTerm, searchTerm).Scan(&total)
 
 	return results, total, nil
@@ -229,7 +229,7 @@ func (idx *SQLiteIndexer) searchByExtension(ctx context.Context, query SearchQue
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	results := idx.scanFileRows(rows)
 
@@ -238,7 +238,7 @@ func (idx *SQLiteIndexer) searchByExtension(ctx context.Context, query SearchQue
 	var total int
 	countArgs := make([]interface{}, len(extensions))
 	copy(countArgs, args[:len(extensions)])
-	idx.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total)
+	_ = idx.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total)
 
 	return results, total, nil
 }
@@ -329,7 +329,7 @@ func (idx *SQLiteIndexer) ListFiles(ctx context.Context, opts ListOptions) (*Fil
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	files := idx.scanFileRows(rows)
 
@@ -351,16 +351,16 @@ func (idx *SQLiteIndexer) ListFiles(ctx context.Context, opts ListOptions) (*Fil
 	if opts.Directory != "" {
 		if opts.Recursive {
 			countSQL += "directory = ? OR directory LIKE ?"
-			idx.db.QueryRowContext(ctx, countSQL, opts.Directory, opts.Directory+"/%").Scan(&totalFiles)
+			_ = idx.db.QueryRowContext(ctx, countSQL, opts.Directory, opts.Directory+"/%").Scan(&totalFiles)
 		} else {
 			countSQL += "directory = ?"
-			idx.db.QueryRowContext(ctx, countSQL, opts.Directory).Scan(&totalFiles)
+			_ = idx.db.QueryRowContext(ctx, countSQL, opts.Directory).Scan(&totalFiles)
 		}
 	} else if !opts.Recursive {
 		countSQL += "directory = ''"
-		idx.db.QueryRowContext(ctx, countSQL).Scan(&totalFiles)
+		_ = idx.db.QueryRowContext(ctx, countSQL).Scan(&totalFiles)
 	} else {
-		idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files").Scan(&totalFiles)
+		_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files").Scan(&totalFiles)
 	}
 	totalDirs = len(directories)
 
@@ -406,7 +406,7 @@ func (idx *SQLiteIndexer) getSubdirectories(ctx context.Context, parentPath stri
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var dirs []DirectoryInfo
 	for rows.Next() {
@@ -506,13 +506,13 @@ func (idx *SQLiteIndexer) GetStats(ctx context.Context) (*RepositoryStats, error
 	}
 
 	// Get basic counts
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files").Scan(&stats.TotalFiles)
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT directory) FROM repository_files").Scan(&stats.TotalDirectories)
-	idx.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(size_bytes), 0) FROM repository_files").Scan(&stats.TotalSizeBytes)
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE git_tracked = 1").Scan(&stats.GitTrackedFiles)
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE git_ignored = 1").Scan(&stats.GitIgnoredFiles)
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE is_binary = 1").Scan(&stats.BinaryFiles)
-	idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE is_sensitive = 1").Scan(&stats.SensitiveFiles)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files").Scan(&stats.TotalFiles)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT directory) FROM repository_files").Scan(&stats.TotalDirectories)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(size_bytes), 0) FROM repository_files").Scan(&stats.TotalSizeBytes)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE git_tracked = 1").Scan(&stats.GitTrackedFiles)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE git_ignored = 1").Scan(&stats.GitIgnoredFiles)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE is_binary = 1").Scan(&stats.BinaryFiles)
+	_ = idx.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM repository_files WHERE is_sensitive = 1").Scan(&stats.SensitiveFiles)
 
 	// Get files by extension
 	rows, err := idx.db.QueryContext(ctx, `
@@ -524,7 +524,7 @@ func (idx *SQLiteIndexer) GetStats(ctx context.Context) (*RepositoryStats, error
 		LIMIT 20
 	`)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var ext string
 			var count int
@@ -543,7 +543,7 @@ func (idx *SQLiteIndexer) GetStats(ctx context.Context) (*RepositoryStats, error
 		LIMIT 10
 	`)
 	if err == nil {
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		stats.LargestFiles = idx.scanFileRows(rows)
 	}
 

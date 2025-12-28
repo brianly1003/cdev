@@ -192,7 +192,7 @@ func (s *AgentService) Run(ctx context.Context, params json.RawMessage) (interfa
 	}
 
 	// Validate session mode
-	mode := SessionModeNew
+	var mode SessionMode
 	switch p.Mode {
 	case "continue":
 		mode = SessionModeContinue

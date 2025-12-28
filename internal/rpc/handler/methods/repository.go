@@ -206,7 +206,7 @@ func (s *RepositoryService) ListFiles(ctx context.Context, params json.RawMessag
 	}
 
 	// Params are optional
-	json.Unmarshal(params, &p)
+	_ = json.Unmarshal(params, &p)
 
 	opts := repository.ListOptions{
 		Directory:  p.Directory,
@@ -245,7 +245,7 @@ func (s *RepositoryService) GetTree(ctx context.Context, params json.RawMessage)
 	}
 
 	// Params are optional
-	json.Unmarshal(params, &p)
+	_ = json.Unmarshal(params, &p)
 
 	// Default depth
 	if p.Depth <= 0 {
@@ -283,7 +283,7 @@ func (s *RepositoryService) Rebuild(ctx context.Context, params json.RawMessage)
 	// Start rebuild in background
 	go func() {
 		// Use background context since the request context will be cancelled
-		s.indexer.FullScan(context.Background())
+		_ = s.indexer.FullScan(context.Background())
 	}()
 
 	return map[string]interface{}{
@@ -293,6 +293,8 @@ func (s *RepositoryService) Rebuild(ctx context.Context, params json.RawMessage)
 }
 
 // Ensure Extensions field works with comma-separated string for backwards compatibility
+//
+//nolint:unused
 func parseExtensions(extensions interface{}) []string {
 	switch v := extensions.(type) {
 	case []string:

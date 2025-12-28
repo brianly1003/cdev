@@ -26,7 +26,7 @@ func setupTestImageHandler(t *testing.T) (*ImageHandler, string) {
 
 	storage, err := imagestorage.New(tmpDir)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
@@ -36,7 +36,7 @@ func setupTestImageHandler(t *testing.T) (*ImageHandler, string) {
 
 func cleanupTestImageHandler(handler *ImageHandler, tmpDir string) {
 	handler.Close()
-	os.RemoveAll(tmpDir)
+	_ = os.RemoveAll(tmpDir)
 }
 
 func createMultipartRequest(t *testing.T, fieldName, filename, mimeType string, data []byte) (*http.Request, error) {
@@ -127,7 +127,7 @@ func TestHandleImages_Upload_MissingFile(t *testing.T) {
 	// Request without file
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	writer.Close()
+	_ = writer.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/images", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -226,7 +226,7 @@ func TestHandleImages_GetSingle(t *testing.T) {
 	handler.HandleImages(rec, req)
 
 	var uploadResp ImageUploadResponse
-	json.NewDecoder(rec.Body).Decode(&uploadResp)
+	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Get single image by ID
 	req = httptest.NewRequest(http.MethodGet, "/api/images?id="+uploadResp.ID, nil)
@@ -274,7 +274,7 @@ func TestHandleImages_Delete(t *testing.T) {
 	handler.HandleImages(rec, req)
 
 	var uploadResp ImageUploadResponse
-	json.NewDecoder(rec.Body).Decode(&uploadResp)
+	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Delete the image
 	req = httptest.NewRequest(http.MethodDelete, "/api/images?id="+uploadResp.ID, nil)
@@ -348,7 +348,7 @@ func TestValidateImagePath(t *testing.T) {
 	handler.HandleImages(rec, req)
 
 	var uploadResp ImageUploadResponse
-	json.NewDecoder(rec.Body).Decode(&uploadResp)
+	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Validate valid path
 	req = httptest.NewRequest(http.MethodGet, "/api/images/validate?path="+uploadResp.LocalPath, nil)
@@ -360,7 +360,7 @@ func TestValidateImagePath(t *testing.T) {
 	}
 
 	var resp ImageValidateResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 
 	if !resp.Valid {
 		t.Error("expected valid to be true")
@@ -381,7 +381,7 @@ func TestValidateImagePath_Invalid(t *testing.T) {
 	}
 
 	var resp ImageValidateResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 
 	if resp.Valid {
 		t.Error("expected valid to be false for path traversal")
@@ -467,7 +467,7 @@ func TestHandleClearImages(t *testing.T) {
 	handler.HandleImages(rec, req)
 
 	var resp ImageListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
 
 	if resp.Count != 0 {
 		t.Errorf("expected 0 images after clear, got %d", resp.Count)
@@ -598,7 +598,7 @@ func TestHandleImages_RateLimiting(t *testing.T) {
 // Benchmark tests
 func BenchmarkHandleImages_Upload(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "image-handler-bench-*")
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage, _ := imagestorage.New(tmpDir)
 	handler := NewImageHandler(storage)
@@ -613,8 +613,8 @@ func BenchmarkHandleImages_Upload(b *testing.B) {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		part, _ := writer.CreateFormFile("file", "test.jpg")
-		part.Write(data)
-		writer.Close()
+		_, _ = part.Write(data)
+		_ = writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/api/images", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -623,13 +623,13 @@ func BenchmarkHandleImages_Upload(b *testing.B) {
 		handler.HandleImages(rec, req)
 
 		// Read body to complete the request
-		io.Copy(io.Discard, rec.Body)
+		_, _ = io.Copy(io.Discard, rec.Body)
 	}
 }
 
 func BenchmarkHandleImages_List(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "image-handler-bench-*")
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage, _ := imagestorage.New(tmpDir)
 	handler := NewImageHandler(storage)
@@ -643,8 +643,8 @@ func BenchmarkHandleImages_List(b *testing.B) {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		part, _ := writer.CreateFormFile("file", "test.jpg")
-		part.Write(data)
-		writer.Close()
+		_, _ = part.Write(data)
+		_ = writer.Close()
 
 		req := httptest.NewRequest(http.MethodPost, "/api/images", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -657,6 +657,6 @@ func BenchmarkHandleImages_List(b *testing.B) {
 		req := httptest.NewRequest(http.MethodGet, "/api/images", nil)
 		rec := httptest.NewRecorder()
 		handler.HandleImages(rec, req)
-		io.Copy(io.Discard, rec.Body)
+		_, _ = io.Copy(io.Discard, rec.Body)
 	}
 }

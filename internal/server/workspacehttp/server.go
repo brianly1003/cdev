@@ -150,7 +150,7 @@ func (s *Server) Stop() error {
 // handleHealth handles GET /health
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "ok",
 		"service":   "cdev-multi-workspace",
 		"timestamp": time.Now().Unix(),
@@ -341,7 +341,7 @@ func (s *Server) handleDiscoverWorkspaces(w http.ResponseWriter, r *http.Request
 	}
 
 	// Parse request (optional)
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	repos, err := s.configManager.DiscoverRepositories(req.Paths)
 	if err != nil {

@@ -75,7 +75,7 @@ func (h *Hub) Stop() error {
 	// Close all subscribers
 	h.mu.Lock()
 	for _, sub := range h.subscribers {
-		sub.Close()
+		_ = sub.Close()
 	}
 	h.subscribers = make(map[string]ports.Subscriber)
 	h.mu.Unlock()
@@ -100,7 +100,7 @@ func (h *Hub) run() {
 		case id := <-h.unregister:
 			h.mu.Lock()
 			if sub, ok := h.subscribers[id]; ok {
-				sub.Close()
+				_ = sub.Close()
 				delete(h.subscribers, id)
 			}
 			h.mu.Unlock()

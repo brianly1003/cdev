@@ -64,13 +64,34 @@ func (wc *WorkspaceClient) Get(ctx context.Context, id string) (*workspace.Works
 	return &info, nil
 }
 
+// AddOptions contains options for adding a workspace.
+type AddOptions struct {
+	Name            string
+	Path            string
+	AutoStart       bool
+	Port            int
+	CreateIfMissing bool // Create directory if it doesn't exist
+}
+
 // Add creates a new workspace.
 func (wc *WorkspaceClient) Add(ctx context.Context, name, path string, autoStart bool, port int) (*workspace.WorkspaceInfo, error) {
+	return wc.AddWithOptions(ctx, AddOptions{
+		Name:      name,
+		Path:      path,
+		AutoStart: autoStart,
+		Port:      port,
+	})
+}
+
+// AddWithOptions creates a new workspace with additional options.
+// Use CreateIfMissing to create the directory if it doesn't exist.
+func (wc *WorkspaceClient) AddWithOptions(ctx context.Context, opts AddOptions) (*workspace.WorkspaceInfo, error) {
 	params := map[string]interface{}{
-		"name":       name,
-		"path":       path,
-		"auto_start": autoStart,
-		"port":       port,
+		"name":              opts.Name,
+		"path":              opts.Path,
+		"auto_start":        opts.AutoStart,
+		"port":              opts.Port,
+		"create_if_missing": opts.CreateIfMissing,
 	}
 
 	resp, err := wc.client.Call(ctx, "workspace/add", params)

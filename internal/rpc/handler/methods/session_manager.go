@@ -643,7 +643,7 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 
 		if exists {
 			// Session exists in .claude/projects - activate it for LIVE attachment
-			s.manager.ActivateSession(p.WorkspaceID, p.SessionID)
+			_ = s.manager.ActivateSession(p.WorkspaceID, p.SessionID)
 			return map[string]interface{}{
 				"session_id":   p.SessionID,
 				"workspace_id": p.WorkspaceID,
@@ -671,7 +671,7 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 
 	if latestSessionID != "" {
 		// Activate the latest session for LIVE attachment
-		s.manager.ActivateSession(p.WorkspaceID, latestSessionID)
+		_ = s.manager.ActivateSession(p.WorkspaceID, latestSessionID)
 		return map[string]interface{}{
 			"session_id":   latestSessionID,
 			"workspace_id": p.WorkspaceID,
@@ -1025,7 +1025,7 @@ func (s *SessionManagerService) Active(ctx context.Context, params json.RawMessa
 		WorkspaceID string `json:"workspace_id"`
 	}
 	// Params are optional
-	json.Unmarshal(params, &p)
+	_ = json.Unmarshal(params, &p)
 
 	sessions := s.manager.ListSessions(p.WorkspaceID)
 	return map[string]interface{}{
@@ -1823,7 +1823,7 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 
 	// Also update focus tracking so this client appears in the session's viewers list
 	if s.focusProvider != nil && clientID != "" {
-		s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
+		_, _ = s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
 	}
 
 	return map[string]interface{}{
@@ -2139,7 +2139,7 @@ func (s *SessionManagerService) FileGet(ctx context.Context, params json.RawMess
 	if err != nil {
 		return nil, message.NewError(message.InternalError, "failed to open file: "+err.Error())
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	content := make([]byte, readSize)
 	n, err := file.Read(content)

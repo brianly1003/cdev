@@ -29,7 +29,7 @@ func setupTestStorage(t *testing.T) (*Storage, string) {
 
 	storage, err := New(tmpDir)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("failed to create storage: %v", err)
 	}
 
@@ -38,7 +38,7 @@ func setupTestStorage(t *testing.T) (*Storage, string) {
 
 func cleanupTestStorage(storage *Storage, tmpDir string) {
 	storage.Close()
-	os.RemoveAll(tmpDir)
+	_ = os.RemoveAll(tmpDir)
 }
 
 func TestNew(t *testing.T) {
@@ -365,7 +365,7 @@ func TestCanAcceptUpload(t *testing.T) {
 	}
 
 	// Should reject file larger than max single size
-	ok, msg = storage.CanAcceptUpload(int64(MaxSingleImageMB*1024*1024) + 1)
+	ok, _ = storage.CanAcceptUpload(int64(MaxSingleImageMB*1024*1024) + 1)
 	if ok {
 		t.Error("should reject file larger than max single size")
 	}
@@ -515,7 +515,7 @@ func TestLoadExistingImages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create images directory and place a test file
 	imagesDir := filepath.Join(tmpDir, CdevImagesDir)

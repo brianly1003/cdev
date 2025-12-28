@@ -61,10 +61,9 @@ func (m *ConfigManager) SetGitTrackerManager(gtm *GitTrackerManager) {
 
 	// Register all existing workspaces with git tracker manager
 	for _, ws := range m.workspaces {
-		if err := gtm.RegisterWorkspace(&ws.Definition); err != nil {
-			// Log but don't fail - workspace may have invalid path
-			// The error will be detected when git operations are attempted
-		}
+		// Log but don't fail - workspace may have invalid path
+		// The error will be detected when git operations are attempted
+		_ = gtm.RegisterWorkspace(&ws.Definition)
 	}
 }
 
@@ -100,7 +99,15 @@ func (m *ConfigManager) GetWorkspace(id string) (*Workspace, error) {
 }
 
 // AddWorkspace adds a new workspace configuration.
+// This is a convenience wrapper around AddWorkspaceWithOptions with createIfMissing=false.
 func (m *ConfigManager) AddWorkspace(name, path string, autoStart bool) (*Workspace, error) {
+	return m.AddWorkspaceWithOptions(name, path, autoStart, false)
+}
+
+// AddWorkspaceWithOptions adds a new workspace configuration with additional options.
+// If createIfMissing is true and the path doesn't exist, it will be created.
+// This supports the iOS app flow where users can create new project folders.
+func (m *ConfigManager) AddWorkspaceWithOptions(name, path string, autoStart bool, createIfMissing bool) (*Workspace, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -110,15 +117,22 @@ func (m *ConfigManager) AddWorkspace(name, path string, autoStart bool) (*Worksp
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
-	// Verify path exists and is a directory
+	// Verify path exists and is a directory, or create it if missing
 	info, err := os.Stat(absPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("path does not exist: %s", absPath)
+			if createIfMissing {
+				// Create the directory
+				if err := os.MkdirAll(absPath, 0755); err != nil {
+					return nil, fmt.Errorf("failed to create directory: %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("path does not exist: %s", absPath)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to access path: %w", err)
 		}
-		return nil, fmt.Errorf("failed to access path: %w", err)
-	}
-	if !info.IsDir() {
+	} else if !info.IsDir() {
 		return nil, fmt.Errorf("path is not a directory: %s", absPath)
 	}
 
@@ -143,10 +157,9 @@ func (m *ConfigManager) AddWorkspace(name, path string, autoStart bool) (*Worksp
 
 	// Register with git tracker manager (if available)
 	if m.gitTrackerManager != nil {
-		if err := m.gitTrackerManager.RegisterWorkspace(&def); err != nil {
-			// Log but don't fail - git tracking is optional
-			// Non-git repos are still valid workspaces
-		}
+		// Log but don't fail - git tracking is optional
+		// Non-git repos are still valid workspaces
+		_ = m.gitTrackerManager.RegisterWorkspace(&def)
 	}
 
 	// Save config
@@ -188,7 +201,7 @@ func (m *ConfigManager) RemoveWorkspace(id string) error {
 		// Rollback
 		m.workspaces[id] = ws
 		if m.gitTrackerManager != nil {
-			m.gitTrackerManager.RegisterWorkspace(&ws.Definition)
+			_ = m.gitTrackerManager.RegisterWorkspace(&ws.Definition)
 		}
 		return fmt.Errorf("failed to save config: %w", err)
 	}

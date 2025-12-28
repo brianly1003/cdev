@@ -157,8 +157,9 @@ func TestWatchSessionNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nonexistent session")
 	}
-	if !streamer.watchCalled == false {
-		// streamer.WatchSession should NOT be called for nonexistent session
+	// streamer.WatchSession should NOT be called for nonexistent session
+	if streamer.watchCalled {
+		t.Error("expected WatchSession not to be called for nonexistent session")
 	}
 }
 

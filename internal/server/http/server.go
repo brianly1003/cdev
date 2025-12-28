@@ -189,7 +189,7 @@ func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 					Msg("request timed out")
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusGatewayTimeout)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "Request timed out",
 				})
 			} else {
@@ -762,7 +762,7 @@ func (s *Server) handleClaudeRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Determine session mode
-	mode := claude.SessionModeNew
+	var mode claude.SessionMode
 	switch req.Mode {
 	case "continue":
 		mode = claude.SessionModeContinue
@@ -1664,7 +1664,7 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 
 	// Flush to ensure response is sent immediately
 	if f, ok := w.(http.Flusher); ok {

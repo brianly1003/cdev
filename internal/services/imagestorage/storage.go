@@ -196,17 +196,17 @@ func (s *Storage) Store(reader io.Reader, mimeType string) (*StoredImage, error)
 	}
 
 	// Check storage limits
-	if ok, msg := s.canAcceptUploadLocked(int64(len(data))); !ok {
+	if ok, _ := s.canAcceptUploadLocked(int64(len(data))); !ok {
 		// Try to free space by cleaning expired images
 		s.cleanupExpiredLocked()
 
 		// Check again
-		if ok, msg = s.canAcceptUploadLocked(int64(len(data))); !ok {
+		if ok, _ = s.canAcceptUploadLocked(int64(len(data))); !ok {
 			// Try LRU eviction
 			s.evictOldestLocked()
 
 			// Final check
-			if ok, msg = s.canAcceptUploadLocked(int64(len(data))); !ok {
+			if ok, msg := s.canAcceptUploadLocked(int64(len(data))); !ok {
 				return nil, fmt.Errorf("%s", msg)
 			}
 		}
@@ -225,20 +225,20 @@ func (s *Storage) Store(reader io.Reader, mimeType string) (*StoredImage, error)
 	}
 
 	_, err = file.Write(data)
-	file.Close()
+	_ = file.Close()
 	if err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return nil, fmt.Errorf("failed to write image data: %w", err)
 	}
 
 	// Atomic rename
 	if err := os.Rename(tempPath, fullPath); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return nil, fmt.Errorf("failed to save image: %w", err)
 	}
 
 	// Set permissions (read-only for others)
-	os.Chmod(fullPath, 0644)
+	_ = os.Chmod(fullPath, 0644)
 
 	now := time.Now()
 	img := &StoredImage{
@@ -325,7 +325,7 @@ func (s *Storage) Clear() error {
 	defer s.mu.Unlock()
 
 	for id, img := range s.images {
-		os.Remove(img.FullPath)
+		_ = os.Remove(img.FullPath)
 		delete(s.images, id)
 	}
 	s.hashIndex = make(map[string]string)
@@ -523,7 +523,7 @@ func (s *Storage) cleanupExpiredLocked() {
 
 	for id, img := range s.images {
 		if now.After(img.ExpiresAt) {
-			os.Remove(img.FullPath)
+			_ = os.Remove(img.FullPath)
 			delete(s.hashIndex, img.ContentHash)
 			delete(s.images, id)
 			s.totalSize -= img.Size
@@ -555,7 +555,7 @@ func (s *Storage) evictOldestLocked() {
 
 	if oldestID != "" {
 		img := s.images[oldestID]
-		os.Remove(img.FullPath)
+		_ = os.Remove(img.FullPath)
 		delete(s.hashIndex, img.ContentHash)
 		delete(s.images, oldestID)
 		s.totalSize -= img.Size

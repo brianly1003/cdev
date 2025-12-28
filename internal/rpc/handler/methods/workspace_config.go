@@ -70,11 +70,12 @@ func (s *WorkspaceConfigService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("workspace/add", s.Add, handler.MethodMeta{
 		Summary:     "Add a new workspace",
-		Description: "Registers a new workspace (git repository) configuration.",
+		Description: "Registers a new workspace configuration. Can be any folder, not just git repositories. Set create_if_missing to true to create the directory if it doesn't exist.",
 		Params: []handler.OpenRPCParam{
 			{Name: "name", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "path", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "auto_start", Required: false, Schema: map[string]interface{}{"type": "boolean"}},
+			{Name: "create_if_missing", Required: false, Schema: map[string]interface{}{"type": "boolean", "description": "Create the directory if it doesn't exist"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "workspace",
@@ -374,9 +375,10 @@ func (s *WorkspaceConfigService) Get(ctx context.Context, params json.RawMessage
 // Add registers a new workspace.
 func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		Name      string `json:"name"`
-		Path      string `json:"path"`
-		AutoStart bool   `json:"auto_start"`
+		Name            string `json:"name"`
+		Path            string `json:"path"`
+		AutoStart       bool   `json:"auto_start"`
+		CreateIfMissing bool   `json:"create_if_missing"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -389,7 +391,7 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "path is required")
 	}
 
-	ws, err := s.configManager.AddWorkspace(p.Name, p.Path, p.AutoStart)
+	ws, err := s.configManager.AddWorkspaceWithOptions(p.Name, p.Path, p.AutoStart, p.CreateIfMissing)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
@@ -404,7 +406,12 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 		"path":       ws.Definition.Path,
 		"auto_start": ws.Definition.AutoStart,
 		"created_at": ws.Definition.CreatedAt,
+		"sessions":   []interface{}{}, // Empty sessions array for new workspace
 	}
+
+	// Initialize git state fields (defaults for non-git folders)
+	response["is_git_repo"] = false
+	response["git_state"] = "no_git"
 
 	// Check git state and add to response
 	gitInfo := map[string]interface{}{
@@ -424,6 +431,10 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 		gitInfo["unstaged_count"] = len(status.Unstaged)
 		gitInfo["untracked_count"] = len(status.Untracked)
 		gitInfo["state"] = status.State
+
+		// Set top-level git state fields
+		response["is_git_repo"] = status.IsGitRepo
+		response["git_state"] = status.State
 	}
 
 	response["git"] = gitInfo
@@ -527,7 +538,7 @@ func (s *WorkspaceConfigService) Discover(ctx context.Context, params json.RawMe
 		Fresh bool     `json:"fresh"` // Force fresh scan, ignore cache
 	}
 	// Params are optional
-	json.Unmarshal(params, &p)
+	_ = json.Unmarshal(params, &p)
 
 	var result *workspace.DiscoveryResult
 	var err error

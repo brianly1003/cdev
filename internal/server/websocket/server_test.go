@@ -115,8 +115,8 @@ func (m *mockStatusProvider) GetUptimeSeconds() int64 {
 
 func TestServer_WebSocketConnection(t *testing.T) {
 	hub := testutil.NewMockEventHub()
-	hub.Start()
-	defer hub.Stop()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
 
 	var receivedMessages [][]byte
 	var mu sync.Mutex
@@ -141,7 +141,7 @@ func TestServer_WebSocketConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Give server time to register client
 	time.Sleep(100 * time.Millisecond)

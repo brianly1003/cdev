@@ -120,7 +120,7 @@ func (h *ImageHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate Content-Type
 	mimeType := header.Header.Get("Content-Type")

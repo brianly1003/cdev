@@ -506,17 +506,17 @@ func (a *App) shutdown() error {
 
 	// Stop file watcher
 	if a.fileWatcher != nil {
-		a.fileWatcher.Stop()
+		_ = a.fileWatcher.Stop()
 	}
 
 	// Stop session cache
 	if a.sessionCache != nil {
-		a.sessionCache.Stop()
+		_ = a.sessionCache.Stop()
 	}
 
 	// Stop message cache
 	if a.messageCache != nil {
-		a.messageCache.Close()
+		_ = a.messageCache.Close()
 	}
 
 	// Stop session streamer
@@ -534,7 +534,7 @@ func (a *App) shutdown() error {
 	// Stop Claude if running
 	if a.claudeManager != nil && a.claudeManager.IsRunning() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		a.claudeManager.Stop(ctx)
+		_ = a.claudeManager.Stop(ctx)
 		cancel()
 	}
 
@@ -553,14 +553,14 @@ func (a *App) shutdown() error {
 	// Stop unified server
 	if a.unifiedServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		a.unifiedServer.Stop(shutdownCtx)
+		_ = a.unifiedServer.Stop(shutdownCtx)
 		cancel()
 	}
 
 	// Stop HTTP server
 	if a.httpServer != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		a.httpServer.Stop(shutdownCtx)
+		_ = a.httpServer.Stop(shutdownCtx)
 		cancel()
 	}
 
@@ -606,7 +606,7 @@ func (a *App) handleLegacyCommand(clientID string, cmd *commands.Command) {
 		}
 
 		// Determine session mode
-		mode := claude.SessionModeNew
+		var mode claude.SessionMode
 		switch payload.Mode {
 		case "continue":
 			mode = claude.SessionModeContinue
@@ -1016,6 +1016,7 @@ func (w *wsOutputWriter) Write(p []byte) (n int, err error) {
 // - Branch switches: .git/HEAD changes (git checkout, git switch)
 // - Pull/Fetch: .git/FETCH_HEAD, .git/refs/remotes/* changes
 // - Merges/Rebases: .git/ORIG_HEAD, .git/MERGE_HEAD changes
+//nolint:unused
 func (a *App) watchGitState(ctx context.Context) {
 	repoPath := a.cfg.Repository.Path
 	gitDir := filepath.Join(repoPath, ".git")
@@ -1032,7 +1033,7 @@ func (a *App) watchGitState(ctx context.Context) {
 		log.Warn().Err(err).Msg("Failed to create git state watcher")
 		return
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	// Watch .git directory for index, HEAD, FETCH_HEAD, ORIG_HEAD, MERGE_HEAD
 	if err := watcher.Add(gitDir); err != nil {
@@ -1176,6 +1177,7 @@ startWatching:
 }
 
 // emitGitStatusChanged emits a git_status_changed event.
+//nolint:unused
 func (a *App) emitGitStatusChanged(ctx context.Context) {
 	if a.gitTracker == nil {
 		log.Debug().Msg("Git tracker is nil, skipping emit")

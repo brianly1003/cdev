@@ -78,7 +78,7 @@ func (s *SessionStreamer) WatchSession(sessionID string) error {
 	}
 
 	if err := watcher.Add(filePath); err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		return err
 	}
 
@@ -117,7 +117,7 @@ func (s *SessionStreamer) stopWatchingLocked() {
 	close(s.done)
 
 	if s.watcher != nil {
-		s.watcher.Close()
+		_ = s.watcher.Close()
 		s.watcher = nil
 	}
 
@@ -312,7 +312,7 @@ func (s *SessionStreamer) checkForNewContent(completeChan chan<- *completeInfo) 
 		log.Warn().Err(err).Msg("failed to open session file for streaming")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Seek to last position
 	_, err = file.Seek(lastOffset, io.SeekStart)
