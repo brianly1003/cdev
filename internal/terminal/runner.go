@@ -1,3 +1,5 @@
+//go:build !windows
+
 // Package terminal provides terminal mode support for cdev.
 // Terminal mode spawns Claude in the current terminal with PTY,
 // allowing both local and remote (mobile) interaction.
