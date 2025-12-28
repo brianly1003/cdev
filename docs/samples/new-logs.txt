@@ -1,0 +1,1033 @@
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM INF emitting stream_read_complete event (after 3s delay) file_size=309638 messages=1 offset=309638 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=1324 current_size=310962 last_offset=309638 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=310962 messages=1 new_offset=310962 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=310962 offset=310962 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Yep, I'm here! What do you need?" state=question
+4:12PM DBG PTY output clean="· Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG cancelled pending stream_read_complete due to new content
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Thinking… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Tip: Use /agents to optimize specific tasks. Eg. Software Architect, ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=808 current_size=311770 last_offset=310962 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=311770 messages=1 new_offset=311770 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=311770 offset=311770 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM INF emitting stream_read_complete event (after 3s delay) file_size=311770 messages=1 offset=311770 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG dispatching request id=7088BB61-951E-40EE-B1AD-1D9895C82173 method=workspace/session/history notification=false
+4:12PM INF full session sync complete elapsed_ms=5.44175 files_scanned=21 sessions_cached=1
+4:12PM DBG listed sessions from cache count=1 elapsed_ms=0.040625
+4:12PM DBG request completed id=7088BB61-951E-40EE-B1AD-1D9895C82173 method=workspace/session/history
+4:12PM DBG dispatching request id=3AF48727-D461-4506-B791-342646E4A4EC method=session/send notification=false
+4:12PM INF sending prompt to existing PTY session prompt="ls thr project" session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM INF sent input to claude PTY input="ls thr project\r" special_key=false
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0ls thr project" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="                                                                             ..." state=idle
+4:12PM INF sent input to claude PTY input="\r" special_key=true
+4:12PM DBG request completed id=3AF48727-D461-4506-B791-342646E4A4EC method=session/send
+4:12PM DBG PTY output clean="> ls thr project" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="> ls thr project" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="> ls thr project" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=675 current_size=312445 last_offset=311770 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=user
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=312445 messages=1 new_offset=312445 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=312445 offset=312445 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt)" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean=">\u00a0" state=idle
+4:12PM DBG PTY output clean="─────────────────────────��..." state=idle
+4:12PM DBG PTY output clean="  ? for shortcuts" state=idle
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM INF emitting stream_read_complete event (after 3s delay) file_size=312445 messages=1 offset=312445 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=1238 current_size=313683 last_offset=312445 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=313683 messages=1 new_offset=313683 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=313683 offset=313683 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Waiting…" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG cancelled pending stream_read_complete due to new content
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Waiting…" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=903 current_size=314586 last_offset=313683 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=314586 messages=1 new_offset=314586 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=314586 offset=314586 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="  Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="  Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="  Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="  Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0Running…" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ Bash(ls -la)" state=thinking
+4:12PM DBG PTY output clean="  ⎿ \u00a0total 336" state=thinking
+4:12PM DBG PTY output clean="     drwxr-xr-x@  10 brianly  staff     320 Dec 28 04:40 ." state=thinking
+4:12PM DBG PTY output clean="     drwxr-xr-x  173 brianly  staff    5536 Dec 28 00:16 .." state=thinking
+4:12PM DBG PTY output clean="     … +8 lines (ctrl+o to expand)" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG cancelled pending stream_read_complete due to new content
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=1795 current_size=316381 last_offset=314586 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=user
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=316381 messages=1 new_offset=316381 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=316381 offset=316381 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✽ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✻ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+{"time":"2025-12-28T16:12:53.568729+07:00","level":"DEBUG","msg":"Git watcher event received","file":".watchman-cookie-MacBookPro.lan-63354-711","path":".watchman-cookie-MacBookPro.lan-63354-711","op":"CREATE","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:12:53.568774+07:00","level":"DEBUG","msg":"Git event ignored (not a trigger file)","file":".watchman-cookie-MacBookPro.lan-63354-711","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:12:53.590942+07:00","level":"DEBUG","msg":"Git watcher event received","file":".watchman-cookie-MacBookPro.lan-63354-711","path":".watchman-cookie-MacBookPro.lan-63354-711","op":"REMOVE","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:12:53.590995+07:00","level":"DEBUG","msg":"Git event ignored (not a trigger file)","file":".watchman-cookie-MacBookPro.lan-63354-711","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM INF emitting stream_read_complete event (after 3s delay) file_size=316381 messages=1 offset=316381 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="· Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=1126 current_size=317507 last_offset=316381 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=317507 messages=1 new_offset=317507 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=317507 offset=317507 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✢ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="⏺ .cdev/" state=thinking
+4:12PM DBG PTY output clean="  .git/" state=thinking
+4:12PM DBG PTY output clean="  node_modules/" state=thinking
+4:12PM DBG PTY output clean="  index.js" state=thinking
+4:12PM DBG PTY output clean="  index.test.js" state=thinking
+4:12PM DBG PTY output clean="  package-lock.json" state=thinking
+4:12PM DBG PTY output clean="  package.json" state=thinking
+4:12PM DBG PTY output clean="  text.txt" state=thinking
+4:12PM DBG PTY output clean="✳ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG cancelled pending stream_read_complete due to new content
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="✶ Unravelling… (esc to interrupt · thinking)" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0" state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:12PM DBG checkForNewContent: found new content to read bytes_to_read=886 current_size=318393 last_offset=317507 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG parsed JSONL message session_id=8a10cd3b-9a1e-4324-8673-b927b686b919 stop_reason_final= stop_reason_msg= stop_reason_top= type=assistant
+4:12PM DBG checkForNewContent: finished reading caught_up=true current_size=318393 messages=1 new_offset=318393 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG scheduled stream_read_complete in 3 seconds file_size=318393 offset=318393 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM INF emitting stream_read_complete event (after 3s delay) file_size=318393 messages=1 offset=318393 session_id=8a10cd3b-9a1e-4324-8673-b927b686b919
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean=">\u00a0show me index.js                                                          ..." state=thinking
+4:12PM DBG PTY output clean="─────────────────────────��..." state=thinking
+4:12PM DBG PTY output clean="  ? for shortcuts" state=thinking
+4:13PM DBG dispatching request id=919AB22D-002F-44B4-A16E-8A1FB890CD5A method=workspace/list notification=false
+4:13PM INF full session sync complete elapsed_ms=13.361625 files_scanned=21 sessions_cached=1
+4:13PM DBG listed sessions from cache count=1 elapsed_ms=0.028958
+4:13PM DBG request completed id=919AB22D-002F-44B4-A16E-8A1FB890CD5A method=workspace/list
+{"time":"2025-12-28T16:13:53.768814+07:00","level":"DEBUG","msg":"Git watcher event received","file":".watchman-cookie-MacBookPro.lan-63354-712","path":".watchman-cookie-MacBookPro.lan-63354-712","op":"CREATE","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:13:53.768968+07:00","level":"DEBUG","msg":"Git event ignored (not a trigger file)","file":".watchman-cookie-MacBookPro.lan-63354-712","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:13:53.790561+07:00","level":"DEBUG","msg":"Git watcher event received","file":".watchman-cookie-MacBookPro.lan-63354-712","path":".watchman-cookie-MacBookPro.lan-63354-712","op":"REMOVE","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}
+{"time":"2025-12-28T16:13:53.79061+07:00","level":"DEBUG","msg":"Git event ignored (not a trigger file)","file":".watchman-cookie-MacBookPro.lan-63354-712","workspace_id":"637a933c-6741-46cf-801e-9290163547e6"}

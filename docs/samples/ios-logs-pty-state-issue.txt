@@ -1,0 +1,67 @@
+# iOS Logs - PTY State Issue
+# Date: 2025-12-28
+# Issue: After pty_spinner events finish, no pty_state(idle) is sent
+#        After claude_message events, no stop_reason is sent
+
+[02:33:29.760] [WS] Connecting...
+[02:33:29.760] [WS] Connecting...
+[02:33:30.771] [WS] Connected
+[02:33:30.776] [WS] → initialize - jsonrpc_initialize
+[02:33:30.806] [WS] → initialize - jsonrpc_initialize
+[02:33:30.877] [WS] ← initialize - jsonrpc_response
+[02:33:30.892] [WS] → initialized - jsonrpc_initialized
+[02:33:30.915] [WS] → workspace/list - jsonrpc_workspace_list
+[02:33:30.952] [WS] ← initialize - jsonrpc_response
+[02:33:30.953] [WS] → initialized - jsonrpc_initialized
+[02:33:31.004] [WS] ← workspace/list - jsonrpc_response
+[02:33:34.460] [WS] → workspace/subscribe - jsonrpc_workspace_subscribe
+[02:33:34.462] [WS] ← workspace/subscribe - jsonrpc_response
+[02:33:34.486] [WS] → workspace/files/list - jsonrpc_workspace_files_list
+[02:33:34.571] [WS] ← workspace/files/list - jsonrpc_response
+[02:33:34.781] [WS] → workspace/list - jsonrpc_workspace_list
+[02:33:34.894] [WS] ← workspace/list - jsonrpc_response
+[02:33:34.902] [WS] → workspace/session/watch - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:34.984] [WS] → workspace/status - jsonrpc_workspace_status
+[02:33:34.996] [WS] ← workspace/session/watch - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:35.010] [WS] → client/session/focus - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:35.101] [WS] ← workspace/status - jsonrpc_response
+[02:33:35.135] [WS] ← client/session/focus - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:35.146] [WS] → workspace/session/messages - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:35.307] [WS] ← workspace/session/messages - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:35.493] [WS] → workspace/git/status - jsonrpc_workspace_git_status
+[02:33:35.631] [WS] ← workspace/git/status - jsonrpc_response
+[02:33:39.489] [WS] → workspace/session/history - jsonrpc_workspace_session_history
+[02:33:39.589] [WS] ← workspace/session/history - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:39.602] [WS] → session/send - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:39.699] [WS] event/pty_state - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.015] [WS] ← session/send - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.016] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.055] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.105] [WS] event/claude_message - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.264] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.630] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.673] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.770] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:40.954] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:41.301] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:41.654] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:41.858] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:41.886] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:41.973] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:42.267] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:42.423] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:42.883] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:43.087] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:43.139] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:43.498] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:43.525] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:43.645] [WS] event/pty_spinner - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:44.200] [WS] event/claude_message - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:44.203] [WS] event/claude_message - 8a10cd3b-9a1e-4324-8673-b927b686b919
+[02:33:50.705] [WS] heartbeat - heartbeat
+
+# ISSUES:
+# 1. After pty_spinner events stop (02:33:43.645), no pty_state(idle) is sent
+#    - cdev-ios doesn't know when PTY processing is complete
+# 2. After claude_message events (02:33:44.203), no stop_reason event
+#    - cdev-ios doesn't know when Claude finished responding

@@ -1037,16 +1037,79 @@ func (m *Manager) getMostRecentHistoricalSessionID(workspacePath string) string 
 }
 
 // StopSession stops a running session.
+// For managed sessions (started via cdev), this stops the Claude process.
+// For LIVE sessions (watched but not started by cdev), this unwatches and clears active status.
 func (m *Manager) StopSession(sessionID string) error {
+	// First check if it's a managed session (started by cdev)
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	session, ok := m.sessions[sessionID]
-	if !ok {
+	if ok {
+		// It's a managed session - stop it while holding the lock
+		err := m.stopSessionInternal(session)
+		m.mu.Unlock()
+		return err
+	}
+
+	// Not a managed session - check if it's a LIVE/watched session
+	// Find the workspace that has this session as active
+	var workspaceID string
+	for wsID, activeID := range m.activeSessions {
+		if activeID == sessionID {
+			workspaceID = wsID
+			break
+		}
+	}
+	m.mu.Unlock() // Release m.mu before acquiring streamerMu to prevent deadlock
+
+	if workspaceID == "" {
+		// Check if we're currently streaming this session
+		m.streamerMu.Lock()
+		if m.streamerSessionID == sessionID {
+			workspaceID = m.streamerWorkspaceID
+		}
+		m.streamerMu.Unlock()
+	}
+
+	if workspaceID == "" {
 		return fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	return m.stopSessionInternal(session)
+	// Stop watching/streaming the LIVE session
+	m.stopWatchingLiveSession(workspaceID, sessionID)
+
+	return nil
+}
+
+// stopWatchingLiveSession stops watching a LIVE session and clears its active status.
+// IMPORTANT: Acquires locks in order: streamerMu first, then m.mu (same as WatchWorkspaceSession)
+func (m *Manager) stopWatchingLiveSession(workspaceID, sessionID string) {
+	// Stop the streamer if it's watching this session
+	// Acquire streamerMu FIRST to match lock order in WatchWorkspaceSession
+	m.streamerMu.Lock()
+	if m.streamerSessionID == sessionID {
+		if m.streamer != nil {
+			m.streamer.UnwatchSession()
+		}
+		m.streamerSessionID = ""
+		m.streamerWorkspaceID = ""
+		m.streamerWatchers = make(map[string]bool)
+	}
+	m.streamerMu.Unlock()
+
+	// Clear active session mapping (acquire m.mu AFTER streamerMu is released)
+	m.mu.Lock()
+	if m.activeSessions[workspaceID] == sessionID {
+		delete(m.activeSessions, workspaceID)
+	}
+	delete(m.activeSessionWorkspaces, sessionID)
+	m.mu.Unlock()
+
+	// Emit session_stopped event for multi-device sync
+	if m.hub != nil {
+		m.hub.Publish(events.NewSessionStoppedEvent(workspaceID, sessionID))
+	}
+
+	m.logger.Info("Stopped watching LIVE session", "session_id", sessionID, "workspace_id", workspaceID)
 }
 
 // stopSessionInternal stops a session (must hold lock).

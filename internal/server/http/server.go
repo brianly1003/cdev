@@ -21,6 +21,7 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/services/imagestorage"
 	"github.com/rs/zerolog/log"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -44,6 +45,8 @@ type Server struct {
 	repoPath      string
 	wsHandler     WebSocketHandler
 	rpcRegistry   *handler.Registry
+	imageHandler  *ImageHandler
+	imageStorage  *imagestorage.Storage
 }
 
 // New creates a new HTTP server.
@@ -103,6 +106,25 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 	s.mux.HandleFunc("/api/rpc/discover", s.handleOpenRPCDiscover)
 
 	return s
+}
+
+// SetImageStorage sets the image storage and registers image upload routes.
+// Must be called before Start() to enable image upload functionality.
+func (s *Server) SetImageStorage(storage *imagestorage.Storage) {
+	if storage == nil {
+		log.Warn().Msg("image storage is nil, image upload routes will not be available")
+		return
+	}
+	s.imageStorage = storage
+	s.imageHandler = NewImageHandler(storage)
+
+	// Register image routes
+	s.mux.HandleFunc("/api/images", s.imageHandler.HandleImages)
+	s.mux.HandleFunc("/api/images/validate", s.imageHandler.ValidateImagePath)
+	s.mux.HandleFunc("/api/images/stats", s.imageHandler.HandleImageStats)
+	s.mux.HandleFunc("/api/images/all", s.imageHandler.HandleClearImages)
+
+	log.Info().Msg("image upload routes registered: /api/images, /api/images/validate, /api/images/stats, /api/images/all")
 }
 
 // requestLoggingMiddleware logs all incoming requests for debugging.
@@ -280,6 +302,15 @@ func (s *Server) Start() error {
 // Stop gracefully stops the HTTP server.
 func (s *Server) Stop(ctx context.Context) error {
 	log.Info().Msg("HTTP server stopping")
+
+	// Close image handler and storage
+	if s.imageHandler != nil {
+		s.imageHandler.Close()
+	}
+	if s.imageStorage != nil {
+		s.imageStorage.Close()
+	}
+
 	return s.server.Shutdown(ctx)
 }
 

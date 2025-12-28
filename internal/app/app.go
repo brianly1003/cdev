@@ -18,6 +18,7 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
 	"github.com/brianly1003/cdev/internal/config"
+	"github.com/brianly1003/cdev/internal/services/imagestorage"
 	"github.com/brianly1003/cdev/internal/domain/commands"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/hub"
@@ -48,6 +49,7 @@ type App struct {
 	messageCache    *sessioncache.MessageCache
 	sessionStreamer *sessioncache.SessionStreamer
 	repoIndexer     *repository.SQLiteIndexer
+	imageStorage    *imagestorage.Storage
 	httpServer      *httpserver.Server
 	unifiedServer   *unified.Server
 	rpcDispatcher   *handler.Dispatcher
@@ -139,6 +141,15 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	if err := os.MkdirAll(cdevImagesDir, 0755); err != nil {
 		log.Warn().Err(err).Msg("failed to create .cdev/images directory")
+	}
+
+	// Initialize Image Storage for iOS image uploads
+	imageStorage, err := imagestorage.New(a.cfg.Repository.Path)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to create image storage, image uploads will not be available")
+	} else {
+		a.imageStorage = imageStorage
+		log.Info().Str("dir", cdevImagesDir).Msg("image storage initialized")
 	}
 
 	// Enable Claude output logging to .cdev/logs directory
@@ -436,6 +447,10 @@ func (a *App) Start(ctx context.Context) error {
 	// Set repository indexer for file search APIs
 	if a.repoIndexer != nil {
 		a.httpServer.SetRepositoryIndexer(a.repoIndexer)
+	}
+	// Set image storage for iOS image uploads
+	if a.imageStorage != nil {
+		a.httpServer.SetImageStorage(a.imageStorage)
 	}
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
