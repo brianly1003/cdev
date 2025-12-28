@@ -397,13 +397,37 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 	// Register with session manager
 	s.sessionManager.RegisterWorkspace(ws)
 
-	return map[string]interface{}{
+	// Build response with git state info
+	response := map[string]interface{}{
 		"id":         ws.Definition.ID,
 		"name":       ws.Definition.Name,
 		"path":       ws.Definition.Path,
 		"auto_start": ws.Definition.AutoStart,
 		"created_at": ws.Definition.CreatedAt,
-	}, nil
+	}
+
+	// Check git state and add to response
+	gitInfo := map[string]interface{}{
+		"initialized": false,
+		"has_remotes": false,
+		"branch":      nil,
+	}
+
+	// Try to get git status for this workspace
+	if status, err := s.sessionManager.GitGetStatus(ws.Definition.ID); err == nil && status != nil {
+		gitInfo["initialized"] = status.IsGitRepo
+		gitInfo["branch"] = status.Branch
+		gitInfo["has_remotes"] = len(status.Remotes) > 0
+		gitInfo["ahead"] = status.Ahead
+		gitInfo["behind"] = status.Behind
+		gitInfo["staged_count"] = len(status.Staged)
+		gitInfo["unstaged_count"] = len(status.Unstaged)
+		gitInfo["untracked_count"] = len(status.Untracked)
+		gitInfo["state"] = status.State
+	}
+
+	response["git"] = gitInfo
+	return response, nil
 }
 
 // Remove unregisters a workspace.
