@@ -28,6 +28,11 @@ jobs:
           go-version: "1.21"
           cache: true
 
+      - name: Create stub frontend/dist for embed
+        run: |
+          mkdir -p frontend/dist
+          echo "stub" > frontend/dist/.gitkeep
+
       - name: Run tests
         run: go test -v ./...
 
