@@ -1,0 +1,115 @@
+# CI workflow for cdev
+# Runs on every push and pull request
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go-version: ["1.21", "1.22"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v -race ./...
+
+      - name: Run tests with coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.22'
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Build
+        run: |
+          go build -v ./...
+
+      - name: Build all platforms
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -o /dev/null ./cmd/cdev
+          GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/cdev
+          GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/cdev
+          GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/cdev
+          GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/cdev
+
+  # Validate GoReleaser config
+  goreleaser-check:
+    name: GoReleaser Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Check GoReleaser config
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check

@@ -1,0 +1,66 @@
+# Release workflow for cdev
+# Triggered when a new tag is pushed (v*)
+# Uses GoReleaser to build and publish releases
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  # Optional: Build and push Docker image
+  # docker:
+  #   name: Docker
+  #   runs-on: ubuntu-latest
+  #   needs: release
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #
+  #     - name: Login to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #
+  #     - name: Build and push
+  #       uses: docker/build-push-action@v5
+  #       with:
+  #         push: true
+  #         tags: brianly1003/cdev:${{ github.ref_name }},brianly1003/cdev:latest

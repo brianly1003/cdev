@@ -1,0 +1,134 @@
+# GoReleaser configuration for cdev
+# Documentation: https://goreleaser.com
+
+version: 2
+
+project_name: cdev
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: cdev
+    main: ./cmd/cdev
+    binary: cdev
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # Skip Windows ARM64 (not commonly used)
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.GitCommit={{.Commit}}
+      - -X main.BuildTime={{.Date}}
+    flags:
+      - -trimpath
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Use zip for Windows
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+      - configs/config.yaml
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: "New Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Performance Improvements"
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "Other Changes"
+      order: 999
+
+release:
+  github:
+    owner: brianly1003
+    name: cdev
+  draft: false
+  prerelease: auto
+  mode: replace
+  name_template: "v{{.Version}}"
+  header: |
+    ## cdev v{{.Version}}
+
+    Claude Code Development Agent - Remote monitoring and control of Claude Code CLI sessions.
+
+    ### Installation
+
+    **Homebrew (macOS/Linux):**
+    ```bash
+    brew tap brianly1003/tap
+    brew install cdev
+    ```
+
+    **Go Install:**
+    ```bash
+    go install github.com/brianly1003/cdev/cmd/cdev@v{{.Version}}
+    ```
+
+    **Manual Download:**
+    Download the appropriate binary for your platform below.
+
+# Homebrew tap configuration
+brews:
+  - name: cdev
+    repository:
+      owner: brianly1003
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/brianly1003/cdev"
+    description: "Claude Code Development Agent - Remote monitoring and control of Claude Code CLI sessions"
+    license: "MIT"
+    install: |
+      bin.install "cdev"
+    test: |
+      system "#{bin}/cdev", "version"
+    dependencies:
+      - name: git
+        type: optional
+
+# Announce releases (optional - uncomment if needed)
+# announce:
+#   discord:
+#     enabled: true
+#     message_template: "cdev {{ .Tag }} is out! Check it out: {{ .ReleaseURL }}"
