@@ -221,10 +221,15 @@ Get current server status.
 
 ### Git Methods
 
+All git methods require a `workspace_id` parameter to specify which workspace to operate on.
+
 #### `git/status`
 Get git repository status.
 
-**Params:** None
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 
 **Result:**
 ```json
@@ -248,7 +253,9 @@ Get diff for a file or all files.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | path | string | No | File path relative to repo root (omit for all files) |
+| staged | boolean | No | Get staged diff (default: false) |
 
 **Result:**
 ```json
@@ -268,6 +275,7 @@ Stage files for commit.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | paths | string[] | Yes | Array of file paths to stage |
 
 **Result:**
@@ -286,6 +294,7 @@ Unstage files from the staging area.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | paths | string[] | Yes | Array of file paths to unstage |
 
 **Result:**
@@ -304,6 +313,7 @@ Discard unstaged changes to files.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | paths | string[] | Yes | Array of file paths to discard changes |
 
 **Result:**
@@ -322,6 +332,7 @@ Create a commit with staged changes.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | message | string | Yes | Commit message |
 | push | boolean | No | Push to remote after commit (default: false) |
 
@@ -338,7 +349,14 @@ Create a commit with staged changes.
 #### `git/push`
 Push commits to remote repository.
 
-**Params:** None
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| force | boolean | No | Force push (default: false) |
+| set_upstream | boolean | No | Set upstream tracking (default: false) |
+| remote | string | No | Remote name (default: "origin") |
+| branch | string | No | Branch name (default: current branch) |
 
 **Result:**
 ```json
@@ -352,7 +370,11 @@ Push commits to remote repository.
 #### `git/pull`
 Pull changes from remote repository.
 
-**Params:** None
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| rebase | boolean | No | Use rebase instead of merge (default: false) |
 
 **Result:**
 ```json
@@ -366,7 +388,10 @@ Pull changes from remote repository.
 #### `git/branches`
 List all git branches.
 
-**Params:** None
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 
 **Result:**
 ```json
@@ -377,7 +402,6 @@ List all git branches.
   ],
   "current": "main"
 }
-```
 
 ---
 
@@ -387,15 +411,417 @@ Checkout a branch.
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
 | branch | string | Yes | Branch name to checkout |
+| create | boolean | No | Create branch if it doesn't exist (default: false) |
 
 **Result:**
 ```json
 {
-  "status": "checked_out",
-  "branch": "feature/auth"
+  "success": true,
+  "branch": "feature/auth",
+  "from_branch": "main",
+  "message": "Switched to branch 'feature/auth'"
 }
 ```
+
+**Note:** When the branch changes, a `git_branch_changed` event is emitted.
+
+---
+
+#### `git/delete_branch`
+Delete a git branch.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| branch | string | Yes | Branch name to delete |
+| force | boolean | No | Force delete even if not fully merged (default: false) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "branch": "feature/old",
+  "was_current": false,
+  "message": "Deleted branch feature/old"
+}
+```
+
+---
+
+#### `git/fetch`
+Fetch updates from remote repository.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| remote | string | No | Remote name (default: "origin") |
+| prune | boolean | No | Prune deleted remote branches (default: false) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "remote": "origin",
+  "message": "Fetched from origin"
+}
+```
+
+---
+
+#### `git/log`
+Get commit history with optional graph layout for visualization.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| limit | number | No | Max commits to return (default: 50) |
+| skip | number | No | Number of commits to skip (default: 0) |
+| branch | string | No | Branch to get history for (default: current) |
+| path | string | No | Filter by file path |
+| graph | boolean | No | Include graph layout info for visualization (default: false) |
+
+**Result:**
+```json
+{
+  "commits": [
+    {
+      "sha": "abc123def456...",
+      "short_sha": "abc123d",
+      "author": "John Doe",
+      "author_email": "john@example.com",
+      "date": "2025-12-28T10:30:00Z",
+      "message": "feat: add new feature",
+      "parents": ["def789..."],
+      "lane": 0,
+      "merge_lanes": []
+    }
+  ],
+  "total": 150,
+  "has_more": true
+}
+```
+
+**Graph Fields (when `graph: true`):**
+| Field | Type | Description |
+|-------|------|-------------|
+| lane | number | Horizontal lane (0 = leftmost) for graph rendering |
+| merge_lanes | number[] | Lanes that merge into this commit |
+
+---
+
+#### `git/stash`
+Create a stash of current changes.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| message | string | No | Stash message |
+| include_untracked | boolean | No | Include untracked files (default: false) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "message": "Saved working directory"
+}
+```
+
+---
+
+#### `git/stash_list`
+List all stashes.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+
+**Result:**
+```json
+{
+  "stashes": [
+    {
+      "index": 0,
+      "message": "WIP on main: abc123 feat: add feature",
+      "branch": "main",
+      "date": "2025-12-28T10:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+#### `git/stash_apply`
+Apply a stash without removing it.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| index | number | No | Stash index to apply (default: 0) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "message": "Applied stash@{0}"
+}
+```
+
+---
+
+#### `git/stash_pop`
+Apply and remove a stash.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| index | number | No | Stash index to pop (default: 0) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "message": "Applied and removed stash@{0}"
+}
+```
+
+---
+
+#### `git/stash_drop`
+Remove a stash without applying it.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| index | number | No | Stash index to drop (default: 0) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "message": "Dropped stash@{0}"
+}
+```
+
+---
+
+#### `git/merge`
+Merge a branch into the current branch.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| branch | string | Yes | Branch to merge |
+| no_ff | boolean | No | Create merge commit even if fast-forward possible (default: false) |
+| message | string | No | Custom merge commit message |
+
+**Result:**
+```json
+{
+  "success": true,
+  "merged_branch": "feature/auth",
+  "fast_forward": false,
+  "has_conflicts": false,
+  "message": "Merge made by the 'ort' strategy"
+}
+```
+
+**Conflict Result:**
+```json
+{
+  "success": false,
+  "has_conflicts": true,
+  "conflicted_files": ["src/auth.go", "src/user.go"],
+  "message": "Automatic merge failed; fix conflicts and commit"
+}
+```
+
+---
+
+#### `git/merge_abort`
+Abort an in-progress merge.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+
+**Result:**
+```json
+{
+  "success": true,
+  "message": "Merge aborted"
+}
+```
+
+---
+
+#### `git/init`
+Initialize a new git repository.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| initial_branch | string | No | Initial branch name (default: "main") |
+| initial_commit | boolean | No | Create initial empty commit (default: false) |
+| commit_message | string | No | Initial commit message |
+
+**Result:**
+```json
+{
+  "success": true,
+  "branch": "main",
+  "has_initial_commit": true,
+  "message": "Initialized empty Git repository"
+}
+```
+
+---
+
+#### `git/remote_add`
+Add a remote repository.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| name | string | Yes | Remote name (e.g., "origin") |
+| url | string | Yes | Remote URL |
+| fetch | boolean | No | Fetch after adding (default: true) |
+
+**Result:**
+```json
+{
+  "success": true,
+  "name": "origin",
+  "url": "git@github.com:user/repo.git",
+  "message": "Remote 'origin' added"
+}
+```
+
+---
+
+#### `git/remote_list`
+List configured remotes.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+
+**Result:**
+```json
+{
+  "remotes": [
+    {
+      "name": "origin",
+      "fetch_url": "git@github.com:user/repo.git",
+      "push_url": "git@github.com:user/repo.git"
+    }
+  ]
+}
+```
+
+---
+
+#### `git/remote_remove`
+Remove a remote.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| name | string | Yes | Remote name to remove |
+
+**Result:**
+```json
+{
+  "success": true,
+  "name": "origin",
+  "message": "Remote 'origin' removed"
+}
+```
+
+---
+
+#### `git/set_upstream`
+Set upstream tracking branch.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+| branch | string | Yes | Local branch name |
+| upstream | string | Yes | Upstream branch (e.g., "origin/main") |
+
+**Result:**
+```json
+{
+  "success": true,
+  "branch": "main",
+  "upstream": "origin/main",
+  "message": "Branch 'main' set up to track 'origin/main'"
+}
+```
+
+---
+
+#### `git/get_status`
+Get comprehensive git status including workspace state.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| workspace_id | string | Yes | Workspace ID |
+
+**Result:**
+```json
+{
+  "is_git_repo": true,
+  "has_commits": true,
+  "state": "synced",
+  "branch": "main",
+  "upstream": "origin/main",
+  "ahead": 0,
+  "behind": 0,
+  "staged": [
+    {"path": "src/main.go", "status": "M", "additions": 10, "deletions": 5}
+  ],
+  "unstaged": [],
+  "untracked": [],
+  "conflicted": [],
+  "has_conflicts": false,
+  "remotes": [
+    {"name": "origin", "fetch_url": "git@github.com:user/repo.git", "push_url": "git@github.com:user/repo.git"}
+  ],
+  "repo_name": "my-project",
+  "repo_root": "/Users/dev/my-project"
+}
+```
+
+**State Values:**
+| State | Description |
+|-------|-------------|
+| `noGit` | Directory is not a git repository |
+| `gitInit` | Git initialized but no commits yet |
+| `noRemote` | Has commits but no remote configured |
+| `noPush` | Has remote but no upstream set or never pushed |
+| `synced` | In sync with remote |
+| `diverged` | Local and remote have diverged |
+| `conflict` | Merge conflict in progress |
 
 ---
 
@@ -1028,6 +1454,30 @@ Git status changed.
   }
 }
 ```
+
+### `event/git_branch_changed`
+Git branch changed (emitted after `git/checkout`).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event/git_branch_changed",
+  "params": {
+    "workspace_id": "ws-abc123",
+    "from_branch": "main",
+    "to_branch": "feature/auth",
+    "session_id": ""
+  }
+}
+```
+
+**Params:**
+| Field | Type | Description |
+|-------|------|-------------|
+| workspace_id | string | Workspace where branch changed |
+| from_branch | string | Previous branch name |
+| to_branch | string | New branch name |
+| session_id | string | Session ID (if applicable) |
 
 ---
 

@@ -2007,7 +2007,7 @@ Sent after any git operation completes (success or failure).
 }
 ```
 
-**Operations:** `stage`, `unstage`, `discard`, `commit`, `push`, `pull`, `checkout`
+**Operations:** `stage`, `unstage`, `discard`, `commit`, `push`, `pull`, `checkout`, `delete_branch`, `fetch`, `stash`, `stash_apply`, `stash_pop`, `stash_drop`, `merge`, `merge_abort`, `init`, `remote_add`, `remote_remove`, `set_upstream`
 
 **Payload Fields:**
 | Field | Type | Description |
@@ -2022,6 +2022,56 @@ Sent after any git operation completes (success or failure).
 | `commits_pushed` | number | Commits pushed (for push) |
 | `commits_pulled` | number | Commits pulled (for pull) |
 | `conflicted_files` | array | Conflicted files (for pull with conflicts) |
+
+---
+
+### git_branch_changed
+
+Sent when a git branch changes (after checkout operation).
+
+```json
+{
+  "event": "git_branch_changed",
+  "timestamp": "2025-12-28T10:30:00Z",
+  "workspace_id": "ws-abc123",
+  "session_id": "",
+  "payload": {
+    "from_branch": "main",
+    "to_branch": "feature/auth",
+    "session_id": ""
+  }
+}
+```
+
+**Payload Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `from_branch` | string | Previous branch name |
+| `to_branch` | string | New branch name |
+| `session_id` | string | Session ID (if applicable) |
+
+**iOS Swift Example:**
+```swift
+func handleGitBranchChanged(_ payload: GitBranchChangedPayload) {
+    // Update branch display
+    updateBranchLabel(payload.toBranch)
+
+    // Optionally show notification
+    showToast("Switched from \(payload.fromBranch) to \(payload.toBranch)")
+}
+
+struct GitBranchChangedPayload: Codable {
+    let fromBranch: String
+    let toBranch: String
+    let sessionId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case fromBranch = "from_branch"
+        case toBranch = "to_branch"
+        case sessionId = "session_id"
+    }
+}
+```
 
 ---
 

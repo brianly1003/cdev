@@ -231,7 +231,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	// Git methods with workspace context
-	registry.RegisterWithMeta("workspace/git/status", s.GitStatus, handler.MethodMeta{
+	registry.RegisterWithMeta("git/status", s.GitStatus, handler.MethodMeta{
 		Summary:     "Get git status for a workspace",
 		Description: "Returns the git status for the specified workspace.",
 		Params: []handler.OpenRPCParam{
@@ -243,7 +243,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/diff", s.GitDiff, handler.MethodMeta{
+	registry.RegisterWithMeta("git/diff", s.GitDiff, handler.MethodMeta{
 		Summary:     "Get git diff for a workspace",
 		Description: "Returns the git diff for the specified workspace.",
 		Params: []handler.OpenRPCParam{
@@ -256,7 +256,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/stage", s.GitStage, handler.MethodMeta{
+	registry.RegisterWithMeta("git/stage", s.GitStage, handler.MethodMeta{
 		Summary:     "Stage files for a workspace",
 		Description: "Stages the specified files for commit in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -269,7 +269,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/unstage", s.GitUnstage, handler.MethodMeta{
+	registry.RegisterWithMeta("git/unstage", s.GitUnstage, handler.MethodMeta{
 		Summary:     "Unstage files for a workspace",
 		Description: "Unstages the specified files in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -282,7 +282,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/discard", s.GitDiscard, handler.MethodMeta{
+	registry.RegisterWithMeta("git/discard", s.GitDiscard, handler.MethodMeta{
 		Summary:     "Discard changes for a workspace",
 		Description: "Discards uncommitted changes to the specified files in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -295,7 +295,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/commit", s.GitCommit, handler.MethodMeta{
+	registry.RegisterWithMeta("git/commit", s.GitCommit, handler.MethodMeta{
 		Summary:     "Commit staged changes for a workspace",
 		Description: "Creates a commit with the staged changes in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -309,7 +309,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/push", s.GitPush, handler.MethodMeta{
+	registry.RegisterWithMeta("git/push", s.GitPush, handler.MethodMeta{
 		Summary:     "Push commits for a workspace",
 		Description: "Pushes commits to the remote repository for the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -325,7 +325,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/pull", s.GitPull, handler.MethodMeta{
+	registry.RegisterWithMeta("git/pull", s.GitPull, handler.MethodMeta{
 		Summary:     "Pull changes for a workspace",
 		Description: "Pulls changes from the remote repository for the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -338,7 +338,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/branches", s.GitBranches, handler.MethodMeta{
+	registry.RegisterWithMeta("git/branches", s.GitBranches, handler.MethodMeta{
 		Summary:     "List branches for a workspace",
 		Description: "Returns the list of git branches for the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -350,13 +350,234 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("workspace/git/checkout", s.GitCheckout, handler.MethodMeta{
+	registry.RegisterWithMeta("git/checkout", s.GitCheckout, handler.MethodMeta{
 		Summary:     "Checkout a branch for a workspace",
 		Description: "Checks out the specified branch in the workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "branch", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "create", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/delete_branch", s.GitDeleteBranch, handler.MethodMeta{
+		Summary:     "Delete a branch for a workspace",
+		Description: "Deletes the specified branch in the workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "branch", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "force", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/fetch", s.GitFetch, handler.MethodMeta{
+		Summary:     "Fetch from remote for a workspace",
+		Description: "Fetches updates from the remote repository.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "remote", Required: false, Schema: map[string]interface{}{"type": "string", "default": "origin"}},
+			{Name: "prune", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/log", s.GitLog, handler.MethodMeta{
+		Summary:     "Get commit log for a workspace",
+		Description: "Returns the commit history with optional graph layout for visualization.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "limit", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
+			{Name: "skip", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
+			{Name: "branch", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "path", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "graph", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	// Stash methods
+	registry.RegisterWithMeta("git/stash", s.GitStash, handler.MethodMeta{
+		Summary:     "Create a stash for a workspace",
+		Description: "Stashes changes in the workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "message", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "include_untracked", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/stash_list", s.GitStashList, handler.MethodMeta{
+		Summary:     "List stashes for a workspace",
+		Description: "Returns the list of stashes in the workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/stash_apply", s.GitStashApply, handler.MethodMeta{
+		Summary:     "Apply a stash for a workspace",
+		Description: "Applies a stash without removing it from the stash list.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "index", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/stash_pop", s.GitStashPop, handler.MethodMeta{
+		Summary:     "Pop a stash for a workspace",
+		Description: "Applies and removes a stash from the stash list.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "index", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/stash_drop", s.GitStashDrop, handler.MethodMeta{
+		Summary:     "Drop a stash for a workspace",
+		Description: "Removes a stash from the stash list without applying it.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "index", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	// Merge methods
+	registry.RegisterWithMeta("git/merge", s.GitMerge, handler.MethodMeta{
+		Summary:     "Merge a branch for a workspace",
+		Description: "Merges the specified branch into the current branch.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "branch", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "no_ff", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+			{Name: "message", Required: false, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/merge_abort", s.GitMergeAbort, handler.MethodMeta{
+		Summary:     "Abort a merge for a workspace",
+		Description: "Aborts an in-progress merge operation.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	// Repository setup methods
+	registry.RegisterWithMeta("git/init", s.GitInit, handler.MethodMeta{
+		Summary:     "Initialize a git repository for a workspace",
+		Description: "Initializes a new git repository in the workspace directory.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "initial_branch", Required: false, Schema: map[string]interface{}{"type": "string", "default": "main"}},
+			{Name: "initial_commit", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": false}},
+			{Name: "commit_message", Required: false, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/remote_add", s.GitRemoteAdd, handler.MethodMeta{
+		Summary:     "Add a remote to a workspace",
+		Description: "Adds a remote repository to the workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "name", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "url", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "fetch", Required: false, Schema: map[string]interface{}{"type": "boolean", "default": true}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/remote_list", s.GitRemoteList, handler.MethodMeta{
+		Summary:     "List remotes for a workspace",
+		Description: "Returns the list of configured remotes.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/remote_remove", s.GitRemoteRemove, handler.MethodMeta{
+		Summary:     "Remove a remote from a workspace",
+		Description: "Removes a remote repository from the workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "name", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/set_upstream", s.GitSetUpstream, handler.MethodMeta{
+		Summary:     "Set upstream for a branch",
+		Description: "Sets the upstream tracking branch for the specified branch.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "branch", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "upstream", Required: true, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	registry.RegisterWithMeta("git/get_status", s.GitGetStatus, handler.MethodMeta{
+		Summary:     "Get comprehensive git status for a workspace",
+		Description: "Returns comprehensive git status including state (noGit, gitInit, noRemote, noPush, synced, diverged, conflict), branch info, and file changes.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -524,24 +745,12 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 		return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
 	}
 
-	// Start watching for new session file creation ONLY if there are no existing sessions
-	// When Claude creates a new session, it generates a new UUID in .claude/projects/
-	// We need to detect this and emit session_id_resolved event so iOS can switch to the real ID
-	sessionsDir := getSessionsDirForWorkspace(ws.Definition.Path)
-	hasExistingSessions := false
-	if entries, dirErr := os.ReadDir(sessionsDir); dirErr == nil {
-		for _, e := range entries {
-			if strings.HasSuffix(e.Name(), ".jsonl") {
-				hasExistingSessions = true
-				break
-			}
-		}
-	}
-
-	if !hasExistingSessions {
-		// No existing sessions - watch for new session file creation
-		go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
-	}
+	// Always watch for new session file creation for PTY sessions
+	// Claude creates a NEW session file with a NEW UUID every time it starts
+	// The temporary ID generated by cdev is internal only - we need to detect
+	// the real session ID from Claude and emit session_id_resolved event
+	// so iOS can switch to watching the real session file
+	go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
 
 	// Start Claude in interactive PTY mode (no initial prompt)
 	claudeManager := newSession.ClaudeManager()
@@ -656,21 +865,9 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 			return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
 		}
 
-		// Start watching for new session file creation (same as session/start)
-		sessionsDir := getSessionsDirForWorkspace(ws.Definition.Path)
-		hasExistingSessions := false
-		if entries, dirErr := os.ReadDir(sessionsDir); dirErr == nil {
-			for _, e := range entries {
-				if strings.HasSuffix(e.Name(), ".jsonl") {
-					hasExistingSessions = true
-					break
-				}
-			}
-		}
-
-		if !hasExistingSessions {
-			go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
-		}
+		// Always watch for new session file creation for PTY sessions
+		// Claude creates a NEW session file with a NEW UUID every time
+		go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
 
 		// Start Claude with the prompt immediately (don't wait for user input)
 		claudeManager := newSession.ClaudeManager()
@@ -1205,6 +1402,398 @@ func (s *SessionManagerService) GitCheckout(ctx context.Context, params json.Raw
 	return result, nil
 }
 
+// GitDeleteBranch deletes a branch for a workspace.
+func (s *SessionManagerService) GitDeleteBranch(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Branch      string `json:"branch"`
+		Force       bool   `json:"force"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Branch == "" {
+		return nil, message.NewError(message.InvalidParams, "branch is required")
+	}
+
+	result, err := s.manager.GitDeleteBranch(p.WorkspaceID, p.Branch, p.Force)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitFetch fetches from a remote for a workspace.
+func (s *SessionManagerService) GitFetch(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Remote      string `json:"remote"`
+		Prune       bool   `json:"prune"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Remote == "" {
+		p.Remote = "origin"
+	}
+
+	result, err := s.manager.GitFetch(p.WorkspaceID, p.Remote, p.Prune)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitLog returns the commit log for a workspace.
+func (s *SessionManagerService) GitLog(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Limit       int    `json:"limit"`
+		Skip        int    `json:"skip"`
+		Branch      string `json:"branch"`
+		Path        string `json:"path"`
+		Graph       bool   `json:"graph"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Limit <= 0 {
+		p.Limit = 50
+	}
+
+	result, err := s.manager.GitLog(p.WorkspaceID, p.Limit, p.Skip, p.Branch, p.Path, p.Graph)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitStash creates a stash for a workspace.
+func (s *SessionManagerService) GitStash(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID      string `json:"workspace_id"`
+		Message          string `json:"message"`
+		IncludeUntracked bool   `json:"include_untracked"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitStash(p.WorkspaceID, p.Message, p.IncludeUntracked)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitStashList lists stashes for a workspace.
+func (s *SessionManagerService) GitStashList(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitStashList(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitStashApply applies a stash for a workspace.
+func (s *SessionManagerService) GitStashApply(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Index       int    `json:"index"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitStashApply(p.WorkspaceID, p.Index)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitStashPop pops a stash for a workspace.
+func (s *SessionManagerService) GitStashPop(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Index       int    `json:"index"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitStashPop(p.WorkspaceID, p.Index)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitStashDrop drops a stash for a workspace.
+func (s *SessionManagerService) GitStashDrop(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Index       int    `json:"index"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitStashDrop(p.WorkspaceID, p.Index)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitMerge merges a branch for a workspace.
+func (s *SessionManagerService) GitMerge(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID   string `json:"workspace_id"`
+		Branch        string `json:"branch"`
+		NoFastForward bool   `json:"no_ff"`
+		Message       string `json:"message"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Branch == "" {
+		return nil, message.NewError(message.InvalidParams, "branch is required")
+	}
+
+	result, err := s.manager.GitMerge(p.WorkspaceID, p.Branch, p.NoFastForward, p.Message)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitMergeAbort aborts a merge for a workspace.
+func (s *SessionManagerService) GitMergeAbort(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitMergeAbort(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitInit initializes a git repository for a workspace.
+func (s *SessionManagerService) GitInit(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID   string `json:"workspace_id"`
+		InitialBranch string `json:"initial_branch"`
+		InitialCommit bool   `json:"initial_commit"`
+		CommitMessage string `json:"commit_message"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.InitialBranch == "" {
+		p.InitialBranch = "main"
+	}
+
+	result, err := s.manager.GitInit(p.WorkspaceID, p.InitialBranch, p.InitialCommit, p.CommitMessage)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitRemoteAdd adds a remote to a workspace.
+func (s *SessionManagerService) GitRemoteAdd(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+		URL         string `json:"url"`
+		Fetch       bool   `json:"fetch"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Name == "" {
+		return nil, message.NewError(message.InvalidParams, "name is required")
+	}
+	if p.URL == "" {
+		return nil, message.NewError(message.InvalidParams, "url is required")
+	}
+
+	result, err := s.manager.GitRemoteAdd(p.WorkspaceID, p.Name, p.URL, p.Fetch)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitRemoteList lists remotes for a workspace.
+func (s *SessionManagerService) GitRemoteList(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitRemoteList(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitRemoteRemove removes a remote from a workspace.
+func (s *SessionManagerService) GitRemoteRemove(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Name == "" {
+		return nil, message.NewError(message.InvalidParams, "name is required")
+	}
+
+	result, err := s.manager.GitRemoteRemove(p.WorkspaceID, p.Name)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitSetUpstream sets the upstream for a branch.
+func (s *SessionManagerService) GitSetUpstream(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		Branch      string `json:"branch"`
+		Upstream    string `json:"upstream"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.Branch == "" {
+		return nil, message.NewError(message.InvalidParams, "branch is required")
+	}
+	if p.Upstream == "" {
+		return nil, message.NewError(message.InvalidParams, "upstream is required")
+	}
+
+	result, err := s.manager.GitSetUpstream(p.WorkspaceID, p.Branch, p.Upstream)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
+// GitGetStatus returns the comprehensive git status for a workspace.
+func (s *SessionManagerService) GitGetStatus(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	result, err := s.manager.GitGetStatus(p.WorkspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return result, nil
+}
+
 // WatchSession starts watching a session for real-time message updates.
 // Returns watch info including the workspace_id, session_id, and watching status.
 // Also updates session focus tracking so the client appears in the session's viewers list.
@@ -1714,20 +2303,6 @@ func isSensitiveFile(name string) bool {
 		}
 	}
 	return false
-}
-
-// getSessionsDirForWorkspace returns the Claude sessions directory for a workspace path.
-// Maps /Users/brianly/Projects/cdev -> ~/.claude/projects/-Users-brianly-Projects-cdev
-func getSessionsDirForWorkspace(repoPath string) string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = "~"
-	}
-
-	repoPath = filepath.Clean(repoPath)
-	encodedPath := strings.ReplaceAll(repoPath, "/", "-")
-
-	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }
 
 // ActivateSession sets the active session for a workspace.

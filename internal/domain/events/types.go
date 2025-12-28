@@ -25,6 +25,7 @@ const (
 	EventTypeGitDiff              EventType = "git_diff"
 	EventTypeGitStatusChanged     EventType = "git_status_changed"
 	EventTypeGitOperationComplete EventType = "git_operation_completed"
+	EventTypeGitBranchChanged     EventType = "git_branch_changed"
 
 	// Session events
 	EventTypeSessionStart        EventType = "session_start"
@@ -168,6 +169,22 @@ type GitOperationCompletedPayload struct {
 	CommitsPushed  int      `json:"commits_pushed,omitempty"`  // for push
 	CommitsPulled  int      `json:"commits_pulled,omitempty"`  // for pull
 	ConflictedFiles []string `json:"conflicted_files,omitempty"` // for pull with conflicts
+}
+
+// GitBranchChangedPayload represents the payload for git_branch_changed events.
+type GitBranchChangedPayload struct {
+	FromBranch string `json:"from_branch"`
+	ToBranch   string `json:"to_branch"`
+	SessionID  string `json:"session_id,omitempty"`
+}
+
+// NewGitBranchChangedEvent creates a new git_branch_changed event.
+func NewGitBranchChangedEvent(workspaceID, fromBranch, toBranch, sessionID string) *BaseEvent {
+	return NewEventWithContext(EventTypeGitBranchChanged, GitBranchChangedPayload{
+		FromBranch: fromBranch,
+		ToBranch:   toBranch,
+		SessionID:  sessionID,
+	}, workspaceID, sessionID)
 }
 
 // --- Workspace Event Payloads ---

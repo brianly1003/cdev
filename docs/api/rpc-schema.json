@@ -1,665 +1,2776 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "cdev JSON-RPC API Schema",
-  "version": "1.2.0",
-  "methods": {
-    "agent/run": {
-      "description": "Start an AI agent with a prompt",
-      "params": {
-        "type": "object",
-        "properties": {
-          "prompt": { "type": "string", "description": "The prompt to send" },
-          "mode": { "type": "string", "enum": ["new", "continue"], "default": "new" },
-          "session_id": { "type": "string", "description": "Required if mode is 'continue'" },
-          "agent_type": { "type": "string", "enum": ["claude", "gemini", "codex"], "default": "claude" }
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "cdev Unified API",
+    "description": "JSON-RPC 2.0 API for cdev mobile AI coding agent",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "name": "Default",
+      "url": "ws://localhost:8766/ws"
+    }
+  ],
+  "methods": [
+    {
+      "name": "agent/status",
+      "summary": "Get agent status",
+      "description": "Returns the current status of the AI agent.",
+      "params": [],
+      "result": {
+        "name": "AgentStatusResult",
+        "schema": {
+          "$ref": "#/components/schemas/AgentStatusResult"
+        }
+      }
+    },
+    {
+      "name": "workspace/file/get",
+      "summary": "Get file content from a workspace",
+      "description": "Returns the content of a file from a workspace. Use this for multi-workspace mode instead of file/get.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
         },
-        "required": ["prompt"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" },
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" }
-        }
-      }
-    },
-    "agent/stop": {
-      "description": "Stop the running agent",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" }
-        }
-      }
-    },
-    "agent/respond": {
-      "description": "Send a response to an agent's tool use request",
-      "params": {
-        "type": "object",
-        "properties": {
-          "tool_use_id": { "type": "string" },
-          "response": { "type": "string" },
-          "is_error": { "type": "boolean", "default": false }
+        {
+          "name": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
         },
-        "required": ["tool_use_id", "response"]
-      },
+        {
+          "name": "max_size_kb",
+          "required": false,
+          "schema": {
+            "default": 500,
+            "type": "integer"
+          }
+        }
+      ],
       "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" }
+        "name": "file_content",
+        "schema": {
+          "type": "object"
         }
       }
     },
-    "status/get": {
-      "description": "Get current server status",
-      "params": null,
+    {
+      "name": "workspace/subscribe",
+      "summary": "Subscribe to workspace events",
+      "description": "Subscribe to receive events for a specific workspace. By default, clients receive all events. After calling this method, only events for subscribed workspaces (and global events) will be forwarded.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "result": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_session_id": { "type": "string" },
-          "agent_state": { "type": "string", "enum": ["idle", "starting", "running", "stopping"] },
-          "agent_type": { "type": "string" },
-          "connected_clients": { "type": "integer" },
-          "repo_path": { "type": "string" },
-          "repo_name": { "type": "string" },
-          "uptime_seconds": { "type": "integer" },
-          "version": { "type": "string" },
-          "watcher_enabled": { "type": "boolean" },
-          "git_enabled": { "type": "boolean" }
+        "name": "result",
+        "schema": {
+          "type": "object"
         }
       }
     },
-    "git/status": {
-      "description": "Get git repository status (matches HTTP API format)",
-      "params": null,
+    {
+      "name": "session/info",
+      "summary": "Get session info",
+      "description": "Returns detailed information about a specific session.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
       "result": {
-        "type": "object",
-        "properties": {
-          "branch": { "type": "string" },
-          "upstream": { "type": "string" },
-          "ahead": { "type": "integer" },
-          "behind": { "type": "integer" },
-          "staged": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string" },
-                "status": { "type": "string" }
-              }
+        "name": "session",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/session/history",
+      "summary": "Get historical Claude sessions for a workspace",
+      "description": "Returns a list of historical Claude sessions from the session cache for the specified workspace. Sessions are stored at ~/.claude/projects/<encoded-path>.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "history",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/status",
+      "summary": "Get git status for a workspace",
+      "description": "Returns the git status for the specified workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "status",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/merge/abort",
+      "summary": "Abort a merge",
+      "description": "Aborts an in-progress merge operation.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "shutdown",
+      "summary": "Shutdown server",
+      "description": "Request the server to shut down gracefully.",
+      "params": [],
+      "result": {
+        "name": "ShutdownResult",
+        "schema": {
+          "properties": {
+            "status": {
+              "type": "string"
             }
+          },
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "agent/stop",
+      "summary": "Stop the running agent",
+      "description": "Stops the currently running AI agent gracefully.",
+      "params": [],
+      "result": {
+        "name": "AgentStopResult",
+        "schema": {
+          "$ref": "#/components/schemas/AgentStopResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/AgentNotRunning"
+        }
+      ]
+    },
+    {
+      "name": "git/commit",
+      "summary": "Create a commit",
+      "description": "Creates a commit with the staged changes.",
+      "params": [
+        {
+          "name": "message",
+          "description": "Commit message",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "push",
+          "description": "Push after commit",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "CommitResult",
+        "schema": {
+          "$ref": "#/components/schemas/CommitResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "workspace/git/fetch",
+      "summary": "Fetch from remote",
+      "description": "Fetches changes from remote without merging. Use prune=true to remove deleted remote branches.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "remote",
+          "required": false,
+          "schema": {
+            "default": "origin",
+            "type": "string"
+          }
+        },
+        {
+          "name": "prune",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/index/rebuild",
+      "summary": "Rebuild repository index",
+      "description": "Triggers a full re-index of the repository in the background. Returns immediately.",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/watch",
+      "summary": "Start watching a session",
+      "description": "Starts watching a session for real-time updates. The client will receive notifications when new messages are added.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to watch",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionWatchResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionWatchResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/SessionNotFound"
+        }
+      ]
+    },
+    {
+      "name": "workspace/git/diff",
+      "summary": "Get git diff for a workspace",
+      "description": "Returns the git diff for the specified workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "staged",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "diff",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/stash/apply",
+      "summary": "Apply a stash",
+      "description": "Applies a stash without removing it. Use pop=true to also remove the stash.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "index",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "pop",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/index/status",
+      "summary": "Get repository index status",
+      "description": "Returns the current status of the repository index including file counts, sizes, and last scan time.",
+      "params": [],
+      "result": {
+        "name": "status",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/files/tree",
+      "summary": "Get directory tree",
+      "description": "Returns a hierarchical tree structure of the repository with files and directories.",
+      "params": [
+        {
+          "name": "path",
+          "required": false,
+          "schema": {
+            "description": "Root path (empty for repository root)",
+            "type": "string"
+          }
+        },
+        {
+          "name": "depth",
+          "required": false,
+          "schema": {
+            "default": 2,
+            "description": "Maximum depth to traverse",
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "tree",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "agent/run",
+      "summary": "Start an AI agent with a prompt",
+      "description": "Starts the specified AI agent (Claude, Gemini, or Codex) with the given prompt. Can start a new session or continue an existing one.",
+      "params": [
+        {
+          "name": "prompt",
+          "description": "The prompt to send to the agent",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "mode",
+          "description": "Session mode: 'new' for new session, 'continue' to continue existing",
+          "required": false,
+          "schema": {
+            "default": "new",
+            "enum": ["new", "continue"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "description": "Session ID to continue (required if mode is 'continue')",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "permission_mode",
+          "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all, 'interactive' for PTY mode with terminal-like permission prompts.",
+          "required": false,
+          "schema": {
+            "default": "default",
+            "enum": [
+              "default",
+              "acceptEdits",
+              "bypassPermissions",
+              "plan",
+              "interactive"
+            ],
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "AgentRunResult",
+        "schema": {
+          "$ref": "#/components/schemas/AgentRunResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/AgentAlreadyRunning"
+        },
+        {
+          "$ref": "#/components/errors/AgentNotConfigured"
+        }
+      ]
+    },
+    {
+      "name": "session/stop",
+      "summary": "Stop a Claude session",
+      "description": "Stops a running Claude CLI session.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/session/messages",
+      "summary": "Get messages from a historical Claude session",
+      "description": "Returns paginated messages from a Claude session file for the specified workspace. Use workspace/session/history to get available session IDs.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "order",
+          "required": false,
+          "schema": {
+            "default": "asc",
+            "enum": ["asc", "desc"],
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "messages",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/remote/add",
+      "summary": "Add a git remote",
+      "description": "Adds a new remote to the repository. Optionally fetches from the remote after adding.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "name",
+          "required": false,
+          "schema": {
+            "default": "origin",
+            "type": "string"
+          }
+        },
+        {
+          "name": "url",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "fetch",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "git/status",
+      "summary": "Get git repository status",
+      "description": "Returns the current git status including staged, unstaged, and untracked files.",
+      "params": [],
+      "result": {
+        "name": "GitStatusResult",
+        "schema": {
+          "$ref": "#/components/schemas/GitStatusResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "workspace/get",
+      "summary": "Get workspace details",
+      "description": "Returns detailed information about a specific workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "workspace",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/add",
+      "summary": "Add a new workspace",
+      "description": "Registers a new workspace (git repository) configuration.",
+      "params": [
+        {
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "auto_start",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "workspace",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/active",
+      "summary": "List active sessions",
+      "description": "Returns a list of all active sessions, optionally filtered by workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "sessions",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/session/unwatch",
+      "summary": "Stop watching the current session",
+      "description": "Stops watching the currently watched session. No more claude_message events will be sent for that session.",
+      "params": [],
+      "result": {
+        "name": "unwatch_info",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/stash/drop",
+      "summary": "Drop a stash",
+      "description": "Removes a stash entry.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "index",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "initialize",
+      "summary": "Initialize connection",
+      "description": "Initialize the connection and negotiate capabilities. Must be called first before using other methods.",
+      "params": [
+        {
+          "name": "protocolVersion",
+          "description": "Protocol version the client supports",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "clientInfo",
+          "description": "Client information",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/ClientInfo"
+          }
+        },
+        {
+          "name": "capabilities",
+          "description": "Client capabilities",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "result": {
+        "name": "InitializeResult",
+        "schema": {
+          "$ref": "#/components/schemas/InitializeResult"
+        }
+      }
+    },
+    {
+      "name": "git/push",
+      "summary": "Push to remote",
+      "description": "Pushes commits to the remote repository.",
+      "params": [],
+      "result": {
+        "name": "OperationResult",
+        "schema": {
+          "$ref": "#/components/schemas/OperationResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "file/get",
+      "summary": "Get file content",
+      "description": "Returns the content of a file from the repository.",
+      "params": [
+        {
+          "name": "path",
+          "description": "File path relative to repository root",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "FileGetResult",
+        "schema": {
+          "$ref": "#/components/schemas/FileGetResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/FileNotFound"
+        }
+      ]
+    },
+    {
+      "name": "session/delete",
+      "summary": "Delete session(s)",
+      "description": "Deletes a specific session or all sessions if no session_id is provided.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to delete (optional, deletes all if not provided)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "description": "Agent type (optional)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionDeleteResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionDeleteResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/SessionNotFound"
+        }
+      ]
+    },
+    {
+      "name": "workspace/list",
+      "summary": "List all workspaces",
+      "description": "Returns a list of all configured workspaces.",
+      "params": [],
+      "result": {
+        "name": "workspaces",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/unstage",
+      "summary": "Unstage files for a workspace",
+      "description": "Unstages the specified files in the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "paths",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/checkout",
+      "summary": "Checkout a branch for a workspace",
+      "description": "Checks out the specified branch in the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "branch",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "create",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/remote/list",
+      "summary": "List git remotes",
+      "description": "Returns all configured remotes with their URLs and tracking branches.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/session/activate",
+      "summary": "Set the active session for a workspace",
+      "description": "Sets the active session for a workspace. This allows iOS clients to switch which session they are viewing/interacting with. The active session ID will be included in workspace/list responses.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "activate_result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/search",
+      "summary": "Search files in repository",
+      "description": "Search for files using fuzzy, exact, prefix, or extension matching. Returns paginated results with match scores.",
+      "params": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "description": "Search query string",
+            "type": "string"
+          }
+        },
+        {
+          "name": "mode",
+          "required": false,
+          "schema": {
+            "default": "fuzzy",
+            "enum": ["fuzzy", "exact", "prefix", "extension"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "extensions",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "exclude_binaries",
+          "required": false,
+          "schema": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "git_tracked_only",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "min_size",
+          "required": false,
+          "schema": {
+            "description": "Minimum file size in bytes",
+            "type": "integer"
+          }
+        },
+        {
+          "name": "max_size",
+          "required": false,
+          "schema": {
+            "description": "Maximum file size in bytes",
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/unsubscribe",
+      "summary": "Unsubscribe from workspace events",
+      "description": "Stop receiving events for a specific workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/subscriptions",
+      "summary": "List workspace subscriptions",
+      "description": "Returns the list of workspaces this client is subscribed to. Empty list means all events are received.",
+      "params": [],
+      "result": {
+        "name": "subscriptions",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/unwatch",
+      "summary": "Stop watching session",
+      "description": "Stops watching the current session.",
+      "params": [],
+      "result": {
+        "name": "SessionUnwatchResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionUnwatchResult"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/discard",
+      "summary": "Discard changes for a workspace",
+      "description": "Discards uncommitted changes to the specified files in the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "paths",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/branch/delete",
+      "summary": "Delete a local branch",
+      "description": "Deletes a local branch from the workspace. Use force=true for unmerged branches.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "branch",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "force",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/stash",
+      "summary": "Create a stash",
+      "description": "Stashes current changes. Use include_untracked=true to include untracked files.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "message",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "include_untracked",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/merge",
+      "summary": "Merge a branch",
+      "description": "Merges a branch into the current branch.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "branch",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "no_ff",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "message",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/stats",
+      "summary": "Get repository statistics",
+      "description": "Returns aggregate statistics about the repository including file counts by extension, largest files, and totals.",
+      "params": [],
+      "result": {
+        "name": "stats",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "initialized",
+      "summary": "Confirm initialization",
+      "description": "Confirm that the client has processed the initialize response. This is a notification (no response expected).",
+      "params": []
+    },
+    {
+      "name": "git/stage",
+      "summary": "Stage files",
+      "description": "Stages the specified files for commit.",
+      "params": [
+        {
+          "name": "paths",
+          "description": "Array of file paths to stage",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "OperationResult",
+        "schema": {
+          "$ref": "#/components/schemas/OperationResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "git/branches",
+      "summary": "List branches",
+      "description": "Returns the list of git branches.",
+      "params": [],
+      "result": {
+        "name": "BranchesResult",
+        "schema": {
+          "$ref": "#/components/schemas/BranchesResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "session/messages",
+      "summary": "Get session messages",
+      "description": "Returns paginated messages for a specific session.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to get messages from",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "description": "Agent type (optional)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "description": "Maximum messages to return (default 50, max 500)",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "offset",
+          "description": "Offset for pagination",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "order",
+          "description": "Sort order: 'asc' or 'desc' (default 'asc')",
+          "required": false,
+          "schema": {
+            "default": "asc",
+            "enum": ["asc", "desc"],
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionMessagesResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionMessagesResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/SessionNotFound"
+        }
+      ]
+    },
+    {
+      "name": "workspace/git/init",
+      "summary": "Initialize a git repository",
+      "description": "Initializes a git repository in the workspace directory. Optionally creates an initial commit.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "initial_branch",
+          "required": false,
+          "schema": {
+            "default": "main",
+            "type": "string"
+          }
+        },
+        {
+          "name": "initial_commit",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "commit_message",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/remote/remove",
+      "summary": "Remove a git remote",
+      "description": "Removes a remote from the repository.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "name",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "client/session/focus",
+      "summary": "Set session focus for current client",
+      "description": "Notifies the server which session this client is currently viewing. The server will broadcast session_joined events to other clients viewing the same session.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "description": "Workspace ID",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "description": "Session ID",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "FocusChangeResult",
+        "schema": {
+          "$ref": "#/components/schemas/FocusChangeResult"
+        }
+      }
+    },
+    {
+      "name": "workspace/update",
+      "summary": "Update workspace settings",
+      "description": "Updates workspace configuration settings.",
+      "params": [
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "name",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "auto_start",
+          "required": false,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "workspace",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/send",
+      "summary": "Send a prompt to a session",
+      "description": "Sends a prompt to the Claude CLI. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": false,
+          "schema": {
+            "description": "Session ID to send to. If empty, workspace_id must be provided to auto-create a session.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "workspace_id",
+          "required": false,
+          "schema": {
+            "description": "Workspace ID. Required when session_id is empty to auto-create a new session.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "prompt",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "mode",
+          "required": false,
+          "schema": {
+            "default": "new",
+            "description": "Session mode. 'new' starts fresh conversation (default), 'continue' resumes existing.",
+            "enum": ["new", "continue"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "permission_mode",
+          "required": false,
+          "schema": {
+            "default": "default",
+            "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all permission checks, 'interactive' to use PTY mode for true terminal-like permission prompts.",
+            "enum": [
+              "default",
+              "acceptEdits",
+              "bypassPermissions",
+              "plan",
+              "interactive"
+            ],
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/state",
+      "summary": "Get session runtime state for reconnection",
+      "description": "Returns the full runtime state of a session including Claude state, pending tool use, and waiting status. Use this to sync state when reconnecting from a mobile device.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "state",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "git/pull",
+      "summary": "Pull from remote",
+      "description": "Pulls changes from the remote repository.",
+      "params": [],
+      "result": {
+        "name": "OperationResult",
+        "schema": {
+          "$ref": "#/components/schemas/OperationResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "file/list",
+      "summary": "List directory contents",
+      "description": "Returns the contents of a directory in the repository. Supports browsing the file tree.",
+      "params": [
+        {
+          "name": "path",
+          "description": "Relative path from repo root (empty for root directory)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "FileListResult",
+        "schema": {
+          "$ref": "#/components/schemas/FileListResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/FileNotFound"
+        }
+      ]
+    },
+    {
+      "name": "session/input",
+      "summary": "Send input to an interactive session",
+      "description": "Sends keyboard input to a session running in interactive (PTY) mode. Use this to respond to permission prompts. Either 'input' (raw text) or 'key' (special key name) must be provided.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "input",
+          "required": false,
+          "schema": {
+            "description": "Raw text input to send (e.g., '1' for Yes, '2' for Yes all, 'n' for No). A carriage return is auto-appended for text input.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "key",
+          "required": false,
+          "schema": {
+            "description": "Special key name to send. Use 'enter' to confirm prompts, arrow keys for navigation.",
+            "enum": [
+              "enter",
+              "escape",
+              "up",
+              "down",
+              "left",
+              "right",
+              "tab",
+              "backspace",
+              "delete",
+              "home",
+              "end",
+              "pageup",
+              "pagedown",
+              "space"
+            ],
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/session/watch",
+      "summary": "Start watching a session for real-time updates",
+      "description": "Starts watching a session file for new messages. The client will receive claude_message events when new messages are added. Only one session can be watched at a time.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "watch_info",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/push",
+      "summary": "Push commits for a workspace",
+      "description": "Pushes commits to the remote repository for the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "force",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "set_upstream",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "remote",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "branch",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/log",
+      "summary": "Get commit history",
+      "description": "Returns paginated commit history for the workspace. Set graph=true for git graph visualization data.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "skip",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "branch",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "path",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "graph",
+          "required": false,
+          "schema": {
+            "default": false,
+            "description": "Compute graph positions for visualization",
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/state",
+      "summary": "Get git state with state machine",
+      "description": "Returns the full git status including state machine (noGit, gitInit, noRemote, noPush, synced, diverged, conflict).",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/subscribeAll",
+      "summary": "Subscribe to all workspace events",
+      "description": "Clear workspace filters and receive events from all workspaces (default behavior).",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/pull",
+      "summary": "Pull changes for a workspace",
+      "description": "Pulls changes from the remote repository for the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "rebase",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "agent/respond",
+      "summary": "Respond to agent tool use request",
+      "description": "Sends a response to an agent's tool use request (e.g., permission approval).",
+      "params": [
+        {
+          "name": "tool_use_id",
+          "description": "The tool use ID from the agent's request",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "response",
+          "description": "The response content",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "is_error",
+          "description": "Whether this is an error response",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "AgentRespondResult",
+        "schema": {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "tool_use_id": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/AgentNotRunning"
+        }
+      ]
+    },
+    {
+      "name": "git/diff",
+      "summary": "Get file diff",
+      "description": "Returns the git diff for a specific file or all files.",
+      "params": [
+        {
+          "name": "path",
+          "description": "File path relative to repository root (optional, omit for all files)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "GitDiffResult",
+        "schema": {
+          "$ref": "#/components/schemas/GitDiffResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/FileNotFound"
+        },
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "git/unstage",
+      "summary": "Unstage files",
+      "description": "Unstages the specified files.",
+      "params": [
+        {
+          "name": "paths",
+          "description": "Array of file paths to unstage",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "OperationResult",
+        "schema": {
+          "$ref": "#/components/schemas/OperationResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "workspace/discover",
+      "summary": "Discover git repositories",
+      "description": "Scans directories to find git repositories that can be added as workspaces.",
+      "params": [
+        {
+          "name": "paths",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "repositories",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/status",
+      "summary": "Get workspace status",
+      "description": "Returns detailed status for a specific workspace including git tracker state, active sessions, and watch status.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "status",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/start",
+      "summary": "Start or attach to a Claude session for a workspace",
+      "description": "If session_id is provided, validates it exists in .claude/projects and returns it for LIVE session attachment. If session_id doesn't exist, returns empty to let user select from history. If no session_id provided, starts a new managed session.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "session_id",
+          "required": false,
+          "schema": {
+            "description": "Optional session ID to attach to. If provided, validates against .claude/projects source of truth.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "session",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "repository/files/list",
+      "summary": "List files in directory",
+      "description": "Returns a paginated list of files in a directory with filtering and sorting options.",
+      "params": [
+        {
+          "name": "directory",
+          "required": false,
+          "schema": {
+            "description": "Directory path (empty for root)",
+            "type": "string"
+          }
+        },
+        {
+          "name": "recursive",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 100,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "sort_by",
+          "required": false,
+          "schema": {
+            "default": "name",
+            "enum": ["name", "size", "modified", "path"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "sort_order",
+          "required": false,
+          "schema": {
+            "default": "asc",
+            "enum": ["asc", "desc"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "extensions",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "min_size",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "max_size",
+          "required": false,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "status/get",
+      "summary": "Get server status",
+      "description": "Returns the current status of the cdev server including agent state, connected clients, and configuration.",
+      "params": [],
+      "result": {
+        "name": "StatusResult",
+        "schema": {
+          "$ref": "#/components/schemas/StatusResult"
+        }
+      }
+    },
+    {
+      "name": "agent/input",
+      "summary": "Send input to interactive agent",
+      "description": "Sends keyboard input to an agent running in interactive (PTY) mode. Use this to respond to permission prompts.",
+      "params": [
+        {
+          "name": "input",
+          "description": "The keyboard input to send (e.g., '1' to select option 1, or '1\\n' with newline)",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "AgentInputResult",
+        "schema": {
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/AgentNotRunning"
+        },
+        {
+          "$ref": "#/components/errors/InvalidRequest"
+        }
+      ]
+    },
+    {
+      "name": "session/get",
+      "summary": "Get session details",
+      "description": "Returns detailed information about a specific session.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to retrieve",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "description": "Agent type (optional, searches all if not specified)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionInfo",
+        "schema": {
+          "$ref": "#/components/schemas/SessionInfo"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/SessionNotFound"
+        }
+      ]
+    },
+    {
+      "name": "workspace/remove",
+      "summary": "Remove a workspace",
+      "description": "Unregisters a workspace configuration.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/respond",
+      "summary": "Respond to a permission or question",
+      "description": "Responds to a pending permission request or interactive question from Claude.",
+      "params": [
+        {
+          "name": "session_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "type",
+          "required": true,
+          "schema": {
+            "enum": ["permission", "question"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "response",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/stage",
+      "summary": "Stage files for a workspace",
+      "description": "Stages the specified files for commit in the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "paths",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/branches",
+      "summary": "List branches for a workspace",
+      "description": "Returns the list of git branches for the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/branch/set-upstream",
+      "summary": "Set upstream tracking branch",
+      "description": "Sets the upstream tracking branch for a local branch.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "branch",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "upstream",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/list",
+      "summary": "List sessions",
+      "description": "Returns a list of available sessions from all configured AI agents.",
+      "params": [
+        {
+          "name": "agent_type",
+          "description": "Filter by agent type (optional)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "description": "Maximum number of sessions to return",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionListResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionListResult"
+        }
+      }
+    },
+    {
+      "name": "session/elements",
+      "summary": "Get session UI elements",
+      "description": "Returns pre-parsed UI elements for a session, ready for rendering in mobile apps.",
+      "params": [
+        {
+          "name": "session_id",
+          "description": "Session ID to get elements from",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "description": "Agent type (optional)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "description": "Maximum elements to return (default 50, max 100)",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "before",
+          "description": "Return elements before this ID (for pagination)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "after",
+          "description": "Return elements after this ID (for catch-up)",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "SessionElementsResult",
+        "schema": {
+          "$ref": "#/components/schemas/SessionElementsResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/SessionNotFound"
+        }
+      ]
+    },
+    {
+      "name": "workspace/cache/invalidate",
+      "summary": "Invalidate discovery cache",
+      "description": "Clears the cached repository discovery results. The next workspace/discover call will perform a fresh scan.",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "session/history",
+      "summary": "Get historical Claude sessions for a workspace (legacy, use workspace/session/history)",
+      "description": "Returns a list of historical Claude sessions from the session cache for the specified workspace. Sessions are stored at ~/.claude/projects/<encoded-path>.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 50,
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "history",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/git/commit",
+      "summary": "Commit staged changes for a workspace",
+      "description": "Creates a commit with the staged changes in the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "message",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "push",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "status/health",
+      "summary": "Health check",
+      "description": "Returns a simple health check response for monitoring.",
+      "params": [],
+      "result": {
+        "name": "HealthResult",
+        "schema": {
+          "$ref": "#/components/schemas/HealthResult"
+        }
+      }
+    },
+    {
+      "name": "git/discard",
+      "summary": "Discard changes",
+      "description": "Discards changes to the specified files.",
+      "params": [
+        {
+          "name": "paths",
+          "description": "Array of file paths to discard",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "OperationResult",
+        "schema": {
+          "$ref": "#/components/schemas/OperationResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "git/checkout",
+      "summary": "Checkout a branch",
+      "description": "Checks out the specified branch.",
+      "params": [
+        {
+          "name": "branch",
+          "description": "Branch name to checkout",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "CheckoutResult",
+        "schema": {
+          "$ref": "#/components/schemas/CheckoutResult"
+        }
+      },
+      "errors": [
+        {
+          "$ref": "#/components/errors/GitError"
+        }
+      ]
+    },
+    {
+      "name": "workspace/git/stash/list",
+      "summary": "List stashes",
+      "description": "Returns all stash entries for the workspace.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "workspace/files/list",
+      "summary": "List files in a workspace directory",
+      "description": "Returns a paginated list of files and directories in a workspace. Matches the format of /api/repository/files/list.",
+      "params": [
+        {
+          "name": "workspace_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "required": false,
+          "schema": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": 100,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "files_list",
+        "schema": {
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "AgentRunResult": {
+        "properties": {
+          "agent_type": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "FileGetResult": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "GitStatusResult": {
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "is_clean": {
+            "type": "boolean"
+          },
+          "staged": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "unstaged": {
-            "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string" },
-                "status": { "type": "string" }
-              }
-            }
+              "type": "string"
+            },
+            "type": "array"
           },
           "untracked": {
-            "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string" },
-                "status": { "type": "string" }
-              }
-            }
-          },
-          "conflicted": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string" },
-                "status": { "type": "string" }
-              }
-            }
-          },
-          "repo_name": { "type": "string" },
-          "repo_root": { "type": "string" }
-        }
-      }
-    },
-    "git/diff": {
-      "description": "Get diff for a file or all files",
-      "params": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string", "description": "File path (optional, omit for all files)" }
-        }
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "diff": { "type": "string" },
-          "is_staged": { "type": "boolean" },
-          "is_new": { "type": "boolean" }
-        }
-      }
-    },
-    "git/stage": {
-      "description": "Stage files for commit (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "paths": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["paths"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "staged": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    },
-    "git/unstage": {
-      "description": "Unstage files from the staging area (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "paths": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["paths"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "unstaged": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    },
-    "git/discard": {
-      "description": "Discard unstaged changes to files (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "paths": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["paths"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "discarded": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    },
-    "git/commit": {
-      "description": "Create a commit with staged changes (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "message": { "type": "string" },
-          "push": { "type": "boolean", "default": false }
-        },
-        "required": ["message"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "sha": { "type": "string" },
-          "message": { "type": "string" },
-          "files_committed": { "type": "integer" },
-          "pushed": { "type": "boolean" },
-          "error": { "type": "string" }
-        }
-      }
-    },
-    "git/push": {
-      "description": "Push commits to remote repository (matches HTTP API format)",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "message": { "type": "string" },
-          "commits_pushed": { "type": "integer" },
-          "error": { "type": "string" }
-        }
-      }
-    },
-    "git/pull": {
-      "description": "Pull changes from remote repository (matches HTTP API format)",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" },
-          "message": { "type": "string" },
-          "commits_pulled": { "type": "integer" },
-          "files_changed": { "type": "integer" },
-          "conflicted_files": { "type": "array", "items": { "type": "string" } },
-          "error": { "type": "string" }
-        }
-      }
-    },
-    "git/branches": {
-      "description": "List all git branches (matches HTTP API format)",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "current": { "type": "string" },
-          "upstream": { "type": "string" },
-          "ahead": { "type": "integer" },
-          "behind": { "type": "integer" },
-          "branches": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "current": { "type": "boolean" }
-              }
-            }
+              "type": "string"
+            },
+            "type": "array"
           }
-        }
-      }
-    },
-    "git/checkout": {
-      "description": "Checkout a branch (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "branch": { "type": "string" },
-          "create": { "type": "boolean", "default": false }
         },
-        "required": ["branch"]
+        "type": "object"
       },
-      "result": {
-        "type": "object",
+      "StatusResult": {
         "properties": {
-          "success": { "type": "boolean" },
-          "branch": { "type": "string" },
-          "message": { "type": "string" },
-          "error": { "type": "string" }
-        }
-      }
-    },
-    "file/get": {
-      "description": "Get file content",
-      "params": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" }
-        },
-        "required": ["path"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "content": { "type": "string" },
-          "encoding": { "type": "string" },
-          "size": { "type": "integer" },
-          "truncated": { "type": "boolean" }
-        }
-      }
-    },
-    "file/list": {
-      "description": "List directory contents",
-      "params": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string", "description": "Relative path from repo root (empty for root)" }
-        }
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "entries": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "type": { "type": "string", "enum": ["file", "directory"] },
-                "size": { "type": "integer" },
-                "modified": { "type": "string", "format": "date-time" },
-                "children_count": { "type": "integer" }
-              }
-            }
+          "agent_session_id": {
+            "type": "string"
           },
-          "total_count": { "type": "integer" }
-        }
-      }
-    },
-    "session/list": {
-      "description": "List available sessions from all configured AI agents",
-      "params": {
-        "type": "object",
-        "properties": {
-          "agent_type": { "type": "string", "description": "Filter by agent type" },
-          "limit": { "type": "integer", "default": 50 }
-        }
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "sessions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "session_id": { "type": "string" },
-                "agent_type": { "type": "string" },
-                "summary": { "type": "string" },
-                "message_count": { "type": "integer" },
-                "start_time": { "type": "string", "format": "date-time" },
-                "last_updated": { "type": "string", "format": "date-time" }
-              }
-            }
+          "agent_state": {
+            "type": "string"
           },
-          "total": { "type": "integer" }
-        }
-      }
-    },
-    "session/get": {
-      "description": "Get detailed information about a specific session",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" }
-        },
-        "required": ["session_id"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" },
-          "summary": { "type": "string" },
-          "message_count": { "type": "integer" },
-          "start_time": { "type": "string", "format": "date-time" },
-          "last_updated": { "type": "string", "format": "date-time" },
-          "branch": { "type": "string" },
-          "project_path": { "type": "string" }
-        }
-      }
-    },
-    "session/messages": {
-      "description": "Get paginated messages for a session (matches HTTP API format)",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" },
-          "limit": { "type": "integer", "default": 50, "maximum": 500 },
-          "offset": { "type": "integer", "default": 0 },
-          "order": { "type": "string", "enum": ["asc", "desc"], "default": "asc" }
-        },
-        "required": ["session_id"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "messages": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": { "type": "integer", "description": "Database row ID" },
-                "session_id": { "type": "string" },
-                "type": { "type": "string", "enum": ["user", "assistant"] },
-                "uuid": { "type": "string" },
-                "timestamp": { "type": "string", "format": "date-time" },
-                "git_branch": { "type": "string" },
-                "message": {
-                  "type": "object",
-                  "description": "Raw Claude API message (content, role, model, usage, etc)"
-                },
-                "is_context_compaction": { "type": "boolean" }
-              }
-            }
+          "connected_clients": {
+            "type": "integer"
           },
-          "total": { "type": "integer" },
-          "limit": { "type": "integer" },
-          "offset": { "type": "integer" },
-          "has_more": { "type": "boolean" },
-          "query_time_ms": { "type": "number" }
-        }
-      }
-    },
-    "session/elements": {
-      "description": "Get pre-parsed UI elements for a session",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" },
-          "limit": { "type": "integer", "default": 50, "maximum": 100 },
-          "before": { "type": "string", "description": "Return elements before this ID" },
-          "after": { "type": "string", "description": "Return elements after this ID" }
-        },
-        "required": ["session_id"]
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "elements": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": { "type": "string" },
-                "type": { "type": "string", "enum": ["user_input", "assistant_text", "tool_call", "tool_result", "diff", "thinking"] },
-                "timestamp": { "type": "string", "format": "date-time" },
-                "content": { "type": "object" }
-              }
-            }
+          "repo_name": {
+            "type": "string"
           },
-          "pagination": {
-            "type": "object",
-            "properties": {
-              "total": { "type": "integer" },
-              "returned": { "type": "integer" },
-              "has_more_before": { "type": "boolean" },
-              "has_more_after": { "type": "boolean" },
-              "oldest_id": { "type": "string" },
-              "newest_id": { "type": "string" }
-            }
+          "repo_path": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "string"
           }
-        }
-      }
-    },
-    "session/delete": {
-      "description": "Delete a specific session or all sessions",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string", "description": "Session ID to delete (omit for all)" },
-          "agent_type": { "type": "string" }
-        }
-      },
-      "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" },
-          "session_id": { "type": "string" },
-          "deleted": { "type": "integer" }
-        }
-      }
-    },
-    "session/watch": {
-      "description": "Start watching a session for real-time updates",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" }
         },
-        "required": ["session_id"]
+        "type": "object"
+      }
+    },
+    "errors": {
+      "AgentAlreadyRunning": {
+        "code": -32001,
+        "message": "An agent is already running"
       },
-      "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" },
-          "watching": { "type": "boolean" }
-        }
-      }
-    },
-    "session/unwatch": {
-      "description": "Stop watching the current session",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string" },
-          "watching": { "type": "boolean" }
-        }
-      }
-    },
-    "initialize": {
-      "description": "Initialize the connection and negotiate capabilities",
-      "params": {
-        "type": "object",
-        "properties": {
-          "protocol_version": { "type": "string" },
-          "client_info": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "version": { "type": "string" }
-            }
-          },
-          "capabilities": { "type": "object" }
-        }
+      "AgentError": {
+        "code": -32003,
+        "message": "Agent execution error"
       },
-      "result": {
-        "type": "object",
-        "properties": {
-          "protocol_version": { "type": "string" },
-          "server_info": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "version": { "type": "string" }
-            }
-          },
-          "capabilities": {
-            "type": "object",
-            "properties": {
-              "agents": { "type": "array", "items": { "type": "string" } },
-              "features": { "type": "array", "items": { "type": "string" } }
-            }
-          }
-        }
-      }
-    },
-    "initialized": {
-      "description": "Notification that client initialization is complete",
-      "params": null,
-      "result": null
-    },
-    "shutdown": {
-      "description": "Request the server to shut down gracefully",
-      "params": null,
-      "result": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean" }
-        }
+      "AgentNotConfigured": {
+        "code": -32004,
+        "message": "Agent type not configured"
+      },
+      "AgentNotRunning": {
+        "code": -32002,
+        "message": "No agent is currently running"
+      },
+      "FileNotFound": {
+        "code": -32010,
+        "message": "Requested file not found"
+      },
+      "GitError": {
+        "code": -32011,
+        "message": "Git operation failed"
+      },
+      "SessionNotFound": {
+        "code": -32012,
+        "message": "Session not found"
       }
     }
-  },
-  "notifications": {
-    "event/heartbeat": {
-      "description": "Periodic heartbeat",
-      "params": {
-        "type": "object",
-        "properties": {
-          "server_time": { "type": "string", "format": "date-time" },
-          "sequence": { "type": "integer" },
-          "agent_status": { "type": "string" },
-          "uptime_seconds": { "type": "integer" }
-        }
-      }
-    },
-    "event/agent_started": {
-      "description": "Agent has started",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "agent_type": { "type": "string" },
-          "prompt": { "type": "string" }
-        }
-      }
-    },
-    "event/agent_output": {
-      "description": "Agent output",
-      "params": {
-        "type": "object",
-        "properties": {
-          "type": { "type": "string", "enum": ["text", "tool_use", "tool_result", "thinking"] },
-          "content": { "type": "string" },
-          "tool_name": { "type": "string" },
-          "tool_id": { "type": "string" },
-          "tool_input": { "type": "object" }
-        }
-      }
-    },
-    "event/agent_stopped": {
-      "description": "Agent has stopped",
-      "params": {
-        "type": "object",
-        "properties": {
-          "session_id": { "type": "string" },
-          "reason": { "type": "string", "enum": ["completed", "stopped", "error"] }
-        }
-      }
-    },
-    "event/file_changed": {
-      "description": "File change detected",
-      "params": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "change": { "type": "string", "enum": ["created", "modified", "deleted", "renamed"] }
-        }
-      }
-    },
-    "event/git_status_changed": {
-      "description": "Git status changed",
-      "params": {
-        "type": "object",
-        "properties": {
-          "branch": { "type": "string" },
-          "staged": { "type": "array", "items": { "type": "string" } },
-          "unstaged": { "type": "array", "items": { "type": "string" } },
-          "untracked": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    }
-  },
-  "errors": {
-    "-32700": { "name": "ParseError", "message": "Invalid JSON" },
-    "-32600": { "name": "InvalidRequest", "message": "Not a valid JSON-RPC request" },
-    "-32601": { "name": "MethodNotFound", "message": "Method does not exist" },
-    "-32602": { "name": "InvalidParams", "message": "Invalid method parameters" },
-    "-32603": { "name": "InternalError", "message": "Internal server error" },
-    "-32001": { "name": "AgentAlreadyRunning", "message": "An agent is already running" },
-    "-32002": { "name": "AgentNotRunning", "message": "No agent is currently running" },
-    "-32003": { "name": "AgentError", "message": "Agent execution error" },
-    "-32004": { "name": "AgentNotConfigured", "message": "Agent type not configured" },
-    "-32010": { "name": "FileNotFound", "message": "Requested file not found" },
-    "-32011": { "name": "GitError", "message": "Git operation failed" },
-    "-32012": { "name": "SessionNotFound", "message": "Session not found" }
   }
 }

@@ -1035,10 +1035,11 @@ func (t *Tracker) ListBranches(ctx context.Context) (*BranchesResult, error) {
 
 // CheckoutResult represents the result of a checkout operation.
 type CheckoutResult struct {
-	Success bool   `json:"success"`
-	Branch  string `json:"branch,omitempty"`
-	Message string `json:"message,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Success    bool   `json:"success"`
+	Branch     string `json:"branch,omitempty"`
+	FromBranch string `json:"from_branch,omitempty"` // Previous branch (for git_branch_changed event)
+	Message    string `json:"message,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 // Checkout switches branches or creates a new branch.
@@ -1046,6 +1047,9 @@ func (t *Tracker) Checkout(ctx context.Context, branch string, create bool) (*Ch
 	if !t.isRepo {
 		return nil, domain.ErrNotGitRepo
 	}
+
+	// Get current branch before checkout (for git_branch_changed event)
+	fromBranch, _, _, _ := t.getBranchInfo(ctx)
 
 	args := []string{"checkout"}
 	if create {
@@ -1084,12 +1088,13 @@ func (t *Tracker) Checkout(ctx context.Context, branch string, create bool) (*Ch
 		action = "Created and switched to"
 	}
 
-	log.Info().Str("branch", branch).Bool("created", create).Msg("checkout branch")
+	log.Info().Str("branch", branch).Str("from", fromBranch).Bool("created", create).Msg("checkout branch")
 
 	return &CheckoutResult{
-		Success: true,
-		Branch:  branch,
-		Message: fmt.Sprintf("%s branch '%s'", action, branch),
+		Success:    true,
+		Branch:     branch,
+		FromBranch: fromBranch,
+		Message:    fmt.Sprintf("%s branch '%s'", action, branch),
 	}, nil
 }
 
@@ -1166,4 +1171,1006 @@ func (t *Tracker) ListDirectory(ctx context.Context, path string) ([]DirectoryEn
 	}
 
 	return result, nil
+}
+
+// --- Branch Delete ---
+
+// DeleteBranchResult represents the result of a branch delete operation.
+type DeleteBranchResult struct {
+	Success bool   `json:"success"`
+	Branch  string `json:"branch"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// DeleteBranch deletes a local branch.
+func (t *Tracker) DeleteBranch(ctx context.Context, branch string, force bool) (*DeleteBranchResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	currentBranch, _, _, _ := t.getBranchInfo(ctx)
+	if branch == currentBranch {
+		return &DeleteBranchResult{
+			Success: false,
+			Branch:  branch,
+			Error:   "cannot delete the currently checked out branch",
+		}, nil
+	}
+
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "branch", flag, branch)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return &DeleteBranchResult{
+			Success: false,
+			Branch:  branch,
+			Error:   strings.TrimSpace(string(output)),
+		}, nil
+	}
+
+	return &DeleteBranchResult{
+		Success: true,
+		Branch:  branch,
+		Message: fmt.Sprintf("Deleted branch %s", branch),
+	}, nil
+}
+
+// --- Fetch ---
+
+// FetchResult represents the result of a fetch operation.
+type FetchResult struct {
+	Success        bool     `json:"success"`
+	Message        string   `json:"message,omitempty"`
+	Error          string   `json:"error,omitempty"`
+	UpdatedRefs    []string `json:"updated_refs,omitempty"`
+	NewBranches    []string `json:"new_branches,omitempty"`
+	PrunedBranches []string `json:"pruned_branches,omitempty"`
+}
+
+// Fetch fetches from remote without merging.
+func (t *Tracker) Fetch(ctx context.Context, remote string, prune bool) (*FetchResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	if remote == "" {
+		remote = "origin"
+	}
+
+	args := []string{"fetch", remote}
+	if prune {
+		args = append(args, "--prune")
+	}
+	args = append(args, "--verbose")
+
+	cmd := exec.CommandContext(ctx, t.command, args...)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	if err != nil {
+		return &FetchResult{
+			Success: false,
+			Error:   strings.TrimSpace(outputStr),
+		}, nil
+	}
+
+	result := &FetchResult{
+		Success: true,
+		Message: "Fetch completed",
+	}
+
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "->") {
+			result.UpdatedRefs = append(result.UpdatedRefs, line)
+		}
+		if strings.HasPrefix(line, "[new branch]") {
+			result.NewBranches = append(result.NewBranches, line)
+		}
+		if strings.HasPrefix(line, "[deleted]") || strings.Contains(line, "- [deleted]") {
+			result.PrunedBranches = append(result.PrunedBranches, line)
+		}
+	}
+
+	return result, nil
+}
+
+// --- Log (Commit History) ---
+
+// GraphLineType represents the type of line in a git graph.
+type GraphLineType string
+
+const (
+	GraphLineStraight    GraphLineType = "straight"
+	GraphLineMergeLeft   GraphLineType = "merge_left"
+	GraphLineMergeRight  GraphLineType = "merge_right"
+	GraphLineBranchLeft  GraphLineType = "branch_left"
+	GraphLineBranchRight GraphLineType = "branch_right"
+	GraphLinePass        GraphLineType = "pass"
+)
+
+// GraphLine represents a line segment in the git graph.
+type GraphLine struct {
+	FromColumn int           `json:"from_column"`
+	ToColumn   int           `json:"to_column"`
+	Type       GraphLineType `json:"type"`
+}
+
+// GraphPosition represents the position of a commit in the git graph.
+type GraphPosition struct {
+	Column int         `json:"column"`
+	Lines  []GraphLine `json:"lines"`
+}
+
+// LogEntry represents a single commit in the log.
+type LogEntry struct {
+	SHA           string         `json:"sha"`
+	ShortSHA      string         `json:"short_sha"`
+	Author        string         `json:"author"`
+	AuthorEmail   string         `json:"author_email"`
+	Date          string         `json:"date"`
+	RelativeDate  string         `json:"relative_date"`
+	Subject       string         `json:"subject"`
+	Body          string         `json:"body,omitempty"`
+	ParentSHAs    []string       `json:"parent_shas,omitempty"`
+	IsMerge       bool           `json:"is_merge"`
+	GraphPosition *GraphPosition `json:"graph_position,omitempty"`
+}
+
+// LogResult represents the result of a log operation.
+type LogResult struct {
+	Commits    []LogEntry `json:"commits"`
+	TotalCount int        `json:"total_count"`
+	HasMore    bool       `json:"has_more"`
+	MaxColumns int        `json:"max_columns,omitempty"`
+}
+
+// Log returns commit history.
+func (t *Tracker) Log(ctx context.Context, limit int, skip int, branch string, path string, graph bool) (*LogResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	format := "%H|%h|%an|%ae|%aI|%ar|%s|%P"
+	args := []string{"log", fmt.Sprintf("--format=%s", format), fmt.Sprintf("-n%d", limit+1)}
+	if skip > 0 {
+		args = append(args, fmt.Sprintf("--skip=%d", skip))
+	}
+	if graph && branch == "" {
+		args = append(args, "--all")
+	} else if branch != "" {
+		args = append(args, branch)
+	}
+	if path != "" {
+		args = append(args, "--", path)
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, args...)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	commits := make([]LogEntry, 0, len(lines))
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 8)
+		if len(parts) < 7 {
+			continue
+		}
+
+		entry := LogEntry{
+			SHA:          parts[0],
+			ShortSHA:     parts[1],
+			Author:       parts[2],
+			AuthorEmail:  parts[3],
+			Date:         parts[4],
+			RelativeDate: parts[5],
+			Subject:      parts[6],
+		}
+
+		if len(parts) > 7 && parts[7] != "" {
+			entry.ParentSHAs = strings.Split(parts[7], " ")
+			entry.IsMerge = len(entry.ParentSHAs) > 1
+		}
+
+		commits = append(commits, entry)
+	}
+
+	hasMore := len(commits) > limit
+	if hasMore {
+		commits = commits[:limit]
+	}
+
+	maxColumns := 0
+	if graph && len(commits) > 0 {
+		maxColumns = computeGraphLayout(commits)
+	}
+
+	return &LogResult{
+		Commits:    commits,
+		TotalCount: len(commits),
+		HasMore:    hasMore,
+		MaxColumns: maxColumns,
+	}, nil
+}
+
+// computeGraphLayout computes the graph positions for commits.
+func computeGraphLayout(commits []LogEntry) int {
+	if len(commits) == 0 {
+		return 0
+	}
+
+	lanes := make([]string, 0, 8)
+
+	findLane := func(sha string) int {
+		for i, s := range lanes {
+			if s == sha {
+				return i
+			}
+		}
+		return -1
+	}
+
+	findEmptyLane := func() int {
+		for i, s := range lanes {
+			if s == "" {
+				return i
+			}
+		}
+		lanes = append(lanes, "")
+		return len(lanes) - 1
+	}
+
+	maxCols := 0
+
+	for i := range commits {
+		commit := &commits[i]
+		var lines []GraphLine
+
+		column := findLane(commit.SHA)
+		if column == -1 {
+			column = findEmptyLane()
+			lanes[column] = commit.SHA
+		}
+
+		if column+1 > maxCols {
+			maxCols = column + 1
+		}
+
+		if len(commit.ParentSHAs) == 0 {
+			lanes[column] = ""
+		} else {
+			firstParent := true
+			for _, parentSHA := range commit.ParentSHAs {
+				parentCol := findLane(parentSHA)
+
+				if parentCol == -1 {
+					if firstParent {
+						lanes[column] = parentSHA
+						parentCol = column
+					} else {
+						parentCol = findEmptyLane()
+						lanes[parentCol] = parentSHA
+						if parentCol+1 > maxCols {
+							maxCols = parentCol + 1
+						}
+					}
+				}
+
+				var lineType GraphLineType
+				if parentCol == column {
+					lineType = GraphLineStraight
+				} else if parentCol < column {
+					lineType = GraphLineMergeLeft
+				} else {
+					lineType = GraphLineMergeRight
+				}
+
+				lines = append(lines, GraphLine{
+					FromColumn: parentCol,
+					ToColumn:   column,
+					Type:       lineType,
+				})
+
+				firstParent = false
+			}
+		}
+
+		for col, sha := range lanes {
+			if sha != "" && col != column {
+				isParent := false
+				for _, psha := range commit.ParentSHAs {
+					if sha == psha {
+						isParent = true
+						break
+					}
+				}
+				if !isParent {
+					lines = append(lines, GraphLine{
+						FromColumn: col,
+						ToColumn:   col,
+						Type:       GraphLinePass,
+					})
+				}
+			}
+		}
+
+		commit.GraphPosition = &GraphPosition{
+			Column: column,
+			Lines:  lines,
+		}
+	}
+
+	return maxCols
+}
+
+// --- Stash Operations ---
+
+// StashEntry represents a single stash entry.
+type StashEntry struct {
+	Index   int    `json:"index"`
+	Name    string `json:"name"`
+	Branch  string `json:"branch"`
+	Message string `json:"message"`
+}
+
+// StashResult represents the result of a stash operation.
+type StashResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+	Name    string `json:"name,omitempty"`
+}
+
+// StashListResult represents the result of listing stashes.
+type StashListResult struct {
+	Stashes []StashEntry `json:"stashes"`
+	Count   int          `json:"count"`
+}
+
+// Stash creates a new stash.
+func (t *Tracker) Stash(ctx context.Context, message string, includeUntracked bool) (*StashResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	args := []string{"stash", "push"}
+	if includeUntracked {
+		args = append(args, "-u")
+	}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, args...)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	outputStr := strings.TrimSpace(string(output))
+
+	if err != nil {
+		return &StashResult{Success: false, Error: outputStr}, nil
+	}
+
+	if strings.Contains(outputStr, "No local changes to save") {
+		return &StashResult{Success: false, Message: "No local changes to stash"}, nil
+	}
+
+	return &StashResult{Success: true, Message: outputStr, Name: "stash@{0}"}, nil
+}
+
+// StashList returns all stash entries.
+func (t *Tracker) StashList(ctx context.Context) (*StashListResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "stash", "list", "--format=%gd|%gs")
+	cmd.Dir = t.repoRoot
+	output, err := cmd.Output()
+	if err != nil {
+		return &StashListResult{Stashes: []StashEntry{}, Count: 0}, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	stashes := make([]StashEntry, 0, len(lines))
+
+	for i, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 2)
+		entry := StashEntry{Index: i, Name: parts[0]}
+
+		if len(parts) > 1 {
+			msg := parts[1]
+			if idx := strings.Index(msg, ": "); idx > 0 {
+				branchPart := msg[:idx]
+				entry.Message = msg[idx+2:]
+				if strings.HasPrefix(branchPart, "WIP on ") {
+					entry.Branch = branchPart[7:]
+				} else if strings.HasPrefix(branchPart, "On ") {
+					entry.Branch = branchPart[3:]
+				} else {
+					entry.Branch = branchPart
+				}
+			} else {
+				entry.Message = msg
+			}
+		}
+
+		stashes = append(stashes, entry)
+	}
+
+	return &StashListResult{Stashes: stashes, Count: len(stashes)}, nil
+}
+
+// StashApply applies a stash without removing it.
+func (t *Tracker) StashApply(ctx context.Context, index int) (*StashResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	stashRef := fmt.Sprintf("stash@{%d}", index)
+	cmd := exec.CommandContext(ctx, t.command, "stash", "apply", stashRef)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return &StashResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &StashResult{Success: true, Message: fmt.Sprintf("Applied %s", stashRef)}, nil
+}
+
+// StashPop applies and removes a stash.
+func (t *Tracker) StashPop(ctx context.Context, index int) (*StashResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	stashRef := fmt.Sprintf("stash@{%d}", index)
+	cmd := exec.CommandContext(ctx, t.command, "stash", "pop", stashRef)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return &StashResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &StashResult{Success: true, Message: fmt.Sprintf("Applied and dropped %s", stashRef)}, nil
+}
+
+// StashDrop removes a stash.
+func (t *Tracker) StashDrop(ctx context.Context, index int) (*StashResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	stashRef := fmt.Sprintf("stash@{%d}", index)
+	cmd := exec.CommandContext(ctx, t.command, "stash", "drop", stashRef)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return &StashResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &StashResult{Success: true, Message: fmt.Sprintf("Dropped %s", stashRef)}, nil
+}
+
+// --- Merge Operations ---
+
+// MergeResult represents the result of a merge operation.
+type MergeResult struct {
+	Success         bool     `json:"success"`
+	Message         string   `json:"message,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	CommitSHA       string   `json:"commit_sha,omitempty"`
+	HasConflicts    bool     `json:"has_conflicts"`
+	ConflictedFiles []string `json:"conflicted_files,omitempty"`
+}
+
+// Merge merges a branch into the current branch.
+func (t *Tracker) Merge(ctx context.Context, branch string, noFastForward bool, message string) (*MergeResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	args := []string{"merge", branch}
+	if noFastForward {
+		args = append(args, "--no-ff")
+	}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, args...)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	outputStr := strings.TrimSpace(string(output))
+
+	if err != nil {
+		if strings.Contains(outputStr, "CONFLICT") || strings.Contains(outputStr, "Automatic merge failed") {
+			conflictedFiles := t.getConflictedFiles(ctx)
+			return &MergeResult{
+				Success:         false,
+				HasConflicts:    true,
+				ConflictedFiles: conflictedFiles,
+				Error:           "Merge conflicts detected. Resolve conflicts and commit.",
+			}, nil
+		}
+		return &MergeResult{Success: false, Error: outputStr}, nil
+	}
+
+	sha := ""
+	shaCmd := exec.CommandContext(ctx, t.command, "rev-parse", "HEAD")
+	shaCmd.Dir = t.repoRoot
+	if shaOutput, err := shaCmd.Output(); err == nil {
+		sha = strings.TrimSpace(string(shaOutput))
+	}
+
+	return &MergeResult{Success: true, Message: fmt.Sprintf("Merged %s", branch), CommitSHA: sha}, nil
+}
+
+// MergeAbort aborts an in-progress merge.
+func (t *Tracker) MergeAbort(ctx context.Context) (*MergeResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "merge", "--abort")
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return &MergeResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &MergeResult{Success: true, Message: "Merge aborted"}, nil
+}
+
+// --- Git Init ---
+
+// InitResult represents the result of a git init operation.
+type InitResult struct {
+	Success        bool   `json:"success"`
+	Message        string `json:"message,omitempty"`
+	Error          string `json:"error,omitempty"`
+	Branch         string `json:"branch,omitempty"`
+	CommitSHA      string `json:"commit_sha,omitempty"`
+	FilesCommitted int    `json:"files_committed,omitempty"`
+}
+
+// Init initializes a git repository.
+func (t *Tracker) Init(ctx context.Context, initialBranch string, initialCommit bool, commitMessage string) (*InitResult, error) {
+	if t.IsGitRepo() {
+		return &InitResult{Success: false, Error: "Directory is already a git repository"}, nil
+	}
+
+	if initialBranch == "" {
+		initialBranch = "main"
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "init", "-b", initialBranch)
+	cmd.Dir = t.repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &InitResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	t.mu.Lock()
+	t.isRepo = true
+	t.repoRoot = t.repoPath
+	t.repoName = filepath.Base(t.repoPath)
+	t.mu.Unlock()
+
+	result := &InitResult{Success: true, Branch: initialBranch, Message: "Initialized empty Git repository"}
+
+	if initialCommit {
+		stageCmd := exec.CommandContext(ctx, t.command, "add", "-A")
+		stageCmd.Dir = t.repoPath
+		stageCmd.CombinedOutput()
+
+		statusCmd := exec.CommandContext(ctx, t.command, "diff", "--cached", "--name-only")
+		statusCmd.Dir = t.repoPath
+		statusOutput, _ := statusCmd.Output()
+		stagedFiles := strings.Split(strings.TrimSpace(string(statusOutput)), "\n")
+		fileCount := 0
+		for _, f := range stagedFiles {
+			if f != "" {
+				fileCount++
+			}
+		}
+
+		if fileCount > 0 {
+			if commitMessage == "" {
+				commitMessage = "Initial commit"
+			}
+
+			commitCmd := exec.CommandContext(ctx, t.command, "commit", "-m", commitMessage)
+			commitCmd.Dir = t.repoPath
+			if _, err := commitCmd.CombinedOutput(); err == nil {
+				result.FilesCommitted = fileCount
+				result.Message = fmt.Sprintf("Initialized and created initial commit with %d files", fileCount)
+
+				shaCmd := exec.CommandContext(ctx, t.command, "rev-parse", "HEAD")
+				shaCmd.Dir = t.repoPath
+				if shaOutput, err := shaCmd.Output(); err == nil {
+					result.CommitSHA = strings.TrimSpace(string(shaOutput))
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// --- Remote Operations ---
+
+// RemoteInfo represents information about a git remote.
+type RemoteInfo struct {
+	Name             string   `json:"name"`
+	FetchURL         string   `json:"fetch_url"`
+	PushURL          string   `json:"push_url"`
+	Provider         string   `json:"provider,omitempty"`
+	TrackingBranches []string `json:"tracking_branches,omitempty"`
+}
+
+// RemoteAddResult represents the result of adding a remote.
+type RemoteAddResult struct {
+	Success         bool        `json:"success"`
+	Message         string      `json:"message,omitempty"`
+	Error           string      `json:"error,omitempty"`
+	Remote          *RemoteInfo `json:"remote,omitempty"`
+	FetchedBranches []string    `json:"fetched_branches,omitempty"`
+}
+
+// RemoteListResult represents the result of listing remotes.
+type RemoteListResult struct {
+	Remotes []RemoteInfo `json:"remotes"`
+}
+
+// RemoteRemoveResult represents the result of removing a remote.
+type RemoteRemoveResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func detectProvider(url string) string {
+	url = strings.ToLower(url)
+	if strings.Contains(url, "github.com") {
+		return "github"
+	}
+	if strings.Contains(url, "gitlab.com") {
+		return "gitlab"
+	}
+	if strings.Contains(url, "bitbucket.org") {
+		return "bitbucket"
+	}
+	return "custom"
+}
+
+// RemoteAdd adds a new remote.
+func (t *Tracker) RemoteAdd(ctx context.Context, name string, url string, fetch bool) (*RemoteAddResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	if name == "" {
+		name = "origin"
+	}
+
+	checkCmd := exec.CommandContext(ctx, t.command, "remote", "get-url", name)
+	checkCmd.Dir = t.repoRoot
+	if _, err := checkCmd.Output(); err == nil {
+		return &RemoteAddResult{Success: false, Error: fmt.Sprintf("Remote '%s' already exists", name)}, nil
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "remote", "add", name, url)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &RemoteAddResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	result := &RemoteAddResult{
+		Success: true,
+		Message: fmt.Sprintf("Added remote '%s'", name),
+		Remote:  &RemoteInfo{Name: name, FetchURL: url, PushURL: url, Provider: detectProvider(url)},
+	}
+
+	if fetch {
+		fetchCmd := exec.CommandContext(ctx, t.command, "fetch", name)
+		fetchCmd.Dir = t.repoRoot
+		fetchCmd.CombinedOutput()
+
+		branchCmd := exec.CommandContext(ctx, t.command, "branch", "-r", "--list", fmt.Sprintf("%s/*", name))
+		branchCmd.Dir = t.repoRoot
+		if branchOutput, err := branchCmd.Output(); err == nil {
+			branches := strings.Split(strings.TrimSpace(string(branchOutput)), "\n")
+			for _, b := range branches {
+				b = strings.TrimSpace(b)
+				if b != "" {
+					if strings.HasPrefix(b, name+"/") {
+						b = strings.TrimPrefix(b, name+"/")
+					}
+					result.FetchedBranches = append(result.FetchedBranches, b)
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// RemoteList returns all configured remotes.
+func (t *Tracker) RemoteList(ctx context.Context) (*RemoteListResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "remote")
+	cmd.Dir = t.repoRoot
+	output, err := cmd.Output()
+	if err != nil {
+		return &RemoteListResult{Remotes: []RemoteInfo{}}, nil
+	}
+
+	remoteNames := strings.Split(strings.TrimSpace(string(output)), "\n")
+	remotes := make([]RemoteInfo, 0, len(remoteNames))
+
+	for _, name := range remoteNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		remote := RemoteInfo{Name: name}
+
+		fetchCmd := exec.CommandContext(ctx, t.command, "remote", "get-url", name)
+		fetchCmd.Dir = t.repoRoot
+		if fetchOutput, err := fetchCmd.Output(); err == nil {
+			remote.FetchURL = strings.TrimSpace(string(fetchOutput))
+			remote.Provider = detectProvider(remote.FetchURL)
+		}
+
+		pushCmd := exec.CommandContext(ctx, t.command, "remote", "get-url", "--push", name)
+		pushCmd.Dir = t.repoRoot
+		if pushOutput, err := pushCmd.Output(); err == nil {
+			remote.PushURL = strings.TrimSpace(string(pushOutput))
+		}
+
+		branchCmd := exec.CommandContext(ctx, t.command, "branch", "-r", "--list", fmt.Sprintf("%s/*", name))
+		branchCmd.Dir = t.repoRoot
+		if branchOutput, err := branchCmd.Output(); err == nil {
+			branches := strings.Split(strings.TrimSpace(string(branchOutput)), "\n")
+			for _, b := range branches {
+				b = strings.TrimSpace(b)
+				if b != "" {
+					if strings.HasPrefix(b, name+"/") {
+						b = strings.TrimPrefix(b, name+"/")
+					}
+					remote.TrackingBranches = append(remote.TrackingBranches, b)
+				}
+			}
+		}
+
+		remotes = append(remotes, remote)
+	}
+
+	return &RemoteListResult{Remotes: remotes}, nil
+}
+
+// RemoteRemove removes a remote.
+func (t *Tracker) RemoteRemove(ctx context.Context, name string) (*RemoteRemoveResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "remote", "remove", name)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &RemoteRemoveResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &RemoteRemoveResult{Success: true, Message: fmt.Sprintf("Removed remote '%s'", name)}, nil
+}
+
+// --- Set Upstream ---
+
+// SetUpstreamResult represents the result of setting upstream.
+type SetUpstreamResult struct {
+	Success  bool   `json:"success"`
+	Message  string `json:"message,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Branch   string `json:"branch,omitempty"`
+	Upstream string `json:"upstream,omitempty"`
+}
+
+// SetUpstream sets the upstream tracking branch.
+func (t *Tracker) SetUpstream(ctx context.Context, branch string, upstream string) (*SetUpstreamResult, error) {
+	if !t.IsGitRepo() {
+		return nil, domain.ErrNotGitRepo
+	}
+
+	if branch == "" {
+		currentBranch, _, _, _ := t.getBranchInfo(ctx)
+		branch = currentBranch
+	}
+
+	cmd := exec.CommandContext(ctx, t.command, "branch", "--set-upstream-to="+upstream, branch)
+	cmd.Dir = t.repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return &SetUpstreamResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+	}
+
+	return &SetUpstreamResult{
+		Success:  true,
+		Branch:   branch,
+		Upstream: upstream,
+		Message:  fmt.Sprintf("Branch '%s' set up to track '%s'", branch, upstream),
+	}, nil
+}
+
+// --- Enhanced Status ---
+
+// WorkspaceGitState represents the git state of a workspace.
+type WorkspaceGitState string
+
+const (
+	GitStateNoGit       WorkspaceGitState = "noGit"
+	GitStateInitialized WorkspaceGitState = "gitInit"
+	GitStateNoRemote    WorkspaceGitState = "noRemote"
+	GitStateNoPush      WorkspaceGitState = "noPush"
+	GitStateSynced      WorkspaceGitState = "synced"
+	GitStateDiverged    WorkspaceGitState = "diverged"
+	GitStateConflict    WorkspaceGitState = "conflict"
+)
+
+// Status represents the full git status of a workspace.
+type Status struct {
+	IsGitRepo    bool              `json:"is_git_repo"`
+	HasCommits   bool              `json:"has_commits"`
+	State        WorkspaceGitState `json:"state"`
+	Branch       string            `json:"branch,omitempty"`
+	Upstream     string            `json:"upstream,omitempty"`
+	Ahead        int               `json:"ahead"`
+	Behind       int               `json:"behind"`
+	Staged       []FileEntry       `json:"staged"`
+	Unstaged     []FileEntry       `json:"unstaged"`
+	Untracked    []FileEntry       `json:"untracked"`
+	Conflicted   []FileEntry       `json:"conflicted"`
+	HasConflicts bool              `json:"has_conflicts"`
+	Remotes      []RemoteInfo      `json:"remotes,omitempty"`
+	RepoName     string            `json:"repo_name,omitempty"`
+	RepoRoot     string            `json:"repo_root,omitempty"`
+}
+
+// GetStatus returns the full git status including state machine.
+func (t *Tracker) GetStatus(ctx context.Context) (*Status, error) {
+	status := &Status{
+		Staged:     make([]FileEntry, 0),
+		Unstaged:   make([]FileEntry, 0),
+		Untracked:  make([]FileEntry, 0),
+		Conflicted: make([]FileEntry, 0),
+		Remotes:    make([]RemoteInfo, 0),
+	}
+
+	if !t.IsGitRepo() {
+		status.IsGitRepo = false
+		status.State = GitStateNoGit
+		return status, nil
+	}
+	status.IsGitRepo = true
+	status.RepoName = t.repoName
+	status.RepoRoot = t.repoRoot
+
+	headCmd := exec.CommandContext(ctx, t.command, "rev-parse", "HEAD")
+	headCmd.Dir = t.repoRoot
+	if _, err := headCmd.Output(); err != nil {
+		status.HasCommits = false
+		status.State = GitStateInitialized
+		branchCmd := exec.CommandContext(ctx, t.command, "branch", "--show-current")
+		branchCmd.Dir = t.repoRoot
+		if branchOutput, err := branchCmd.Output(); err == nil {
+			status.Branch = strings.TrimSpace(string(branchOutput))
+		}
+		return status, nil
+	}
+	status.HasCommits = true
+
+	branch, upstream, ahead, behind := t.getBranchInfo(ctx)
+	status.Branch = branch
+	status.Upstream = upstream
+	status.Ahead = ahead
+	status.Behind = behind
+
+	cmd := exec.CommandContext(ctx, t.command, "status", "--porcelain", "-uall")
+	cmd.Dir = t.repoRoot
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSuffix(string(output), "\n"), "\n")
+		for _, line := range lines {
+			if len(line) < 3 {
+				continue
+			}
+
+			staged := line[0]
+			unstaged := line[1]
+			path := strings.TrimLeft(line[2:], " ")
+
+			if strings.Contains(path, " -> ") {
+				parts := strings.Split(path, " -> ")
+				path = parts[len(parts)-1]
+			}
+
+			if staged == 'U' || unstaged == 'U' || (staged == 'A' && unstaged == 'A') || (staged == 'D' && unstaged == 'D') {
+				status.Conflicted = append(status.Conflicted, FileEntry{Path: path, Status: "!"})
+				status.HasConflicts = true
+			} else if staged == '?' && unstaged == '?' {
+				status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?"})
+			} else {
+				if staged != ' ' && staged != '?' {
+					entry := FileEntry{Path: path, Status: string(staged)}
+					additions, deletions := t.getDiffStats(ctx, path, true)
+					entry.Additions = additions
+					entry.Deletions = deletions
+					status.Staged = append(status.Staged, entry)
+				}
+				if unstaged != ' ' && unstaged != '?' {
+					entry := FileEntry{Path: path, Status: string(unstaged)}
+					additions, deletions := t.getDiffStats(ctx, path, false)
+					entry.Additions = additions
+					entry.Deletions = deletions
+					status.Unstaged = append(status.Unstaged, entry)
+				}
+			}
+		}
+	}
+
+	remoteResult, _ := t.RemoteList(ctx)
+	if remoteResult != nil {
+		status.Remotes = remoteResult.Remotes
+	}
+
+	if len(status.Remotes) == 0 {
+		status.State = GitStateNoRemote
+	} else if status.Upstream == "" {
+		status.State = GitStateNoPush
+	} else if status.HasConflicts {
+		status.State = GitStateConflict
+	} else if status.Ahead > 0 || status.Behind > 0 {
+		status.State = GitStateDiverged
+	} else {
+		status.State = GitStateSynced
+	}
+
+	return status, nil
 }

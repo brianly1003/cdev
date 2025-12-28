@@ -1998,7 +1998,162 @@ func (m *Manager) GitCheckout(workspaceID string, branch string, create bool) (*
 	if err != nil {
 		return nil, err
 	}
-	return tracker.Checkout(m.ctx, branch, create)
+	result, err := tracker.Checkout(m.ctx, branch, create)
+	if err != nil {
+		return nil, err
+	}
+
+	// Emit git_branch_changed event if branch actually changed
+	if result.FromBranch != "" && result.FromBranch != result.Branch {
+		event := events.NewGitBranchChangedEvent(workspaceID, result.FromBranch, result.Branch, "")
+		m.hub.Publish(event)
+	}
+
+	return result, nil
+}
+
+// GitDeleteBranch deletes a branch for a workspace.
+func (m *Manager) GitDeleteBranch(workspaceID string, branch string, force bool) (*git.DeleteBranchResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.DeleteBranch(m.ctx, branch, force)
+}
+
+// GitFetch fetches from a remote for a workspace.
+func (m *Manager) GitFetch(workspaceID string, remote string, prune bool) (*git.FetchResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.Fetch(m.ctx, remote, prune)
+}
+
+// GitLog returns the commit log for a workspace.
+func (m *Manager) GitLog(workspaceID string, limit int, skip int, branch string, path string, graph bool) (*git.LogResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.Log(m.ctx, limit, skip, branch, path, graph)
+}
+
+// GitStash creates a stash for a workspace.
+func (m *Manager) GitStash(workspaceID string, message string, includeUntracked bool) (*git.StashResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.Stash(m.ctx, message, includeUntracked)
+}
+
+// GitStashList lists stashes for a workspace.
+func (m *Manager) GitStashList(workspaceID string) (*git.StashListResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.StashList(m.ctx)
+}
+
+// GitStashApply applies a stash for a workspace.
+func (m *Manager) GitStashApply(workspaceID string, index int) (*git.StashResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.StashApply(m.ctx, index)
+}
+
+// GitStashPop pops a stash for a workspace.
+func (m *Manager) GitStashPop(workspaceID string, index int) (*git.StashResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.StashPop(m.ctx, index)
+}
+
+// GitStashDrop drops a stash for a workspace.
+func (m *Manager) GitStashDrop(workspaceID string, index int) (*git.StashResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.StashDrop(m.ctx, index)
+}
+
+// GitMerge merges a branch for a workspace.
+func (m *Manager) GitMerge(workspaceID string, branch string, noFastForward bool, message string) (*git.MergeResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.Merge(m.ctx, branch, noFastForward, message)
+}
+
+// GitMergeAbort aborts a merge for a workspace.
+func (m *Manager) GitMergeAbort(workspaceID string) (*git.MergeResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.MergeAbort(m.ctx)
+}
+
+// GitInit initializes a git repository for a workspace.
+func (m *Manager) GitInit(workspaceID string, initialBranch string, initialCommit bool, commitMessage string) (*git.InitResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.Init(m.ctx, initialBranch, initialCommit, commitMessage)
+}
+
+// GitRemoteAdd adds a remote to a workspace.
+func (m *Manager) GitRemoteAdd(workspaceID string, name string, url string, fetch bool) (*git.RemoteAddResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.RemoteAdd(m.ctx, name, url, fetch)
+}
+
+// GitRemoteList lists remotes for a workspace.
+func (m *Manager) GitRemoteList(workspaceID string) (*git.RemoteListResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.RemoteList(m.ctx)
+}
+
+// GitRemoteRemove removes a remote from a workspace.
+func (m *Manager) GitRemoteRemove(workspaceID string, name string) (*git.RemoteRemoveResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.RemoteRemove(m.ctx, name)
+}
+
+// GitSetUpstream sets the upstream for a branch.
+func (m *Manager) GitSetUpstream(workspaceID string, branch string, upstream string) (*git.SetUpstreamResult, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.SetUpstream(m.ctx, branch, upstream)
+}
+
+// GitGetStatus returns the comprehensive git status for a workspace.
+func (m *Manager) GitGetStatus(workspaceID string) (*git.Status, error) {
+	tracker, err := m.getGitTracker(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return tracker.GetStatus(m.ctx)
 }
 
 // HistoryInfo represents historical session information from the session cache.

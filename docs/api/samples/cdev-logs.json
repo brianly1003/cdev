@@ -1,0 +1,844 @@
+2:24AM DBG skipping session without user interaction session_id=afe4ba9e-eb46-4a85-8ecc-4c0a451f1259
+2:24AM DBG skipping session without user interaction session_id=c0499490-6a24-4248-a82a-bb690af0761f
+2:24AM DBG skipping session without user interaction session_id=e57c22c4-93df-452f-8f8e-4965a9ff1623
+2:24AM INF full session sync complete elapsed_ms=1.343292 files_scanned=4 sessions_cached=0
+2:24AM DBG listed sessions from cache count=0 elapsed_ms=0.05425
+{"time":"2025-12-29T02:24:12.435671+07:00","level":"INFO","msg":"No historical session found, using new session ID","session_id":"5b3595d7-8028-4fe4-a0e1-d10fb13c639d","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+2:24AM INF git repository detected name=CW88Web-v2 root=/Users/brianly/Projects/CW88Web-v2
+2:24AM INF file watcher started debounce_ms=100 path=/Users/brianly/Projects/CW88Web-v2
+{"time":"2025-12-29T02:24:12.576288+07:00","level":"INFO","msg":"Started session","session_id":"5b3595d7-8028-4fe4-a0e1-d10fb13c639d","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","workspace_name":"CW88Web-v2","path":"/Users/brianly/Projects/CW88Web-v2"}
+2:24AM DBG request completed id=20A90DE4-31BA-4F2F-8D89-BAEA3E0520C3 method=session/start
+2:24AM DBG spawning claude process with PTY args=[] command=claude pty_mode=true work_dir=/Users/brianly/Projects/CW88Web-v2
+2:24AM INF claude log file created (PTY mode) path=/Users/brianly/Projects/CW88Web-v2/.cdev/logs/claude_51895.jsonl
+2:24AM INF claude started with PTY pid=51895 prompt= pty_mode=true
+2:24AM DBG PTY output streaming started
+2:24AM DBG dispatching request id=70F423BE-B678-4D5A-B8AA-7CEFCD80993A method=workspace/list notification=false
+2:24AM INF full session sync complete elapsed_ms=8.970167 files_scanned=47 sessions_cached=8
+2:24AM DBG listed sessions from cache count=8 elapsed_ms=0.038834
+2:24AM INF full session sync complete elapsed_ms=0.540625 files_scanned=4 sessions_cached=0
+2:24AM DBG listed sessions from cache count=0 elapsed_ms=0.019542
+2:24AM DBG request completed id=70F423BE-B678-4D5A-B8AA-7CEFCD80993A method=workspace/list
+{"time":"2025-12-29T02:24:13.493875+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.493902+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.493917+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:13.493969+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:13.503741+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:13.503764+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:13.503773+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.503814+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.508652+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.508666+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:13.508663+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:13.508687+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.041488+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.04153+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.041503+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.041588+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.044953+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.044982+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.044959+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.045003+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.046065+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.046075+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.046083+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.046085+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.056386+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.056401+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.056412+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.056417+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.057016+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","branch":"master","staged":0,"unstaged":0,"untracked":0}
+{"time":"2025-12-29T02:24:14.057538+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a","branch":"master","staged":0,"unstaged":0,"untracked":0}
+2:24AM DBG dispatching request id=7461A7A6-3C14-4B31-BEC9-FCFF4D955D5C method=git/status notification=false
+{"time":"2025-12-29T02:24:14.274173+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.274207+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.274175+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.274226+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.27712+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.277143+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.27714+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.277167+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.284219+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.284227+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:14.284238+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:14.284241+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+2:24AM DBG request completed id=7461A7A6-3C14-4B31-BEC9-FCFF4D955D5C method=git/status
+2:24AM DBG dispatching request id=EDBB4FA4-128C-42BE-80BF-38D38AA79649 method=workspace/subscribe notification=false
+{"time":"2025-12-29T02:24:14.29666+07:00","level":"DEBUG","msg":"Git watcher already running, added subscriber","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","subscriber_count":5}
+2:24AM DBG request completed id=EDBB4FA4-128C-42BE-80BF-38D38AA79649 method=workspace/subscribe
+2:24AM DBG dispatching request id=5E61ABE3-2758-4848-B5F0-04C5071C6E08 method=workspace/session/watch notification=false
+2:24AM DBG request failed error="session not found: 5b3595d7-8028-4fe4-a0e1-d10fb13c639d" code=-32603 method=workspace/session/watch
+2:24AM DBG dispatching request id=A27713E6-5AA7-4188-B5DD-DADDA36E5577 method=workspace/files/list notification=false
+2:24AM DBG request completed id=A27713E6-5AA7-4188-B5DD-DADDA36E5577 method=workspace/files/list
+2:24AM DBG dispatching request id=3F0A5CF8-99A5-45D8-8F78-692B31E1BDBD method=workspace/session/messages notification=false
+2:24AM INF message cache initialized db_path=/var/folders/9p/q2n8x7nx3fn0mq_h7z8mck780000gn/T/cdev/message-cache/-Users-brianly-.claude-projects--Users-brianly-Projects-CW88Web-v2-messages.db
+2:24AM DBG request failed error="failed to get messages: session not found: 5b3595d7-8028-4fe4-a0e1-d10fb13c639d" code=-32603 method=workspace/session/messages
+2:24AM DBG dispatching request id=D2DB6252-9B2A-4E11-BDB1-34BAC5AE70F8 method=workspace/status notification=false
+2:24AM DBG request completed id=D2DB6252-9B2A-4E11-BDB1-34BAC5AE70F8 method=workspace/status
+2:24AM DBG PTY output clean="╭─── Claude Code v2.0.71 ──────────────��..." state=idle
+2:24AM DBG PTY output clean="│                                                    │ Tips for getting s..." state=idle
+2:24AM DBG PTY output clean="│                 Welcome back Brian!                │ Run /init to creat..." state=idle
+2:24AM DBG PTY output clean="│                                                    │ ──────..." state=idle
+2:24AM DBG PTY output clean="│                     * ▐▛███▜▌ *                    │ Rece..." state=idle
+2:24AM DBG PTY output clean="│                    * ▝▜█████▛▘ *                   │ ..." state=idle
+2:24AM DBG PTY output clean="│                     *  ▘▘ ▝▝  *                    │           ..." state=idle
+2:24AM DBG PTY output clean="│                                                    │                   ..." state=idle
+2:24AM DBG PTY output clean="│  Opus 4.5 · Claude Max · brianly1003@gmail.com's   │                 ..." state=idle
+2:24AM DBG PTY output clean="│  Organization                                      │                   ..." state=idle
+2:24AM DBG PTY output clean="│               ~/Projects/CW88Web-v2                │                   ..." state=idle
+2:24AM DBG PTY output clean="╰────────────────────────��..." state=idle
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean=">\u00a0Try \"refactor common.js\"" state=idle
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:24AM DBG dispatching request id=F2EF545F-3EE8-4A0C-9B9B-6C8CA9C288FF method=git/status notification=false
+{"time":"2025-12-29T02:24:15.041692+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.041723+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.041706+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.041741+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.045757+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.045773+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.045771+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.045784+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.055812+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.055834+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.055836+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.055867+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+2:24AM DBG request completed id=F2EF545F-3EE8-4A0C-9B9B-6C8CA9C288FF method=git/status
+2:24AM DBG dispatching request id=96A9FD16-A5B6-4CC7-9BB1-C51A28EA104E method=workspace/session/watch notification=false
+2:24AM DBG request failed error="session not found: 5b3595d7-8028-4fe4-a0e1-d10fb13c639d" code=-32603 method=workspace/session/watch
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean=">\u00a0Try \"refactor common.js\"" state=idle
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean="  ? for shortcuts                                                            ..." state=idle
+{"time":"2025-12-29T02:24:15.590866+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.590913+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.590909+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.591045+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.593102+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.593143+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.593194+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.593201+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.597707+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.597728+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.59776+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.597763+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.609171+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.60919+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.60917+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.609206+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.609506+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a","branch":"master","staged":0,"unstaged":0,"untracked":0}
+{"time":"2025-12-29T02:24:15.609511+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","branch":"master","staged":0,"unstaged":0,"untracked":0}
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean=">\u00a0Try \"refactor common.js\"" state=idle
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean="  ? for shortcuts                                                            ..." state=idle
+2:24AM DBG PTY output clean="                                                                             ..." state=idle
+2:24AM DBG dispatching request id=07204D40-AF43-4EFF-8463-F46BFB7B5CEF method=git/status notification=false
+{"time":"2025-12-29T02:24:15.918353+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.918383+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.918399+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.918391+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.921408+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.921425+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.921415+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.921434+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.928257+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.928276+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:24:15.928269+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:24:15.928289+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+2:24AM DBG request completed id=07204D40-AF43-4EFF-8463-F46BFB7B5CEF method=git/status
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean=">\u00a0Try \"refactor common.js\"" state=idle
+2:24AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:24AM DBG PTY output clean="  ? for shortcuts                                                            ..." state=idle
+{"time":"2025-12-29T02:24:48.295983+07:00","level":"INFO","msg":"Client disconnected, cleaning up","client_id":"b3748ba0-6cf8-4c86-83e1-fc9d317224e4","subscribed_workspaces":1}
+{"time":"2025-12-29T02:24:48.296086+07:00","level":"DEBUG","msg":"Removed git watcher subscriber (others still watching)","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","remaining_subscribers":4}
+2:24AM INF client disconnected client_id=b3748ba0-6cf8-4c86-83e1-fc9d317224e4 subscribed_workspaces=1
+2:24AM DBG subscriber unregistered subscriber_id=b3748ba0-6cf8-4c86-83e1-fc9d317224e4
+2:24AM DBG file changed change=created path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.V2x8PO size=0
+2:24AM DBG repo indexer received file change event change=created old_path= path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.V2x8PO
+2:24AM DBG repo indexer received file change event change=created old_path= path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate
+2:24AM DBG file changed change=created path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate size=128757
+2:24AM WRN failed to index file error="lstat /Users/brianly/Projects/cdev/cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.V2x8PO: no such file or directory" path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.V2x8PO
+2:24AM WRN failed to index file error="lstat /Users/brianly/Projects/cdev/cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate: no such file or directory" path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate
+2:25AM INF client disconnected client_id=17d9900b-bd0f-482b-8a06-1caf374fe7cc subscribed_workspaces=0
+2:25AM DBG subscriber unregistered subscriber_id=17d9900b-bd0f-482b-8a06-1caf374fe7cc
+2:25AM DBG file changed change=created path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate size=128757
+2:25AM DBG repo indexer received file change event change=created old_path= path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate
+2:25AM DBG file changed change=created path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.7a1gIB size=0
+2:25AM DBG repo indexer received file change event change=created old_path= path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.7a1gIB
+2:25AM WRN failed to index file error="lstat /Users/brianly/Projects/cdev/cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate: no such file or directory" path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/UserInterfaceState.xcuserstate
+2:25AM WRN failed to index file error="lstat /Users/brianly/Projects/cdev/cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.7a1gIB: no such file or directory" path=cdev.xcodeproj/project.xcworkspace/xcuserdata/brianly.xcuserdatad/.dat.nosync244C.7a1gIB
+2:25AM DBG incoming request host=localhost:8766 method=GET path=/ws remote_addr=127.0.0.1:54947 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:25AM DBG HTTP request received method=GET path=/ws remote=127.0.0.1:54947
+2:25AM INF WebSocket upgrade request received at /ws host=localhost:8766 origin= path=/ws remote_addr=127.0.0.1:54947 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:25AM DBG processing WebSocket upgrade connection=Upgrade path=/ws remote_addr=127.0.0.1:54947 sec_websocket_key=g3n+qsIPSDUyLqlQaSkWHA== upgrade=websocket
+2:25AM INF client connected (unified) client_id=0e456533-01b9-416b-9f5c-f4c19acd41c0 remote_addr=127.0.0.1:54947
+2:25AM DBG HTTP request completed elapsed=0.6815 method=GET path=/ws
+2:25AM DBG subscriber registered subscriber_id=0e456533-01b9-416b-9f5c-f4c19acd41c0
+2:25AM DBG request completed duration=3.001333 method=GET path=/ws
+2:25AM DBG incoming request host=localhost:8766 method=GET path=/ws remote_addr=127.0.0.1:54949 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:25AM DBG HTTP request received method=GET path=/ws remote=127.0.0.1:54949
+2:25AM INF WebSocket upgrade request received at /ws host=localhost:8766 origin= path=/ws remote_addr=127.0.0.1:54949 user_agent="cdev/1 CFNetwork/3860.200.71 Darwin/25.1.0"
+2:25AM DBG processing WebSocket upgrade connection=Upgrade path=/ws remote_addr=127.0.0.1:54949 sec_websocket_key=YArpu7rWs/+YdWteW6iXQQ== upgrade=websocket
+2:25AM INF client connected (unified) client_id=db4e498d-10c9-4455-83ed-2bbc28fc561e remote_addr=127.0.0.1:54949
+2:25AM DBG HTTP request completed elapsed=0.6995 method=GET path=/ws
+2:25AM DBG request completed duration=2.303666 method=GET path=/ws
+2:25AM DBG subscriber registered subscriber_id=db4e498d-10c9-4455-83ed-2bbc28fc561e
+2:25AM DBG protocol detected client_id=0e456533-01b9-416b-9f5c-f4c19acd41c0 protocol=json-rpc
+2:25AM DBG dispatching request id=B5AAAD58-BC8B-460B-9645-A13E2EEADCF5 method=initialize notification=false
+2:25AM DBG request completed id=B5AAAD58-BC8B-460B-9645-A13E2EEADCF5 method=initialize
+2:25AM DBG dispatching request id=16E14722-350B-43BA-88AB-B2A880FC0D91 method=initialize notification=false
+2:25AM DBG request completed id=16E14722-350B-43BA-88AB-B2A880FC0D91 method=initialize
+2:25AM DBG dispatching request id=<nil> method=initialized notification=true
+2:25AM DBG dispatching request id=5E577822-07CB-4599-9F1D-37160618EBBB method=workspace/list notification=false
+2:25AM INF full session sync complete elapsed_ms=27.241833 files_scanned=47 sessions_cached=8
+2:25AM DBG listed sessions from cache count=8 elapsed_ms=0.050125
+2:25AM INF full session sync complete elapsed_ms=0.734792 files_scanned=5 sessions_cached=0
+2:25AM DBG listed sessions from cache count=0 elapsed_ms=0.023875
+2:25AM DBG request completed id=5E577822-07CB-4599-9F1D-37160618EBBB method=workspace/list
+2:25AM DBG dispatching request id=<nil> method=initialized notification=true
+2:25AM DBG dispatching request id=B07AD0CD-DCF8-4B40-A344-0056FD3B7876 method=session/stop notification=false
+2:25AM INF emitted pty_state idle on Stop() session_id=250e0620-c8d6-4372-accc-071df31c21f9
+2:25AM INF file watcher stopped
+{"time":"2025-12-29T02:25:07.373975+07:00","level":"INFO","msg":"Stopped session","session_id":"250e0620-c8d6-4372-accc-071df31c21f9","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+2:25AM DBG request completed id=B07AD0CD-DCF8-4B40-A344-0056FD3B7876 method=session/stop
+2:25AM DBG PTY output streaming finished lines_read=5163
+2:25AM INF emitted pty_state idle - Claude PTY session finished session_id=250e0620-c8d6-4372-accc-071df31c21f9
+2:25AM INF claude stopped by user (PTY mode) exit_code=-1
+{"time":"2025-12-29T02:25:07.463111+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.463166+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.46414+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.464187+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.465194+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.465217+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.510017+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.510083+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.510362+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.510376+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.51191+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:07.511926+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.060577+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.060627+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.061355+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.061374+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.063542+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.06356+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.072928+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.072963+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.082549+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.082587+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.09079+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.09085+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.099365+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.099394+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.107509+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.107538+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.115546+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.115576+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.124191+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.124241+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.132723+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.132758+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.140693+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.140725+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.148397+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.148435+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.156222+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.156256+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.164964+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.164998+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.173415+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.173446+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.181578+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.181611+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8"}
+{"time":"2025-12-29T02:25:08.182113+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8","branch":"main","staged":13,"unstaged":1,"untracked":0}
+2:25AM DBG dispatching request id=DB1A60F8-3B51-4FF6-9DBB-8A4238501C30 method=workspace/get notification=false
+2:25AM INF full session sync complete elapsed_ms=16.8615 files_scanned=47 sessions_cached=8
+2:25AM DBG listed sessions from cache count=8 elapsed_ms=0.065208
+2:25AM DBG request completed id=DB1A60F8-3B51-4FF6-9DBB-8A4238501C30 method=workspace/get
+2:25AM DBG dispatching request id=5FC80D29-BA7B-498A-9689-8DEAC410FCC9 method=workspace/remove notification=false
+{"time":"2025-12-29T02:25:09.935518+07:00","level":"INFO","msg":"Unregistered workspace from git tracking","workspace_id":"3559140d-aa1e-4e39-b003-b4904cebfaa8","path":"/Users/brianly/Projects/cdev-ios"}
+2:25AM DBG request completed id=5FC80D29-BA7B-498A-9689-8DEAC410FCC9 method=workspace/remove
+2:25AM DBG dispatching request id=32C69FC1-CFC8-4060-80B8-DEA78FA75E33 method=workspace/subscribe notification=false
+{"time":"2025-12-29T02:25:13.039669+07:00","level":"DEBUG","msg":"Git watcher already running, added subscriber","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","subscriber_count":5}
+2:25AM DBG request completed id=32C69FC1-CFC8-4060-80B8-DEA78FA75E33 method=workspace/subscribe
+2:25AM DBG dispatching request id=030CB10A-73FA-46D0-B438-EB6403CB87D8 method=workspace/files/list notification=false
+2:25AM DBG request completed id=030CB10A-73FA-46D0-B438-EB6403CB87D8 method=workspace/files/list
+2:25AM DBG dispatching request id=928E2F09-7396-45DA-B4F9-0B906630B588 method=workspace/list notification=false
+2:25AM INF full session sync complete elapsed_ms=0.977375 files_scanned=5 sessions_cached=0
+2:25AM DBG listed sessions from cache count=0 elapsed_ms=0.043791
+2:25AM DBG request completed id=928E2F09-7396-45DA-B4F9-0B906630B588 method=workspace/list
+2:25AM DBG dispatching request id=EFD72A2E-9B2F-419C-B167-2F76EBF77FD2 method=workspace/session/watch notification=false
+2:25AM DBG request failed error="session not found: 5b3595d7-8028-4fe4-a0e1-d10fb13c639d" code=-32603 method=workspace/session/watch
+2:25AM DBG dispatching request id=5A0AFE9C-65D7-4B2B-953A-98732F33FA4F method=workspace/session/messages notification=false
+2:25AM INF message cache initialized db_path=/var/folders/9p/q2n8x7nx3fn0mq_h7z8mck780000gn/T/cdev/message-cache/-Users-brianly-.claude-projects--Users-brianly-Projects-CW88Web-v2-messages.db
+2:25AM DBG request failed error="failed to get messages: session not found: 5b3595d7-8028-4fe4-a0e1-d10fb13c639d" code=-32603 method=workspace/session/messages
+2:25AM DBG dispatching request id=1C69B9E7-BEBE-4A5B-B578-8A7EAFD17911 method=workspace/status notification=false
+2:25AM DBG request completed id=1C69B9E7-BEBE-4A5B-B578-8A7EAFD17911 method=workspace/status
+2:25AM DBG dispatching request id=1C489DA2-9130-438A-ABD2-ACFAE878DA49 method=git/status notification=false
+{"time":"2025-12-29T02:25:13.878234+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.878274+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.878235+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:13.878291+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:13.881902+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.881927+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.881905+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:13.881956+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:13.890973+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.890988+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:13.890981+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:13.891012+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+2:25AM DBG request completed id=1C489DA2-9130-438A-ABD2-ACFAE878DA49 method=git/status
+{"time":"2025-12-29T02:25:14.434213+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.434259+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.434228+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.434283+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.437846+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.437858+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.437864+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.437879+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.437905+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.43794+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.437923+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.43799+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.447855+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.447866+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.447876+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.447882+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.44819+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021","branch":"master","staged":0,"unstaged":0,"untracked":0}
+{"time":"2025-12-29T02:25:14.450959+07:00","level":"INFO","msg":"Emitted git_status_changed","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a","branch":"master","staged":0,"unstaged":0,"untracked":0}
+2:25AM DBG dispatching request id=E79C363D-E77B-4258-90CC-14D97244EB9F method=git/status notification=false
+{"time":"2025-12-29T02:25:14.613728+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.613761+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.61374+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index","path":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.61379+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index","op":"CHMOD","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.616875+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.616883+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.616887+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.616895+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"CREATE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.623847+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.623859+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"9cf4db57-e220-4b23-a151-0442ebc5c99a"}
+{"time":"2025-12-29T02:25:14.623845+07:00","level":"DEBUG","msg":"Git watcher event received","file":"index.lock","path":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+{"time":"2025-12-29T02:25:14.62387+07:00","level":"INFO","msg":"Git event detected, scheduling status update","file":"index.lock","op":"REMOVE","workspace_id":"99a7c92d-75f8-4167-8df5-c7b9f86a7021"}
+2:25AM DBG request completed id=E79C363D-E77B-4258-90CC-14D97244EB9F method=git/status
+2:25AM DBG dispatching request id=FD90408C-F442-4E72-B4EB-912640A5CF1A method=workspace/session/history notification=false
+2:25AM INF full session sync complete elapsed_ms=1.614958 files_scanned=5 sessions_cached=0
+2:25AM DBG listed sessions from cache count=0 elapsed_ms=0.035875
+2:25AM DBG request completed id=FD90408C-F442-4E72-B4EB-912640A5CF1A method=workspace/session/history
+2:25AM DBG dispatching request id=ED7ACF85-21B2-4472-9E1A-DD940AFA1C30 method=session/send notification=false
+2:25AM INF sending prompt to existing PTY session prompt=hello session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d
+2:25AM INF sent input to claude PTY input="hello\r" special_key=false
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0hello" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="                                                                             ..." state=idle
+2:25AM DBG PTY output clean="                                                                             ..." state=idle
+2:25AM INF sent input to claude PTY input="\r" special_key=true
+2:25AM DBG request completed id=ED7ACF85-21B2-4472-9E1A-DD940AFA1C30 method=session/send
+2:25AM DBG PTY output clean="> hello" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG PTY output clean="> hello" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG PTY output clean="> hello" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt)" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean=">\u00a0" state=idle
+2:25AM DBG PTY output clean="─────────────────────────��..." state=idle
+2:25AM DBG PTY output clean="  ? for shortcuts" state=idle
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="·"
+2:25AM DBG PTY output clean="· Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✢"
+2:25AM DBG PTY output clean="✢ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✳"
+2:25AM DBG PTY output clean="✳ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✶"
+2:25AM DBG PTY output clean="✶ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG PTY output clean="⏺ Hello! How can I help you today?" state=question
+2:25AM INF emitting pty_spinner event session_id=5b3595d7-8028-4fe4-a0e1-d10fb13c639d symbol="✻"
+2:25AM DBG PTY output clean="✻ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG pty_spinner debounced (same message within 150ms) symbol="✽"
+2:25AM DBG PTY output clean="✽ Hatching… (esc to interrupt · thinking)" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean=">\u00a0What can you help me with                                                 ..." state=thinking
+2:25AM DBG PTY output clean="─────────────────────────��..." state=thinking
+2:25AM DBG PTY output clean="  ? for shortcuts" state=thinking
+2:26AM INF client disconnected client_id=db4e498d-10c9-4455-83ed-2bbc28fc561e subscribed_workspaces=0
+2:26AM DBG subscriber unregistered subscriber_id=db4e498d-10c9-4455-83ed-2bbc28fc561e
