@@ -164,50 +164,72 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>cdev Pairing</title>
     <style>
+        /* Cdev Signature Design System - Eye-Friendly Edition */
+        :root {
+            /* Terminal Backgrounds */
+            --bg-primary: #16181D;
+            --bg-elevated: #1E2128;
+            --bg-highlight: #282D36;
+            --bg-selected: #343B47;
+            /* Text Colors (WCAG Compliant) */
+            --text-primary: #E2E8F0;
+            --text-secondary: #A0AEC0;
+            --text-tertiary: #718096;
+            /* Brand */
+            --brand: #FF8C5A;
+            --brand-dim: #E67A4A;
+            /* Semantic Colors (Desaturated) */
+            --success: #68D391;
+            --primary: #4FD1C5;
+            --error: #FC8181;
+            --warning: #F6C85D;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: var(--bg-primary);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            color: #fff;
+            color: var(--text-primary);
         }
         .container {
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
+            background: var(--bg-elevated);
+            border-radius: 16px;
             padding: 40px;
             text-align: center;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid var(--bg-highlight);
             max-width: 400px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
         }
         h1 {
             font-size: 24px;
             margin-bottom: 10px;
+            color: var(--brand);
+            font-weight: 700;
         }
         .subtitle {
-            color: #aaa;
+            color: var(--text-secondary);
             margin-bottom: 30px;
             font-size: 14px;
         }
         .qr-container {
-            background: #fff;
-            padding: 10px;
+            background: #FAFAF8;
+            padding: 12px;
             border-radius: 12px;
             display: inline-block;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         .qr-container img {
             display: block;
         }
         .info {
             text-align: left;
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
+            background: var(--bg-highlight);
+            padding: 16px;
             border-radius: 10px;
-            font-family: monospace;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
             font-size: 12px;
             margin-bottom: 20px;
         }
@@ -215,28 +237,35 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             display: flex;
             margin-bottom: 8px;
         }
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
         .info-label {
-            color: #888;
+            color: var(--text-tertiary);
             width: 80px;
             flex-shrink: 0;
         }
         .info-value {
-            color: #4ade80;
+            color: var(--success);
             word-break: break-all;
         }
         .btn {
-            background: #4ade80;
-            color: #000;
+            background: var(--success);
+            color: var(--bg-primary);
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
-            transition: transform 0.2s;
+            transition: all 0.2s ease;
         }
         .btn:hover {
-            transform: scale(1.05);
+            background: #7BE0A4;
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0);
         }
         .actions {
             display: flex;
@@ -251,17 +280,18 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             font-size: 11px;
             font-weight: 500;
             letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
-        .auth-enabled { background: #4ade80; color: #000; }
-        .auth-disabled { background: rgba(255,255,255,0.15); color: #aaa; }
+        .auth-enabled { background: var(--success); color: var(--bg-primary); }
+        .auth-disabled { background: var(--bg-selected); color: var(--text-secondary); }
         .timer {
-            color: #888;
+            color: var(--text-tertiary);
             font-size: 12px;
-            margin-top: 5px;
+            margin-top: 8px;
             margin-bottom: 20px;
         }
         .timer span {
-            color: #4ade80;
+            color: var(--primary);
             font-weight: 600;
         }
         .qr-expired {
@@ -273,12 +303,13 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
+            background: var(--bg-elevated);
             padding: 10px 20px;
             border-radius: 8px;
-            color: #ff6b6b;
+            color: var(--error);
             font-weight: 600;
             display: none;
+            border: 1px solid var(--error);
         }
         .qr-wrapper {
             position: relative;
