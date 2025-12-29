@@ -272,7 +272,6 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 
 		info["sessions"] = allSessions
 		info["active_session_count"] = runningCount
-		info["active_session_id"] = activeSessionID
 		info["has_active_session"] = runningCount > 0
 
 		result = append(result, info)
@@ -729,9 +728,6 @@ func (s *WorkspaceConfigService) Status(ctx context.Context, params json.RawMess
 	watchInfo := s.sessionManager.GetWatchedSession()
 	isBeingWatched := watchInfo != nil && watchInfo.Watching && watchInfo.WorkspaceID == p.WorkspaceID
 
-	// Get active session ID
-	activeSessionID := s.sessionManager.GetActiveSession(p.WorkspaceID)
-
 	return map[string]interface{}{
 		// Workspace info
 		"workspace_id":   ws.Definition.ID,
@@ -744,7 +740,6 @@ func (s *WorkspaceConfigService) Status(ctx context.Context, params json.RawMess
 		"sessions":             sessionInfos,
 		"active_session_count": activeCount,
 		"has_active_session":   activeCount > 0,
-		"active_session_id":    activeSessionID,
 
 		// Git tracker info
 		"git_tracker_state": gitTrackerState,
