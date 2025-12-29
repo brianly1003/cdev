@@ -2103,12 +2103,30 @@ func (m *Manager) GitMergeAbort(workspaceID string) (*git.MergeResult, error) {
 }
 
 // GitInit initializes a git repository for a workspace.
+// This method works on non-git directories to initialize them.
 func (m *Manager) GitInit(workspaceID string, initialBranch string, initialCommit bool, commitMessage string) (*git.InitResult, error) {
-	tracker, err := m.getGitTracker(workspaceID)
+	// Get workspace path - don't use getGitTracker as it rejects non-git repos
+	ws, err := m.GetWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	return tracker.Init(m.ctx, initialBranch, initialCommit, commitMessage)
+
+	// Create a tracker for the directory (works even if not a git repo yet)
+	tracker := git.NewTracker(ws.Definition.Path, m.cfg.Git.Command, nil)
+
+	// Initialize the git repository
+	result, err := tracker.Init(m.ctx, initialBranch, initialCommit, commitMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	// If successful, register/refresh the tracker in GitTrackerManager
+	if result.Success && m.gitTrackerManager != nil {
+		// Re-register workspace to update the tracker now that it's a git repo
+		_ = m.gitTrackerManager.RegisterWorkspace(&ws.Definition)
+	}
+
+	return result, nil
 }
 
 // GitRemoteAdd adds a remote to a workspace.
