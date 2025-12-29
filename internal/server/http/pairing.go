@@ -258,6 +258,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             color: #888;
             font-size: 12px;
             margin-top: 5px;
+            margin-bottom: 20px;
         }
         .timer span {
             color: #4ade80;
