@@ -1305,6 +1305,11 @@ func (s *SessionManagerService) GitCommit(ctx context.Context, params json.RawMe
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("commit", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1330,6 +1335,11 @@ func (s *SessionManagerService) GitPush(ctx context.Context, params json.RawMess
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("push", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1350,6 +1360,11 @@ func (s *SessionManagerService) GitPull(ctx context.Context, params json.RawMess
 	result, err := s.manager.GitPull(p.WorkspaceID, p.Rebase)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("pull", result.Error)
 	}
 
 	return result, nil
@@ -1399,6 +1414,11 @@ func (s *SessionManagerService) GitCheckout(ctx context.Context, params json.Raw
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("checkout", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1425,6 +1445,11 @@ func (s *SessionManagerService) GitDeleteBranch(ctx context.Context, params json
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("delete_branch", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1449,6 +1474,11 @@ func (s *SessionManagerService) GitFetch(ctx context.Context, params json.RawMes
 	result, err := s.manager.GitFetch(p.WorkspaceID, p.Remote, p.Prune)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("fetch", result.Error)
 	}
 
 	return result, nil
@@ -1503,6 +1533,11 @@ func (s *SessionManagerService) GitStash(ctx context.Context, params json.RawMes
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("stash", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1546,6 +1581,11 @@ func (s *SessionManagerService) GitStashApply(ctx context.Context, params json.R
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("stash_apply", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1568,6 +1608,11 @@ func (s *SessionManagerService) GitStashPop(ctx context.Context, params json.Raw
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("stash_pop", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1588,6 +1633,11 @@ func (s *SessionManagerService) GitStashDrop(ctx context.Context, params json.Ra
 	result, err := s.manager.GitStashDrop(p.WorkspaceID, p.Index)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("stash_drop", result.Error)
 	}
 
 	return result, nil
@@ -1617,6 +1667,11 @@ func (s *SessionManagerService) GitMerge(ctx context.Context, params json.RawMes
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed (but not for conflicts - those return success with has_conflicts)
+	if !result.Success && !result.HasConflicts {
+		return nil, message.ErrGitOperationFailed("merge", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1636,6 +1691,11 @@ func (s *SessionManagerService) GitMergeAbort(ctx context.Context, params json.R
 	result, err := s.manager.GitMergeAbort(p.WorkspaceID)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("merge_abort", result.Error)
 	}
 
 	return result, nil
@@ -1663,6 +1723,11 @@ func (s *SessionManagerService) GitInit(ctx context.Context, params json.RawMess
 	result, err := s.manager.GitInit(p.WorkspaceID, p.InitialBranch, p.InitialCommit, p.CommitMessage)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("init", result.Error)
 	}
 
 	return result, nil
@@ -1693,6 +1758,11 @@ func (s *SessionManagerService) GitRemoteAdd(ctx context.Context, params json.Ra
 	result, err := s.manager.GitRemoteAdd(p.WorkspaceID, p.Name, p.URL, p.Fetch)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("remote_add", result.Error)
 	}
 
 	return result, nil
@@ -1741,6 +1811,11 @@ func (s *SessionManagerService) GitRemoteRemove(ctx context.Context, params json
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("remote_remove", result.Error)
+	}
+
 	return result, nil
 }
 
@@ -1768,6 +1843,11 @@ func (s *SessionManagerService) GitSetUpstream(ctx context.Context, params json.
 	result, err := s.manager.GitSetUpstream(p.WorkspaceID, p.Branch, p.Upstream)
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	// Return JSON-RPC error if git operation failed
+	if !result.Success {
+		return nil, message.ErrGitOperationFailed("set_upstream", result.Error)
 	}
 
 	return result, nil
