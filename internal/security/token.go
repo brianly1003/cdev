@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -56,26 +58,86 @@ type TokenManager struct {
 	defaultExpirySecs int
 }
 
-// NewTokenManager creates a new token manager with a random server secret.
+// secretData holds the persisted secret and server ID.
+type secretData struct {
+	ServerID string `json:"server_id"`
+	Secret   string `json:"secret"` // base64 encoded
+}
+
+// NewTokenManager creates a new token manager with a persisted server secret.
+// The secret is stored in ~/.cdev/token_secret.json and reused across restarts.
 func NewTokenManager(expirySecs int) (*TokenManager, error) {
-	// Generate server ID
-	serverID, err := generateRandomString(16)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate server ID: %w", err)
+	secretPath := getSecretPath()
+
+	var serverID string
+	var secret []byte
+
+	// Try to load existing secret
+	if data, err := os.ReadFile(secretPath); err == nil {
+		var sd secretData
+		if err := json.Unmarshal(data, &sd); err == nil {
+			secret, _ = base64.StdEncoding.DecodeString(sd.Secret)
+			serverID = sd.ServerID
+		}
 	}
 
-	// Generate server secret (32 bytes for HMAC-SHA256)
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		return nil, fmt.Errorf("failed to generate server secret: %w", err)
+	// Generate new secret if not loaded
+	if len(secret) == 0 || serverID == "" {
+		var err error
+		serverID, err = generateRandomString(16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate server ID: %w", err)
+		}
+
+		secret = make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, fmt.Errorf("failed to generate server secret: %w", err)
+		}
+
+		// Save to file
+		if err := saveSecret(secretPath, serverID, secret); err != nil {
+			// Log warning but continue - tokens will work for this session
+			fmt.Fprintf(os.Stderr, "Warning: could not persist token secret: %v\n", err)
+		}
 	}
 
 	return &TokenManager{
-		serverID:         serverID,
-		serverSecret:     secret,
-		revokedNonces:    make(map[string]time.Time),
+		serverID:          serverID,
+		serverSecret:      secret,
+		revokedNonces:     make(map[string]time.Time),
 		defaultExpirySecs: expirySecs,
 	}, nil
+}
+
+// getSecretPath returns the path to the secret file.
+func getSecretPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	return filepath.Join(home, ".cdev", "token_secret.json")
+}
+
+// saveSecret saves the server ID and secret to a file.
+func saveSecret(path, serverID string, secret []byte) error {
+	// Ensure directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+
+	sd := secretData{
+		ServerID: serverID,
+		Secret:   base64.StdEncoding.EncodeToString(secret),
+	}
+
+	data, err := json.MarshalIndent(sd, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write with restrictive permissions (owner only)
+	return os.WriteFile(path, data, 0600)
 }
 
 // ServerID returns the server's unique ID.
