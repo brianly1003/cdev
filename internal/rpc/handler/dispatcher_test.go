@@ -411,8 +411,8 @@ func TestDispatcher_ConcurrentDispatch(t *testing.T) {
 
 	registry.Register("test/increment", func(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 		mu.Lock()
+		defer mu.Unlock()
 		counter++
-		mu.Unlock()
 		return counter, nil
 	})
 
