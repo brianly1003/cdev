@@ -364,7 +364,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/delete_branch", s.GitDeleteBranch, handler.MethodMeta{
+	registry.RegisterWithMeta("git/branch/delete", s.GitDeleteBranch, handler.MethodMeta{
 		Summary:     "Delete a branch for a workspace",
 		Description: "Deletes the specified branch in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -424,7 +424,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/stash_list", s.GitStashList, handler.MethodMeta{
+	registry.RegisterWithMeta("git/stash/list", s.GitStashList, handler.MethodMeta{
 		Summary:     "List stashes for a workspace",
 		Description: "Returns the list of stashes in the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -436,7 +436,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/stash_apply", s.GitStashApply, handler.MethodMeta{
+	registry.RegisterWithMeta("git/stash/apply", s.GitStashApply, handler.MethodMeta{
 		Summary:     "Apply a stash for a workspace",
 		Description: "Applies a stash without removing it from the stash list.",
 		Params: []handler.OpenRPCParam{
@@ -449,7 +449,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/stash_pop", s.GitStashPop, handler.MethodMeta{
+	registry.RegisterWithMeta("git/stash/pop", s.GitStashPop, handler.MethodMeta{
 		Summary:     "Pop a stash for a workspace",
 		Description: "Applies and removes a stash from the stash list.",
 		Params: []handler.OpenRPCParam{
@@ -462,7 +462,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/stash_drop", s.GitStashDrop, handler.MethodMeta{
+	registry.RegisterWithMeta("git/stash/drop", s.GitStashDrop, handler.MethodMeta{
 		Summary:     "Drop a stash for a workspace",
 		Description: "Removes a stash from the stash list without applying it.",
 		Params: []handler.OpenRPCParam{
@@ -491,7 +491,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/merge_abort", s.GitMergeAbort, handler.MethodMeta{
+	registry.RegisterWithMeta("git/merge/abort", s.GitMergeAbort, handler.MethodMeta{
 		Summary:     "Abort a merge for a workspace",
 		Description: "Aborts an in-progress merge operation.",
 		Params: []handler.OpenRPCParam{
@@ -519,7 +519,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/remote_add", s.GitRemoteAdd, handler.MethodMeta{
+	registry.RegisterWithMeta("git/remote/add", s.GitRemoteAdd, handler.MethodMeta{
 		Summary:     "Add a remote to a workspace",
 		Description: "Adds a remote repository to the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -534,7 +534,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/remote_list", s.GitRemoteList, handler.MethodMeta{
+	registry.RegisterWithMeta("git/remote/list", s.GitRemoteList, handler.MethodMeta{
 		Summary:     "List remotes for a workspace",
 		Description: "Returns the list of configured remotes.",
 		Params: []handler.OpenRPCParam{
@@ -546,7 +546,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/remote_remove", s.GitRemoteRemove, handler.MethodMeta{
+	registry.RegisterWithMeta("git/remote/remove", s.GitRemoteRemove, handler.MethodMeta{
 		Summary:     "Remove a remote from a workspace",
 		Description: "Removes a remote repository from the workspace.",
 		Params: []handler.OpenRPCParam{
@@ -559,7 +559,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
-	registry.RegisterWithMeta("git/set_upstream", s.GitSetUpstream, handler.MethodMeta{
+	registry.RegisterWithMeta("git/upstream/set", s.GitSetUpstream, handler.MethodMeta{
 		Summary:     "Set upstream for a branch",
 		Description: "Sets the upstream tracking branch for the specified branch.",
 		Params: []handler.OpenRPCParam{

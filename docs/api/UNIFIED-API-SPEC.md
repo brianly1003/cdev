@@ -429,7 +429,7 @@ Checkout a branch.
 
 ---
 
-#### `git/delete_branch`
+#### `git/branch/delete`
 Delete a git branch.
 
 **Params:**
@@ -534,7 +534,7 @@ Create a stash of current changes.
 
 ---
 
-#### `git/stash_list`
+#### `git/stash/list`
 List all stashes.
 
 **Params:**
@@ -559,7 +559,7 @@ List all stashes.
 
 ---
 
-#### `git/stash_apply`
+#### `git/stash/apply`
 Apply a stash without removing it.
 
 **Params:**
@@ -578,7 +578,7 @@ Apply a stash without removing it.
 
 ---
 
-#### `git/stash_pop`
+#### `git/stash/pop`
 Apply and remove a stash.
 
 **Params:**
@@ -597,7 +597,7 @@ Apply and remove a stash.
 
 ---
 
-#### `git/stash_drop`
+#### `git/stash/drop`
 Remove a stash without applying it.
 
 **Params:**
@@ -650,7 +650,7 @@ Merge a branch into the current branch.
 
 ---
 
-#### `git/merge_abort`
+#### `git/merge/abort`
 Abort an in-progress merge.
 
 **Params:**
@@ -691,7 +691,7 @@ Initialize a new git repository.
 
 ---
 
-#### `git/remote_add`
+#### `git/remote/add`
 Add a remote repository.
 
 **Params:**
@@ -714,7 +714,7 @@ Add a remote repository.
 
 ---
 
-#### `git/remote_list`
+#### `git/remote/list`
 List configured remotes.
 
 **Params:**
@@ -737,7 +737,7 @@ List configured remotes.
 
 ---
 
-#### `git/remote_remove`
+#### `git/remote/remove`
 Remove a remote.
 
 **Params:**
@@ -757,7 +757,7 @@ Remove a remote.
 
 ---
 
-#### `git/set_upstream`
+#### `git/upstream/set`
 Set upstream tracking branch.
 
 **Params:**
