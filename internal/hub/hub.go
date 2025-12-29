@@ -172,17 +172,35 @@ func (h *Hub) Publish(event events.Event) {
 
 // Subscribe adds a new subscriber.
 func (h *Hub) Subscribe(sub ports.Subscriber) {
+	// Capture done channel under lock to avoid race with Stop()
+	h.mu.RLock()
+	done := h.done
+	h.mu.RUnlock()
+
+	if done == nil {
+		return // Hub is stopped
+	}
+
 	select {
 	case h.register <- sub:
-	case <-h.done:
+	case <-done:
 	}
 }
 
 // Unsubscribe removes a subscriber by ID.
 func (h *Hub) Unsubscribe(id string) {
+	// Capture done channel under lock to avoid race with Stop()
+	h.mu.RLock()
+	done := h.done
+	h.mu.RUnlock()
+
+	if done == nil {
+		return // Hub is stopped
+	}
+
 	select {
 	case h.unregister <- id:
-	case <-h.done:
+	case <-done:
 	}
 }
 
