@@ -134,23 +134,23 @@ cdev start -v
 
 ### Configuration
 
-Create a `config.yaml` file (see `configs/config.example.yaml`):
+cdev works with sensible defaults - no configuration file required. Workspaces are managed dynamically via the `workspace/add` API from cdev-ios.
+
+For advanced settings, create `~/.cdev/config.yaml`:
 
 ```yaml
 server:
-  port: 8766           # Single unified port (HTTP + WebSocket)
+  http_port: 8766      # Single unified port (HTTP + WebSocket)
   host: "127.0.0.1"
-
-repository:
-  path: "/path/to/your/project"
-
-watcher:
-  enabled: true
-  debounce_ms: 100
 
 logging:
   level: "info"
   format: "console"
+
+claude:
+  command: "claude"
+  skip_permissions: false
+  timeout_minutes: 30
 ```
 
 Configuration is loaded from:
@@ -161,8 +161,18 @@ Configuration is loaded from:
 
 Environment variables override config file values (prefix: `CDEV_`):
 ```bash
-export CDEV_SERVER_PORT=8766
+export CDEV_SERVER_HTTP_PORT=8766
 ```
+
+### VS Code Port Forwarding
+
+When using VS Code Dev Tunnels for remote access, simply pass the forwarded URL:
+
+```bash
+cdev start --external-url "https://your-tunnel.devtunnels.ms"
+```
+
+This auto-derives both HTTP and WebSocket URLs for QR code pairing.
 
 ## API
 

@@ -148,8 +148,8 @@ Set logging.level = debug in ~/.cdev/config.yaml
 | `server.http_port` | int | 8766 | HTTP/WebSocket port |
 | `server.websocket_port` | int | 8765 | Legacy WebSocket port |
 | `server.host` | string | 127.0.0.1 | Bind address |
-| `server.external_ws_url` | string | - | External WebSocket URL for tunnels |
-| `server.external_http_url` | string | - | External HTTP URL for tunnels |
+| `server.external_ws_url` | string | - | External WebSocket URL for tunnels (auto-derived from `--external-url`) |
+| `server.external_http_url` | string | - | External HTTP URL for tunnels (auto-derived from `--external-url`) |
 | `logging.level` | string | info | Log level: debug, info, warn, error |
 | `logging.format` | string | console | Log format: console, json |
 | `claude.command` | string | claude | Path to claude CLI |
@@ -161,7 +161,8 @@ Set logging.level = debug in ~/.cdev/config.yaml
 | `watcher.enabled` | bool | true | Enable file watcher |
 | `watcher.debounce_ms` | int | 100 | Debounce time in milliseconds |
 | `indexer.enabled` | bool | true | Enable repository indexer |
-| `repository.path` | string | . | Repository path (current directory) |
+
+> **Note:** `repository.path` is deprecated. Workspaces are now managed via the `workspace/add` API.
 
 ### `cdev config get <key>`
 

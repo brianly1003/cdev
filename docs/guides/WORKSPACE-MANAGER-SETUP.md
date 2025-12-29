@@ -88,73 +88,56 @@ cdev version X.X.X (commit: abc1234)
 
 ---
 
-## Step 2: Configure Workspace Manager
+## Step 2: Start cdev
 
-### 2.1 Check Configuration File
+### 2.1 Simple Start (Recommended)
 
-The workspace manager configuration is stored at `~/.cdev/workspaces.yaml`.
+Just run cdev - no configuration required:
 
 ```bash
-# View current config (if exists)
-cat ~/.cdev/workspaces.yaml
+# Start cdev server (workspaces added via API)
+./bin/cdev start
 ```
 
-### 2.2 Create/Update Configuration
+Workspaces are added dynamically via the `workspace/add` API from the iOS app.
 
-If the file doesn't exist, create it:
+### 2.2 With VS Code Port Forwarding
+
+When using VS Code Dev Tunnels, pass the tunnel URL directly:
+
+```bash
+# Copy the VS Code tunnel URL and pass it
+./bin/cdev start --external-url "https://abc123x4-8766.asse.devtunnels.ms"
+```
+
+This automatically sets up the QR code with the correct public URLs.
+
+### 2.3 Optional: Configuration File
+
+For advanced settings, create `~/.cdev/config.yaml`:
 
 ```bash
 mkdir -p ~/.cdev
-cat > ~/.cdev/workspaces.yaml << 'EOF'
-manager:
-  enabled: true
-  port: 8765
-  host: 0.0.0.0          # Important: Use 0.0.0.0 for external access
-  auto_start_workspaces: false
-  log_level: info
-  max_concurrent_workspaces: 5
-  auto_stop_idle_minutes: 30
-  port_range_start: 8766
-  port_range_end: 8799
-  restart_on_crash: true
-  max_restart_attempts: 3
-  restart_backoff_seconds: 5
+cat > ~/.cdev/config.yaml << 'EOF'
+# Server settings
+server:
+  http_port: 8766
+  host: "127.0.0.1"
 
-workspaces: []
+# Logging
+logging:
+  level: "info"
+  format: "console"
 
-defaults:
-  watcher:
-    enabled: true
-    debouncems: 100
-    ignorepatterns:
-      - .git
-      - .DS_Store
-      - node_modules
-      - .vscode
-      - .idea
-  git:
-    enabled: true
-    command: git
-    diffonchange: true
-  logging:
-    level: info
-    format: console
-  limits:
-    maxfilesizekb: 200
-    maxdiffsizekb: 500
-    maxlogbuffer: 1000
-    maxpromptlen: 10000
+# Claude CLI settings
+claude:
+  command: "claude"
+  skip_permissions: false
+  timeout_minutes: 30
 EOF
 ```
 
-### 2.3 Key Configuration Options
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| `host` | `0.0.0.0` | **Required** for VS Code tunnels (accepts external connections) |
-| `port` | `8765` | Workspace manager port |
-| `port_range_start` | `8766` | First port for workspace agents |
-| `max_concurrent_workspaces` | `5` | Limit running workspaces |
+> **Note:** Workspaces are no longer pre-configured in config files. They are managed dynamically via the `workspace/add` API.
 
 ---
 
@@ -304,6 +287,26 @@ Record your tunnel URLs:
 | Manager | 8765 | `https://abc123x4-8765.asse.devtunnels.ms` |
 | Workspace 1 | 8766 | `https://abc123x4-8766.asse.devtunnels.ms` |
 | Workspace 2 | 8767 | `https://abc123x4-8767.asse.devtunnels.ms` |
+
+### 5.6 Using --external-url Flag (Recommended)
+
+Instead of editing config files, simply pass the tunnel URL when starting cdev:
+
+```bash
+# Just copy the VS Code tunnel URL and pass it directly
+cdev start --external-url "https://abc123x4-8766.asse.devtunnels.ms"
+```
+
+This automatically derives both HTTP and WebSocket URLs:
+- **HTTP URL**: `https://abc123x4-8766.asse.devtunnels.ms`
+- **WebSocket URL**: `wss://abc123x4-8766.asse.devtunnels.ms/ws`
+
+You can also set them individually if needed:
+```bash
+cdev start \
+  --external-ws-url "wss://abc123x4-8766.asse.devtunnels.ms/ws" \
+  --external-http-url "https://abc123x4-8766.asse.devtunnels.ms"
+```
 
 ---
 

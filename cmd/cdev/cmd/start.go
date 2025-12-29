@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/brianly1003/cdev/internal/app"
@@ -18,6 +19,7 @@ var (
 	repoPath        string
 	wsPort          int
 	httpPort        int
+	externalURL     string // Single URL that auto-derives WS and HTTP
 	externalWSURL   string
 	externalHTTPURL string
 	headless        bool
@@ -50,12 +52,16 @@ Example:
   cdev start --ws-port 8765 --http-port 8766
 
 VS Code Port Forwarding:
-  When using VS Code port forwarding, set the external URLs so the QR code
-  contains the public tunnel URLs instead of localhost:
+  When using VS Code port forwarding, just copy the forwarded URL and pass it:
+
+  cdev start --external-url https://your-tunnel.devtunnels.ms
+
+  This auto-derives both HTTP and WebSocket URLs from the single URL.
+  Or set them individually if needed:
 
   cdev start \
-    --external-ws-url wss://your-tunnel-8765.devtunnels.ms \
-    --external-http-url https://your-tunnel-8766.devtunnels.ms`,
+    --external-ws-url wss://your-tunnel.devtunnels.ms/ws \
+    --external-http-url https://your-tunnel.devtunnels.ms`,
 	RunE: runStart,
 }
 
@@ -63,7 +69,8 @@ func init() {
 	startCmd.Flags().StringVar(&repoPath, "repo", "", "path to repository (default: current directory)")
 	startCmd.Flags().IntVar(&wsPort, "ws-port", 0, "WebSocket port (default: 8765)")
 	startCmd.Flags().IntVar(&httpPort, "http-port", 0, "HTTP port (default: 8766)")
-	startCmd.Flags().StringVar(&externalWSURL, "external-ws-url", "", "external WebSocket URL for QR code (e.g., wss://tunnel.devtunnels.ms)")
+	startCmd.Flags().StringVar(&externalURL, "external-url", "", "external URL for QR code - auto-derives WS and HTTP URLs (e.g., https://tunnel.devtunnels.ms)")
+	startCmd.Flags().StringVar(&externalWSURL, "external-ws-url", "", "external WebSocket URL for QR code (e.g., wss://tunnel.devtunnels.ms/ws)")
 	startCmd.Flags().StringVar(&externalHTTPURL, "external-http-url", "", "external HTTP URL for QR code (e.g., https://tunnel.devtunnels.ms)")
 	startCmd.Flags().BoolVar(&headless, "headless", false, "run in headless mode (no terminal UI, daemon mode)")
 }
@@ -85,6 +92,20 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if httpPort != 0 {
 		cfg.Server.HTTPPort = httpPort
 	}
+
+	// Auto-derive WS and HTTP URLs from single external URL
+	if externalURL != "" {
+		httpURL, wsURL := deriveExternalURLs(externalURL)
+		cfg.Server.ExternalHTTPURL = httpURL
+		cfg.Server.ExternalWSURL = wsURL
+		log.Info().
+			Str("external_url", externalURL).
+			Str("http_url", httpURL).
+			Str("ws_url", wsURL).
+			Msg("auto-derived external URLs")
+	}
+
+	// Individual URL flags override auto-derived ones
 	if externalWSURL != "" {
 		cfg.Server.ExternalWSURL = externalWSURL
 	}
@@ -177,4 +198,28 @@ func printConfig(cfg *config.Config) {
 	fmt.Printf("Git Enabled:     %t\n", cfg.Git.Enabled)
 	fmt.Printf("Log Level:       %s\n", cfg.Logging.Level)
 	fmt.Printf("Log Format:      %s\n", cfg.Logging.Format)
+}
+
+// deriveExternalURLs derives HTTP and WebSocket URLs from a single base URL.
+// Input: https://abc123x4-8766.asse.devtunnels.ms/ (or http://)
+// Output: httpURL = https://abc123x4-8766.asse.devtunnels.ms
+//
+//	wsURL   = wss://abc123x4-8766.asse.devtunnels.ms/ws
+func deriveExternalURLs(baseURL string) (httpURL, wsURL string) {
+	// Trim trailing slashes
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	// HTTP URL is the base URL as-is
+	httpURL = baseURL
+
+	// WebSocket URL: convert scheme and append /ws
+	wsURL = baseURL
+	if strings.HasPrefix(wsURL, "https://") {
+		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+	} else if strings.HasPrefix(wsURL, "http://") {
+		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	}
+	wsURL = wsURL + "/ws"
+
+	return httpURL, wsURL
 }
