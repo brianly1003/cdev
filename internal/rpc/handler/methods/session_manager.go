@@ -1760,11 +1760,6 @@ func (s *SessionManagerService) GitRemoteAdd(ctx context.Context, params json.Ra
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
-	// Return JSON-RPC error if git operation failed
-	if !result.Success {
-		return nil, message.ErrGitOperationFailed("remote_add", result.Error)
-	}
-
 	return result, nil
 }
 
