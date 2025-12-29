@@ -107,23 +107,32 @@ func (h *Hub) run() {
 			log.Debug().Str("subscriber_id", id).Msg("subscriber unregistered")
 
 		case event := <-h.broadcast:
+			// Collect failed subscribers while holding read lock
 			h.mu.RLock()
+			var failed []string
 			for id, sub := range h.subscribers {
 				if err := sub.Send(event); err != nil {
 					log.Warn().
 						Str("subscriber_id", id).
 						Err(err).
 						Msg("failed to send event to subscriber")
-					// Queue unregister (don't block)
-					go func(subID string) {
-						select {
-						case h.unregister <- subID:
-						default:
-						}
-					}(id)
+					failed = append(failed, id)
 				}
 			}
 			h.mu.RUnlock()
+
+			// Remove failed subscribers with write lock
+			if len(failed) > 0 {
+				h.mu.Lock()
+				for _, id := range failed {
+					if sub, ok := h.subscribers[id]; ok {
+						_ = sub.Close()
+						delete(h.subscribers, id)
+						log.Debug().Str("subscriber_id", id).Msg("subscriber removed after send failure")
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }

@@ -183,6 +183,233 @@ var upgrader = websocket.Upgrader{
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## JSON-RPC 2.0 Authentication Best Practices
+
+### Industry Patterns Comparison
+
+| Protocol | Auth Method | When Validated | Token Refresh |
+|----------|-------------|----------------|---------------|
+| **MCP** (Model Context Protocol) | `initialize` params | After connect | Not specified |
+| **LSP** (Language Server Protocol) | None (trusted) | N/A | N/A |
+| **Ethereum JSON-RPC** | HTTP header | Before connect | Per-request |
+| **OpenRPC** | Not specified | Transport-level | Transport-level |
+
+### Recommended: Hybrid Approach (Transport + Lifecycle)
+
+cdev should use a **two-phase authentication** that combines:
+
+1. **Transport-level** (WebSocket upgrade) - Initial pairing token
+2. **Lifecycle method** (`initialize`) - Session token exchange
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              JSON-RPC 2.0 AUTHENTICATION FLOW                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Phase 1: Transport Authentication (WebSocket Upgrade)              │
+│  ─────────────────────────────────────────────────────              │
+│                                                                     │
+│  Mobile App                           cdev Server                   │
+│      │                                     │                        │
+│      │─── GET /ws?token=<pairing_token> ──►│                        │
+│      │                                     │                        │
+│      │    [Server validates pairing token] │                        │
+│      │    [If invalid: 401 Unauthorized]   │                        │
+│      │    [If valid: Upgrade to WebSocket] │                        │
+│      │                                     │                        │
+│      │◄── 101 Switching Protocols ─────────│                        │
+│      │                                     │                        │
+│                                                                     │
+│  Phase 2: JSON-RPC Initialize (Session Establishment)               │
+│  ────────────────────────────────────────────────────               │
+│                                                                     │
+│      │─── {"jsonrpc":"2.0",               │                        │
+│      │     "method":"initialize",          │                        │
+│      │     "params":{                      │                        │
+│      │       "clientInfo":{...},           │                        │
+│      │       "auth":{"token":"<pairing>"}  │  ◄── Optional: can     │
+│      │     },                              │      re-validate here  │
+│      │     "id":1} ───────────────────────►│                        │
+│      │                                     │                        │
+│      │◄── {"jsonrpc":"2.0",               │                        │
+│      │     "result":{                      │                        │
+│      │       "serverInfo":{...},           │                        │
+│      │       "capabilities":{...},         │                        │
+│      │       "clientId":"uuid",            │                        │
+│      │       "sessionToken":"<session>",   │  ◄── New session token │
+│      │       "sessionExpires":"ISO8601"    │                        │
+│      │     },                              │                        │
+│      │     "id":1} ────────────────────────│                        │
+│      │                                     │                        │
+│      │─── {"jsonrpc":"2.0",               │                        │
+│      │     "method":"initialized"} ────────►│  (notification)       │
+│      │                                     │                        │
+│                                                                     │
+│  Phase 3: Ongoing Requests (Session Token)                          │
+│  ─────────────────────────────────────────                          │
+│                                                                     │
+│      │─── {"jsonrpc":"2.0",               │                        │
+│      │     "method":"agent/run",           │                        │
+│      │     "params":{...},                 │                        │
+│      │     "id":2} ───────────────────────►│                        │
+│      │                                     │                        │
+│      │    [Server validates via client_id] │                        │
+│      │    [Session token auto-refreshed]   │                        │
+│      │                                     │                        │
+│                                                                     │
+│  Phase 4: Token Refresh (When Needed)                               │
+│  ────────────────────────────────────                               │
+│                                                                     │
+│      │─── {"jsonrpc":"2.0",               │                        │
+│      │     "method":"auth/refresh",        │                        │
+│      │     "params":{                      │                        │
+│      │       "sessionToken":"<current>"    │                        │
+│      │     },                              │                        │
+│      │     "id":99} ──────────────────────►│                        │
+│      │                                     │                        │
+│      │◄── {"jsonrpc":"2.0",               │                        │
+│      │     "result":{                      │                        │
+│      │       "sessionToken":"<new>",       │                        │
+│      │       "expiresAt":"ISO8601"         │                        │
+│      │     },                              │                        │
+│      │     "id":99} ───────────────────────│                        │
+│      │                                     │                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Updated Initialize Method
+
+Current `InitializeParams`:
+```go
+type InitializeParams struct {
+    ProtocolVersion string            `json:"protocolVersion"`
+    ClientInfo      *ClientInfo       `json:"clientInfo,omitempty"`
+    Capabilities    *ClientCapabilities `json:"capabilities,omitempty"`
+    RootPath        string            `json:"rootPath,omitempty"`
+}
+```
+
+Proposed `InitializeParams` (with auth):
+```go
+type InitializeParams struct {
+    ProtocolVersion string              `json:"protocolVersion"`
+    ClientInfo      *ClientInfo         `json:"clientInfo,omitempty"`
+    Capabilities    *ClientCapabilities `json:"capabilities,omitempty"`
+    RootPath        string              `json:"rootPath,omitempty"`
+
+    // Authentication (optional, for re-validation)
+    Auth            *AuthParams         `json:"auth,omitempty"`
+}
+
+type AuthParams struct {
+    // Pairing token from QR code (for initial auth)
+    Token    string `json:"token,omitempty"`
+
+    // Device identifier (for device tracking)
+    DeviceID string `json:"deviceId,omitempty"`
+
+    // Device name (for display in device list)
+    DeviceName string `json:"deviceName,omitempty"`
+}
+```
+
+Proposed `InitializeResult` (with session token):
+```go
+type InitializeResult struct {
+    ProtocolVersion string             `json:"protocolVersion"`
+    ServerInfo      ServerInfo         `json:"serverInfo"`
+    Capabilities    ServerCapabilities `json:"capabilities"`
+    ClientID        string             `json:"clientId"`
+
+    // Session authentication (when auth enabled)
+    Session         *SessionInfo       `json:"session,omitempty"`
+}
+
+type SessionInfo struct {
+    // Session token for ongoing requests
+    Token     string    `json:"token"`
+
+    // When the session expires
+    ExpiresAt time.Time `json:"expiresAt"`
+
+    // Whether token will auto-refresh on activity
+    AutoRefresh bool    `json:"autoRefresh"`
+}
+```
+
+### New Auth Methods
+
+```go
+// auth/refresh - Refresh session token
+{
+    "jsonrpc": "2.0",
+    "method": "auth/refresh",
+    "params": {
+        "sessionToken": "current_token"
+    },
+    "id": 1
+}
+
+// Response
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "sessionToken": "new_token",
+        "expiresAt": "2024-01-01T12:00:00Z"
+    },
+    "id": 1
+}
+
+// auth/revoke - Revoke current session (logout)
+{
+    "jsonrpc": "2.0",
+    "method": "auth/revoke",
+    "id": 2
+}
+```
+
+### Error Codes (JSON-RPC 2.0 Standard)
+
+Following JSON-RPC 2.0 specification, use standard error codes:
+
+| Code | Message | When |
+|------|---------|------|
+| `-32000` | Authentication required | No token provided |
+| `-32001` | Invalid token | Token validation failed |
+| `-32002` | Token expired | Token past expiry |
+| `-32003` | Session expired | Session token expired |
+| `-32004` | Permission denied | Insufficient permissions |
+
+```go
+// Example error response
+{
+    "jsonrpc": "2.0",
+    "error": {
+        "code": -32001,
+        "message": "Invalid token",
+        "data": {
+            "reason": "Token signature verification failed",
+            "hint": "Regenerate QR code with 'cdev pair --refresh'"
+        }
+    },
+    "id": 1
+}
+```
+
+### Why Two-Phase Authentication?
+
+| Phase | Purpose | Benefits |
+|-------|---------|----------|
+| **Transport (WebSocket)** | Gate-keep connections | Reject before resource allocation |
+| **Lifecycle (initialize)** | Exchange session info | Token refresh, device tracking |
+
+**Benefits:**
+1. **Early rejection** - Invalid tokens rejected before WebSocket upgrade
+2. **Resource protection** - No resources allocated for invalid clients
+3. **Flexibility** - Session tokens can be refreshed without reconnecting
+4. **MCP/LSP compatible** - Follows industry standard lifecycle pattern
+5. **Device tracking** - Can associate sessions with devices
+
 ## QR Code vs Authentication
 
 **Important distinction:**
