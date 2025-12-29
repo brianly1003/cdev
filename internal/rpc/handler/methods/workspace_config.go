@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
+	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
@@ -48,8 +50,11 @@ func (s *WorkspaceConfigService) SetViewerProvider(provider SessionViewerProvide
 func (s *WorkspaceConfigService) RegisterMethods(registry *handler.Registry) {
 	registry.RegisterWithMeta("workspace/list", s.List, handler.MethodMeta{
 		Summary:     "List all workspaces",
-		Description: "Returns a list of all configured workspaces.",
-		Params:      []handler.OpenRPCParam{},
+		Description: "Returns a list of all configured workspaces. Optionally includes git status for each workspace.",
+		Params: []handler.OpenRPCParam{
+			{Name: "include_git", Required: false, Schema: map[string]interface{}{"type": "boolean", "description": "Include git status for each workspace (default: false)"}},
+			{Name: "git_limit", Required: false, Schema: map[string]interface{}{"type": "integer", "description": "Limit git status fetching to first N workspaces (0 = all)"}},
+		},
 		Result: &handler.OpenRPCResult{
 			Name:   "workspaces",
 			Schema: map[string]interface{}{"type": "object"},
@@ -146,8 +151,25 @@ func (s *WorkspaceConfigService) RegisterMethods(registry *handler.Registry) {
 
 // List returns all configured workspaces.
 // Includes both running sessions and historical sessions from ~/.claude/projects/
+// Optional params:
+//   - include_git: bool - include git status for each workspace (default: false)
+//   - git_limit: int - limit git status fetching to first N workspaces (0 = all)
 func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	// Parse optional params
+	var p struct {
+		IncludeGit bool `json:"include_git"`
+		GitLimit   int  `json:"git_limit"`
+	}
+	// Params are optional, ignore parse errors
+	_ = json.Unmarshal(params, &p)
+
 	workspaces := s.configManager.ListWorkspaces()
+
+	// Fetch git status in parallel if requested
+	var gitStatuses map[string]*git.Status
+	if p.IncludeGit {
+		gitStatuses = s.fetchGitStatusParallel(ctx, workspaces, p.GitLimit)
+	}
 
 	// Enrich with session status
 	result := make([]map[string]interface{}, 0, len(workspaces))
@@ -158,6 +180,11 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 			"path":       ws.Definition.Path,
 			"auto_start": ws.Definition.AutoStart,
 			"created_at": ws.Definition.CreatedAt,
+		}
+
+		// Add git info if available
+		if gitStatuses != nil {
+			s.addGitInfoToWorkspace(info, ws.Definition.ID, gitStatuses)
 		}
 
 		// Get session viewers for this workspace (if provider is available)
@@ -254,6 +281,91 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 	return map[string]interface{}{
 		"workspaces": result,
 	}, nil
+}
+
+// fetchGitStatusParallel fetches git status for workspaces in parallel.
+// Uses a semaphore to limit concurrent git operations.
+func (s *WorkspaceConfigService) fetchGitStatusParallel(ctx context.Context, workspaces []*workspace.Workspace, limit int) map[string]*git.Status {
+	// Determine how many workspaces to fetch git status for
+	count := len(workspaces)
+	if limit > 0 && limit < count {
+		count = limit
+	}
+
+	if count == 0 {
+		return nil
+	}
+
+	// Result map with mutex for thread-safe access
+	statuses := make(map[string]*git.Status)
+	var mu sync.Mutex
+
+	// Use semaphore to limit concurrent git operations (max 10)
+	const maxConcurrent = 10
+	sem := make(chan struct{}, maxConcurrent)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < count; i++ {
+		ws := workspaces[i]
+		wg.Add(1)
+
+		go func(wsID string) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+
+			// Fetch git status
+			if status, err := s.sessionManager.GitGetStatus(wsID); err == nil && status != nil {
+				mu.Lock()
+				statuses[wsID] = status
+				mu.Unlock()
+			}
+		}(ws.Definition.ID)
+	}
+
+	wg.Wait()
+	return statuses
+}
+
+// addGitInfoToWorkspace adds git status info to a workspace info map.
+func (s *WorkspaceConfigService) addGitInfoToWorkspace(info map[string]interface{}, wsID string, gitStatuses map[string]*git.Status) {
+	// Initialize defaults
+	info["is_git_repo"] = false
+	info["git_state"] = "noGit"
+
+	gitInfo := map[string]interface{}{
+		"initialized": false,
+		"has_remotes": false,
+		"branch":      nil,
+		"state":       "noGit",
+	}
+
+	// Check if we have git status for this workspace
+	if status, ok := gitStatuses[wsID]; ok && status != nil {
+		gitInfo["initialized"] = status.IsGitRepo
+		gitInfo["branch"] = status.Branch
+		gitInfo["has_remotes"] = len(status.Remotes) > 0
+		gitInfo["ahead"] = status.Ahead
+		gitInfo["behind"] = status.Behind
+		gitInfo["staged_count"] = len(status.Staged)
+		gitInfo["unstaged_count"] = len(status.Unstaged)
+		gitInfo["untracked_count"] = len(status.Untracked)
+		gitInfo["has_conflicts"] = status.HasConflicts
+		gitInfo["state"] = status.State
+
+		// Set top-level git state fields
+		info["is_git_repo"] = status.IsGitRepo
+		info["git_state"] = status.State
+	}
+
+	info["git"] = gitInfo
 }
 
 // Get returns details of a specific workspace.
