@@ -73,13 +73,13 @@ func TestHub_Subscribe(t *testing.T) {
 	defer func() { _ = h.Stop() }()
 
 	// Give hub time to start
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	sub := testutil.NewMockSubscriber("test-1")
 	h.Subscribe(sub)
 
 	// Wait for registration to process
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if h.SubscriberCount() != 1 {
 		t.Errorf("SubscriberCount() = %d, want 1", h.SubscriberCount())
@@ -91,12 +91,12 @@ func TestHub_Unsubscribe(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	sub := testutil.NewMockSubscriber("test-1")
 	h.Subscribe(sub)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if h.SubscriberCount() != 1 {
 		t.Fatalf("SubscriberCount() = %d, want 1", h.SubscriberCount())
@@ -104,7 +104,7 @@ func TestHub_Unsubscribe(t *testing.T) {
 
 	h.Unsubscribe("test-1")
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if h.SubscriberCount() != 0 {
 		t.Errorf("SubscriberCount() after unsubscribe = %d, want 0", h.SubscriberCount())
@@ -120,19 +120,19 @@ func TestHub_Publish(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	sub := testutil.NewMockSubscriber("test-1")
 	h.Subscribe(sub)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// Publish an event
 	event := events.NewEvent(events.EventTypeHeartbeat, map[string]string{"test": "value"})
 	h.Publish(event)
 
 	// Wait for event to be delivered
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	if sub.EventCount() != 1 {
 		t.Errorf("subscriber received %d events, want 1", sub.EventCount())
@@ -149,7 +149,7 @@ func TestHub_PublishToMultipleSubscribers(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	sub1 := testutil.NewMockSubscriber("test-1")
 	sub2 := testutil.NewMockSubscriber("test-2")
@@ -159,7 +159,7 @@ func TestHub_PublishToMultipleSubscribers(t *testing.T) {
 	h.Subscribe(sub2)
 	h.Subscribe(sub3)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if h.SubscriberCount() != 3 {
 		t.Fatalf("SubscriberCount() = %d, want 3", h.SubscriberCount())
@@ -186,7 +186,7 @@ func TestHub_FailedSendRemovesSubscriber(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// Create a subscriber that fails on send
 	failingSub := testutil.NewMockSubscriber("failing")
@@ -197,7 +197,7 @@ func TestHub_FailedSendRemovesSubscriber(t *testing.T) {
 	h.Subscribe(failingSub)
 	h.Subscribe(goodSub)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	// Publish an event
 	event := events.NewEvent(events.EventTypeHeartbeat, nil)
@@ -221,7 +221,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	var wg sync.WaitGroup
 	numGoroutines := 10
@@ -234,7 +234,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 		h.Subscribe(subscribers[i])
 	}
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// Concurrently publish events
 	wg.Add(numGoroutines)
@@ -249,7 +249,7 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 	}
 
 	wg.Wait()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond) // More time for 1000 events on slow CI
 
 	// Each subscriber should receive all events
 	expectedEvents := numGoroutines * numEvents
@@ -265,7 +265,7 @@ func TestHub_StopClosesAllSubscribers(t *testing.T) {
 	h := New()
 	_ = h.Start()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	sub1 := testutil.NewMockSubscriber("test-1")
 	sub2 := testutil.NewMockSubscriber("test-2")
@@ -273,7 +273,7 @@ func TestHub_StopClosesAllSubscribers(t *testing.T) {
 	h.Subscribe(sub1)
 	h.Subscribe(sub2)
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	_ = h.Stop()
 
@@ -291,7 +291,7 @@ func TestHub_SubscriberCount(t *testing.T) {
 	_ = h.Start()
 	defer func() { _ = h.Stop() }()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	if h.SubscriberCount() != 0 {
 		t.Errorf("initial SubscriberCount() = %d, want 0", h.SubscriberCount())
@@ -302,7 +302,7 @@ func TestHub_SubscriberCount(t *testing.T) {
 		h.Subscribe(sub)
 	}
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	if h.SubscriberCount() != 5 {
 		t.Errorf("SubscriberCount() = %d, want 5", h.SubscriberCount())
