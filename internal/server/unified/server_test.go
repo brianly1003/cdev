@@ -490,12 +490,14 @@ func TestUnifiedClient_Send_LegacyFormat(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// Get any client
+	// Get any client (with proper locking to avoid race)
 	var client *UnifiedClient
+	server.mu.RLock()
 	for _, c := range server.clients {
 		client = c
 		break
 	}
+	server.mu.RUnlock()
 
 	if client == nil {
 		t.Fatal("no client found")
