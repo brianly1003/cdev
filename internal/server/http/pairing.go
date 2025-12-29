@@ -194,10 +194,10 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         }
         .qr-container {
             background: #fff;
-            padding: 20px;
-            border-radius: 15px;
+            padding: 10px;
+            border-radius: 12px;
             display: inline-block;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
         .qr-container img {
             display: block;
@@ -238,15 +238,51 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         .btn:hover {
             transform: scale(1.05);
         }
+        .actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
         .auth-badge {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            margin-top: 15px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
         }
         .auth-enabled { background: #4ade80; color: #000; }
-        .auth-disabled { background: #666; color: #fff; }
+        .auth-disabled { background: rgba(255,255,255,0.15); color: #aaa; }
+        .timer {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .timer span {
+            color: #4ade80;
+            font-weight: 600;
+        }
+        .qr-expired {
+            opacity: 0.3;
+            filter: blur(2px);
+        }
+        .expired-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: #ff6b6b;
+            font-weight: 600;
+            display: none;
+        }
+        .qr-wrapper {
+            position: relative;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -254,9 +290,13 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         <h1>cdev Pairing</h1>
         <p class="subtitle">Scan with cdev mobile app to connect</p>
 
-        <div class="qr-container">
-            <img src="/api/pair/qr?size=200" alt="QR Code" width="200" height="200">
+        <div class="qr-wrapper">
+            <div class="qr-container" id="qrContainer">
+                <img src="/api/pair/qr?size=200" alt="QR Code" width="200" height="200" id="qrImage">
+            </div>
+            <div class="expired-overlay" id="expiredOverlay">Expired</div>
         </div>
+        <div class="timer">Refreshes in <span id="countdown">60</span>s</div>
 
         <div class="info">
             <div class="info-row">
@@ -277,12 +317,41 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             </div>
         </div>
 
-        <button class="btn" onclick="location.reload()">Refresh QR Code</button>
-
-        <div class="auth-badge ` + authBadgeClass(h.requireAuth) + `">
-            ` + authBadgeText(h.requireAuth) + `
+        <div class="actions">
+            <button class="btn" onclick="refreshQR()">Refresh QR Code</button>
+            <span class="auth-badge ` + authBadgeClass(h.requireAuth) + `">` + authBadgeText(h.requireAuth) + `</span>
         </div>
     </div>
+
+    <script>
+        const REFRESH_INTERVAL = 60;
+        let countdown = REFRESH_INTERVAL;
+        let expired = false;
+
+        function updateCountdown() {
+            countdown--;
+            document.getElementById('countdown').textContent = countdown;
+
+            if (countdown <= 0) {
+                expired = true;
+                document.getElementById('qrContainer').classList.add('qr-expired');
+                document.getElementById('expiredOverlay').style.display = 'block';
+                refreshQR();
+            }
+        }
+
+        function refreshQR() {
+            const img = document.getElementById('qrImage');
+            img.src = '/api/pair/qr?size=200&t=' + Date.now();
+            countdown = REFRESH_INTERVAL;
+            expired = false;
+            document.getElementById('qrContainer').classList.remove('qr-expired');
+            document.getElementById('expiredOverlay').style.display = 'none';
+            document.getElementById('countdown').textContent = countdown;
+        }
+
+        setInterval(updateCountdown, 1000);
+    </script>
 </body>
 </html>`
 
