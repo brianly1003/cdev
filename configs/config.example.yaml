@@ -57,6 +57,13 @@ git:
   command: "git"     # Path to git CLI
   diff_on_change: true  # Auto-generate diff on file change
 
+# Security settings
+security:
+  require_auth: false           # Set true to require token authentication for WebSocket connections
+  token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
+  bind_localhost_only: true     # Only accept connections from localhost (recommended)
+  allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
+
 # Logging settings
 logging:
   level: "info"      # debug, info, warn, error
@@ -71,7 +78,6 @@ limits:
 
 # Mobile pairing settings
 pairing:
-  token_expiry_secs: 3600     # How long pairing tokens are valid
   show_qr_in_terminal: true   # Display QR code in terminal on startup
 
 # Repository indexer settings
