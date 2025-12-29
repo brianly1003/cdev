@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Git hook to prevent commits with Claude Code co-author line
+#
+
+COMMIT_MSG_FILE=$1
+
+# Check for Claude Code generated line
+if grep -q "Generated with \[Claude Code\]" "$COMMIT_MSG_FILE"; then
+    echo "ERROR: Commit message contains Claude Code generated line."
+    echo "Please remove the following line from your commit message:"
+    echo "  🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+    exit 1
+fi
+
+# Check for Claude co-author line
+if grep -q "Co-Authored-By: Claude" "$COMMIT_MSG_FILE"; then
+    echo "ERROR: Commit message contains Claude co-author line."
+    echo "Please remove the Co-Authored-By line from your commit message."
+    exit 1
+fi
+
+exit 0
