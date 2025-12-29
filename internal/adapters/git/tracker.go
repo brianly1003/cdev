@@ -2045,10 +2045,10 @@ func (t *Tracker) SetUpstream(ctx context.Context, branch string, upstream strin
 type WorkspaceGitState string
 
 const (
-	GitStateNoGit       WorkspaceGitState = "noGit"
-	GitStateInitialized WorkspaceGitState = "gitInit"
-	GitStateNoRemote    WorkspaceGitState = "noRemote"
-	GitStateNoPush      WorkspaceGitState = "noPush"
+	GitStateNoGit       WorkspaceGitState = "no_git"
+	GitStateInitialized WorkspaceGitState = "git_init"
+	GitStateNoRemote    WorkspaceGitState = "no_remote"
+	GitStateNoPush      WorkspaceGitState = "no_push"
 	GitStateSynced      WorkspaceGitState = "synced"
 	GitStateDiverged    WorkspaceGitState = "diverged"
 	GitStateConflict    WorkspaceGitState = "conflict"

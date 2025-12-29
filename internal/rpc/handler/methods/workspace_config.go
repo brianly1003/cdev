@@ -338,13 +338,13 @@ func (s *WorkspaceConfigService) fetchGitStatusParallel(ctx context.Context, wor
 func (s *WorkspaceConfigService) addGitInfoToWorkspace(info map[string]interface{}, wsID string, gitStatuses map[string]*git.Status) {
 	// Initialize defaults
 	info["is_git_repo"] = false
-	info["git_state"] = "noGit"
+	info["git_state"] = "no_git"
 
 	gitInfo := map[string]interface{}{
 		"initialized": false,
 		"has_remotes": false,
 		"branch":      nil,
-		"state":       "noGit",
+		"state":       "no_git",
 	}
 
 	// Check if we have git status for this workspace
