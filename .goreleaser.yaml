@@ -116,8 +116,8 @@ brews:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    # Homebrew downloads from cdev-release (public repo for distribution)
-    url_template: "https://github.com/brianly1003/cdev-release/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    # Homebrew downloads from cdev-releases (public repo for distribution)
+    url_template: "https://github.com/brianly1003/cdev-releases/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     homepage: "https://github.com/brianly1003/Cdev"
     description: "AI Coding Agent Server - Remote monitoring and control of AI coding agents from mobile devices"
     license: "MIT"

@@ -51,7 +51,7 @@ jobs:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          RELEASE_REPO="brianly1003/cdev-release"
+          RELEASE_REPO="brianly1003/cdev-releases"
 
           echo "Mirroring release $TAG to $RELEASE_REPO..."
 
