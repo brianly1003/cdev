@@ -17,7 +17,7 @@ func newTestTokenManager(t *testing.T, expirySecs int) *TokenManager {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(tempDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
 
 	// Override the secret path for this manager
 	originalGetSecretPath := getSecretPath
