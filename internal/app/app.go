@@ -25,6 +25,7 @@ import (
 	"github.com/brianly1003/cdev/internal/pairing"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
+	"github.com/brianly1003/cdev/internal/security"
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
 	"github.com/brianly1003/cdev/internal/server/unified"
 	"github.com/brianly1003/cdev/internal/session"
@@ -452,6 +453,30 @@ func (a *App) Start(ctx context.Context) error {
 	if a.imageStorage != nil {
 		a.httpServer.SetImageStorage(a.imageStorage)
 	}
+
+	// Set up pairing handler for mobile app connection
+	tokenManager, err := security.NewTokenManager(a.cfg.Security.TokenExpirySecs)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to create token manager, pairing will work without auth")
+	}
+	originChecker := security.NewOriginChecker(a.cfg.Security.AllowedOrigins, a.cfg.Security.BindLocalhostOnly)
+
+	// Configure security on unified server
+	a.unifiedServer.SetSecurity(tokenManager, originChecker, a.cfg.Security.RequireAuth)
+
+	// Create pairing handler with function to get current pairing info
+	pairingHandler := httpserver.NewPairingHandler(
+		tokenManager,
+		a.cfg.Security.RequireAuth,
+		func() *pairing.PairingInfo {
+			if a.qrGenerator != nil {
+				return a.qrGenerator.GetPairingInfo()
+			}
+			return nil
+		},
+	)
+	a.httpServer.SetPairingHandler(pairingHandler)
+
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
 	// Set WebSocket handler for port consolidation
