@@ -94,11 +94,12 @@ func validateExternalURL(rawURL, fieldName string, allowedSchemes []string) erro
 }
 
 func validateRepository(cfg *RepositoryConfig) error {
+	// repository.path is optional - workspaces are managed via workspace/add API
 	if cfg.Path == "" {
-		return fmt.Errorf("repository.path cannot be empty")
+		return nil
 	}
 
-	// Check if path exists
+	// Only validate if path is explicitly configured
 	info, err := os.Stat(cfg.Path)
 	if err != nil {
 		if os.IsNotExist(err) {

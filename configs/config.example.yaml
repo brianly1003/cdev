@@ -13,10 +13,6 @@ server:
   # external_ws_url: "wss://your-tunnel-8765.devtunnels.ms"
   # external_http_url: "https://your-tunnel-8766.devtunnels.ms"
 
-# Repository settings
-repository:
-  path: ""  # Empty = current directory
-
 # File watcher settings
 watcher:
   enabled: true

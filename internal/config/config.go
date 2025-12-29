@@ -191,29 +191,22 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("indexer.skip_directories", DefaultSkipDirectories)
 
 	// Security defaults
-	v.SetDefault("security.require_auth", false)       // No auth required by default (local development)
-	v.SetDefault("security.token_expiry_secs", 3600)   // 1 hour
+	v.SetDefault("security.require_auth", false)     // No auth required by default (local development)
+	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
 }
 
 // postProcess applies post-processing to configuration.
 func postProcess(cfg *Config) error {
-	// If repository path is empty, use current directory
-	if cfg.Repository.Path == "" {
-		cwd, err := os.Getwd()
+	if cfg.Repository.Path != "" {
+		// Resolve to absolute path only if explicitly configured
+		absPath, err := filepath.Abs(cfg.Repository.Path)
 		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
+			return fmt.Errorf("failed to resolve repository path: %w", err)
 		}
-		cfg.Repository.Path = cwd
+		cfg.Repository.Path = absPath
 	}
-
-	// Resolve to absolute path
-	absPath, err := filepath.Abs(cfg.Repository.Path)
-	if err != nil {
-		return fmt.Errorf("failed to resolve repository path: %w", err)
-	}
-	cfg.Repository.Path = absPath
 
 	// Ensure required Claude args are always present
 	// Base args needed for proper operation: -p, --verbose, --output-format stream-json

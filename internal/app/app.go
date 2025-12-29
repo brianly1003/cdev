@@ -122,7 +122,7 @@ func (a *App) Start(ctx context.Context) error {
 	})
 	a.hub.Subscribe(logSub)
 
-	// Initialize Claude Manager
+	// Initialize Claude Manager (always needed for multi-workspace support)
 	a.claudeManager = claude.NewManager(
 		a.cfg.Claude.Command,
 		a.cfg.Claude.Args,
@@ -130,101 +130,110 @@ func (a *App) Start(ctx context.Context) error {
 		a.hub,
 		a.cfg.Claude.SkipPermissions,
 	)
-	// Set Claude working directory to repository path
-	a.claudeManager.SetWorkDir(a.cfg.Repository.Path)
 
-	// Create .cdev directory structure
-	cdevDir := filepath.Join(a.cfg.Repository.Path, ".cdev")
-	cdevLogsDir := filepath.Join(cdevDir, "logs")
-	cdevImagesDir := filepath.Join(cdevDir, "images")
-	if err := os.MkdirAll(cdevLogsDir, 0755); err != nil {
-		log.Warn().Err(err).Msg("failed to create .cdev/logs directory")
-	}
-	if err := os.MkdirAll(cdevImagesDir, 0755); err != nil {
-		log.Warn().Err(err).Msg("failed to create .cdev/images directory")
-	}
+	// Legacy single-repo mode: Initialize repo-dependent components only if repository.path is configured
+	// New multi-workspace mode uses workspace/add API and doesn't require repository.path
+	if a.cfg.Repository.Path != "" {
+		// Set Claude working directory to repository path
+		a.claudeManager.SetWorkDir(a.cfg.Repository.Path)
 
-	// Initialize Image Storage for iOS image uploads
-	imageStorage, err := imagestorage.New(a.cfg.Repository.Path)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to create image storage, image uploads will not be available")
-	} else {
-		a.imageStorage = imageStorage
-		log.Info().Str("dir", cdevImagesDir).Msg("image storage initialized")
-	}
+		// Create .cdev directory structure
+		cdevDir := filepath.Join(a.cfg.Repository.Path, ".cdev")
+		cdevLogsDir := filepath.Join(cdevDir, "logs")
+		cdevImagesDir := filepath.Join(cdevDir, "images")
+		if err := os.MkdirAll(cdevLogsDir, 0755); err != nil {
+			log.Warn().Err(err).Msg("failed to create .cdev/logs directory")
+		}
+		if err := os.MkdirAll(cdevImagesDir, 0755); err != nil {
+			log.Warn().Err(err).Msg("failed to create .cdev/images directory")
+		}
 
-	// Enable Claude output logging to .cdev/logs directory
-	a.claudeManager.SetLogDir(cdevLogsDir)
+		// Initialize Image Storage for iOS image uploads
+		imageStorage, err := imagestorage.New(a.cfg.Repository.Path)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create image storage, image uploads will not be available")
+		} else {
+			a.imageStorage = imageStorage
+			log.Info().Str("dir", cdevImagesDir).Msg("image storage initialized")
+		}
 
-	// Initialize Git Tracker
-	a.gitTracker = git.NewTracker(
-		a.cfg.Repository.Path,
-		a.cfg.Git.Command,
-		a.hub,
-	)
+		// Enable Claude output logging to .cdev/logs directory
+		a.claudeManager.SetLogDir(cdevLogsDir)
 
-	// Initialize File Watcher
-	if a.cfg.Watcher.Enabled {
-		a.fileWatcher = watcher.NewWatcher(
+		// Initialize Git Tracker
+		a.gitTracker = git.NewTracker(
 			a.cfg.Repository.Path,
+			a.cfg.Git.Command,
 			a.hub,
-			a.cfg.Watcher.DebounceMS,
-			a.cfg.Watcher.IgnorePatterns,
 		)
 
-		// Subscribe to file change events to generate git diffs
-		if a.cfg.Git.Enabled && a.cfg.Git.DiffOnChange {
-			fileChangeSub := hub.NewLogSubscriber("git-diff-generator", func(event events.Event) {
-				if event.Type() == events.EventTypeFileChanged {
-					go a.handleFileChangeForGitDiff(ctx, event)
+		// Initialize File Watcher
+		if a.cfg.Watcher.Enabled {
+			a.fileWatcher = watcher.NewWatcher(
+				a.cfg.Repository.Path,
+				a.hub,
+				a.cfg.Watcher.DebounceMS,
+				a.cfg.Watcher.IgnorePatterns,
+			)
+
+			// Subscribe to file change events to generate git diffs
+			if a.cfg.Git.Enabled && a.cfg.Git.DiffOnChange {
+				fileChangeSub := hub.NewLogSubscriber("git-diff-generator", func(event events.Event) {
+					if event.Type() == events.EventTypeFileChanged {
+						go a.handleFileChangeForGitDiff(ctx, event)
+					}
+				})
+				a.hub.Subscribe(fileChangeSub)
+			}
+
+			// Subscribe to file change events for repository indexer incremental updates
+			repoIndexSub := hub.NewLogSubscriber("repo-index-updater", func(event events.Event) {
+				if event.Type() == events.EventTypeFileChanged && a.repoIndexer != nil {
+					go a.handleFileChangeForRepoIndex(ctx, event)
 				}
 			})
-			a.hub.Subscribe(fileChangeSub)
+			a.hub.Subscribe(repoIndexSub)
 		}
 
-		// Subscribe to file change events for repository indexer incremental updates
-		repoIndexSub := hub.NewLogSubscriber("repo-index-updater", func(event events.Event) {
-			if event.Type() == events.EventTypeFileChanged && a.repoIndexer != nil {
-				go a.handleFileChangeForRepoIndex(ctx, event)
+		// Initialize Session Cache for fast session listing
+		sessionCache, err := sessioncache.New(a.cfg.Repository.Path)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create session cache, falling back to direct file access")
+		} else {
+			a.sessionCache = sessionCache
+			if err := a.sessionCache.Start(); err != nil {
+				log.Warn().Err(err).Msg("failed to start session cache")
 			}
-		})
-		a.hub.Subscribe(repoIndexSub)
-	}
-
-	// Initialize Session Cache for fast session listing
-	sessionCache, err := sessioncache.New(a.cfg.Repository.Path)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to create session cache, falling back to direct file access")
-	} else {
-		a.sessionCache = sessionCache
-		if err := a.sessionCache.Start(); err != nil {
-			log.Warn().Err(err).Msg("failed to start session cache")
 		}
-	}
 
-	// Initialize Message Cache for fast paginated message retrieval
-	sessionsDir := claude.GetSessionsDir(a.cfg.Repository.Path)
-	messageCache, err := sessioncache.NewMessageCache(sessionsDir)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to create message cache, falling back to direct file access")
+		// Initialize Message Cache for fast paginated message retrieval
+		sessionsDir := claude.GetSessionsDir(a.cfg.Repository.Path)
+		messageCache, err := sessioncache.NewMessageCache(sessionsDir)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create message cache, falling back to direct file access")
+		} else {
+			a.messageCache = messageCache
+			log.Info().Msg("message cache initialized for fast pagination")
+		}
+
+		// Initialize Session Streamer for real-time session watching
+		// This allows iOS to receive messages when Claude Code runs directly on laptop
+		a.sessionStreamer = sessioncache.NewSessionStreamer(sessionsDir, a.hub)
+
+		log.Info().Str("repo", a.cfg.Repository.Path).Msg("legacy single-repo mode initialized")
 	} else {
-		a.messageCache = messageCache
-		log.Info().Msg("message cache initialized for fast pagination")
+		log.Info().Msg("no repository.path configured, using multi-workspace mode only")
 	}
-
-	// Initialize Session Streamer for real-time session watching
-	// This allows iOS to receive messages when Claude Code runs directly on laptop
-	a.sessionStreamer = sessioncache.NewSessionStreamer(sessionsDir, a.hub)
 
 	// Initialize Multi-Workspace Support
-	// Workspace config manager handles workspace CRUD
+	// Workspaces are managed dynamically via workspace/add API, not loaded from file
+	// The configPath is still used to persist workspaces when added via API
 	workspacesPath := config.DefaultWorkspacesPath()
-	workspacesCfg, err := config.LoadWorkspaces(workspacesPath)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to load workspaces config, using defaults")
-		workspacesCfg = &config.WorkspacesConfig{}
+	emptyWorkspacesCfg := &config.WorkspacesConfig{
+		Workspaces: []config.WorkspaceDefinition{},
 	}
-	a.workspaceConfigManager = workspace.NewConfigManager(workspacesCfg, workspacesPath)
+	a.workspaceConfigManager = workspace.NewConfigManager(emptyWorkspacesCfg, workspacesPath)
+	log.Info().Msg("workspace manager initialized (workspaces added via API)")
 
 	// Initialize GitTrackerManager for cached git operations
 	// This provides lazy-init, cached git trackers for all workspaces
@@ -249,21 +258,21 @@ func (a *App) Start(ctx context.Context) error {
 	// Connect session manager to git tracker manager
 	a.sessionManager.SetGitTrackerManager(a.gitTrackerManager)
 
-	// Enable LIVE session support for the repository
-	a.sessionManager.SetLiveSessionSupport(a.cfg.Repository.Path)
+	// Enable LIVE session support for the repository (only if path configured)
+	if a.cfg.Repository.Path != "" {
+		a.sessionManager.SetLiveSessionSupport(a.cfg.Repository.Path)
+	}
 
 	if err := a.sessionManager.Start(); err != nil {
 		log.Warn().Err(err).Msg("failed to start session manager")
 	}
 
-	// Register existing workspaces with session manager
-	for _, ws := range a.workspaceConfigManager.ListWorkspaces() {
-		a.sessionManager.RegisterWorkspace(ws)
-	}
-	log.Info().Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).Msg("multi-workspace support initialized")
+	// Workspaces are added dynamically via workspace/add API
+	// No workspaces are pre-loaded from config file
+	log.Info().Msg("multi-workspace support initialized (use workspace/add API to add workspaces)")
 
-	// Initialize Repository Indexer
-	if a.cfg.Indexer.Enabled {
+	// Initialize Repository Indexer (only if repository.path is configured)
+	if a.cfg.Indexer.Enabled && a.cfg.Repository.Path != "" {
 		repoIndexer, err := repository.NewIndexer(a.cfg.Repository.Path, a.cfg.Indexer.SkipDirectories)
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create repository indexer")
@@ -275,14 +284,19 @@ func (a *App) Start(ctx context.Context) error {
 				log.Info().Int("skip_dirs", len(a.cfg.Indexer.SkipDirectories)).Msg("repository indexer started")
 			}
 		}
+	} else if a.cfg.Indexer.Enabled && a.cfg.Repository.Path == "" {
+		log.Info().Msg("repository indexer skipped - no repository.path configured")
 	} else {
 		log.Info().Msg("repository indexer disabled by config")
 	}
 
 	// Initialize QR Generator
-	repoName := filepath.Base(a.cfg.Repository.Path)
-	if a.gitTracker.IsGitRepo() {
-		repoName = a.gitTracker.GetRepoName()
+	repoName := "cdev"
+	if a.cfg.Repository.Path != "" {
+		repoName = filepath.Base(a.cfg.Repository.Path)
+		if a.gitTracker != nil && a.gitTracker.IsGitRepo() {
+			repoName = a.gitTracker.GetRepoName()
+		}
 	}
 	// Use HTTPPort for both since WebSocket is now consolidated at /ws endpoint
 	a.qrGenerator = pairing.NewQRGenerator(

@@ -134,11 +134,11 @@ func TestValidateRepository(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name: "empty path",
+			name: "empty path (valid - workspaces via API)",
 			cfg: RepositoryConfig{
 				Path: "",
 			},
-			wantErr: "path cannot be empty",
+			wantErr: "", // Empty path is valid - workspaces are managed via workspace/add API
 		},
 		{
 			name: "non-existent path",
