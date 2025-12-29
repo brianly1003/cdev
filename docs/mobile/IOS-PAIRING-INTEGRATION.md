@@ -142,50 +142,200 @@ These endpoints are always accessible without authentication:
 
 ### Token Types
 
-| Prefix | Type | Purpose |
-|--------|------|---------|
-| `cdev_p_` | Pairing token | Initial connection from QR scan |
-| `cdev_s_` | Session token | Long-lived session access |
+| Prefix | Type | Expiry | Purpose |
+|--------|------|--------|---------|
+| `cdev_p_` | Pairing token | 1 hour | Initial connection from QR scan |
+| `cdev_s_` | Access token | 15 min | API/WebSocket authentication |
+| `cdev_r_` | Refresh token | 7 days | Obtain new access tokens |
 
-### Token Expiry
+### Recommended Flow
 
-- Default expiry: **3600 seconds (1 hour)**
-- Configurable via `security.token_expiry_secs`
-- QR code auto-refreshes every **60 seconds** for fresh tokens
+```
+┌─────────────┐     Scan QR      ┌─────────────┐
+│  iOS App    │ ───────────────► │  Pairing    │
+└─────────────┘                  │  Token      │
+                                 └──────┬──────┘
+                                        │
+                                        ▼ POST /api/auth/exchange
+                                 ┌──────────────┐
+                                 │ Access Token │ ◄── Use for API calls
+                                 │ Refresh Token│ ◄── Store in Keychain
+                                 └──────┬───────┘
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    │                                       │
+                    ▼ (Every 15 min)                       ▼ (Every 7 days)
+             POST /api/auth/refresh                   Re-scan QR
+             with refresh_token                       (or auto-refresh)
+```
 
-### Handling Token Expiry
+### Step 1: Exchange Pairing Token
+
+After scanning QR, exchange the pairing token for access + refresh tokens:
 
 ```swift
-func handleWebSocketError(_ error: Error) {
-    if isAuthenticationError(error) {
-        // Token expired - prompt user to re-scan QR code
-        showRescanPrompt()
+struct TokenPairResponse: Codable {
+    let access_token: String
+    let access_token_expires_at: String
+    let refresh_token: String
+    let refresh_token_expires_at: String
+    let token_type: String
+    let expires_in: Int
+}
+
+func exchangePairingToken(baseURL: String, pairingToken: String) async throws -> TokenPairResponse {
+    let url = URL(string: "\(baseURL)/api/auth/exchange")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body = ["pairing_token": pairingToken]
+    request.httpBody = try JSONEncoder().encode(body)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+
+    guard let httpResponse = response as? HTTPURLResponse,
+          httpResponse.statusCode == 200 else {
+        throw AuthError.exchangeFailed
+    }
+
+    return try JSONDecoder().decode(TokenPairResponse.self, from: data)
+}
+```
+
+### Step 2: Use Access Token for API Calls
+
+```swift
+class APIClient {
+    private var accessToken: String?
+    private var refreshToken: String?
+    private var accessTokenExpiry: Date?
+
+    func setTokens(_ pair: TokenPairResponse) {
+        self.accessToken = pair.access_token
+        self.refreshToken = pair.refresh_token
+        self.accessTokenExpiry = ISO8601DateFormatter().date(from: pair.access_token_expires_at)
+
+        // Store refresh token securely
+        KeychainService.saveToken(pair.refresh_token, for: "refresh")
+    }
+
+    func request(_ endpoint: String) async throws -> Data {
+        // Check if access token is about to expire (within 1 min)
+        if let expiry = accessTokenExpiry, expiry.timeIntervalSinceNow < 60 {
+            try await refreshAccessToken()
+        }
+
+        var request = URLRequest(url: URL(string: "\(baseURL)\(endpoint)")!)
+        request.setValue("Bearer \(accessToken ?? "")", forHTTPHeaderField: "Authorization")
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return data
     }
 }
 ```
 
-### Refreshing Tokens
+### Step 3: Refresh Access Token
 
-Call `/api/pair/refresh` to get a new token (revokes all previous tokens):
+When access token expires, use refresh token to get a new pair:
 
 ```swift
-func refreshToken(baseURL: String) async throws -> String {
-    let url = URL(string: "\(baseURL)/api/pair/refresh")!
+func refreshAccessToken() async throws {
+    guard let refreshToken = self.refreshToken else {
+        throw AuthError.noRefreshToken
+    }
+
+    let url = URL(string: "\(baseURL)/api/auth/refresh")!
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    let (data, _) = try await URLSession.shared.data(for: request)
-    let response = try JSONDecoder().decode(RefreshResponse.self, from: data)
+    let body = ["refresh_token": refreshToken]
+    request.httpBody = try JSONEncoder().encode(body)
 
-    return response.token
-}
+    let (data, response) = try await URLSession.shared.data(for: request)
 
-struct RefreshResponse: Codable {
-    let token: String
-    let expires_at: String
-    let message: String
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw AuthError.refreshFailed
+    }
+
+    switch httpResponse.statusCode {
+    case 200:
+        let pair = try JSONDecoder().decode(TokenPairResponse.self, from: data)
+        setTokens(pair)
+    case 401:
+        // Refresh token expired - need to re-pair
+        throw AuthError.refreshTokenExpired
+    default:
+        throw AuthError.refreshFailed
+    }
 }
 ```
+
+### Token Storage
+
+Store tokens securely in Keychain:
+
+```swift
+class TokenStorage {
+    private static let service = "com.cdev.ios"
+
+    static func saveTokenPair(_ pair: TokenPairResponse) {
+        save(key: "access_token", value: pair.access_token)
+        save(key: "refresh_token", value: pair.refresh_token)
+        save(key: "access_expiry", value: pair.access_token_expires_at)
+        save(key: "refresh_expiry", value: pair.refresh_token_expires_at)
+    }
+
+    static func loadAccessToken() -> String? {
+        return load(key: "access_token")
+    }
+
+    static func loadRefreshToken() -> String? {
+        return load(key: "refresh_token")
+    }
+
+    static func clearTokens() {
+        delete(key: "access_token")
+        delete(key: "refresh_token")
+        delete(key: "access_expiry")
+        delete(key: "refresh_expiry")
+    }
+
+    // ... Keychain helper methods
+}
+```
+
+### Auto-Refresh Strategy
+
+```swift
+class TokenRefreshManager {
+    private var refreshTimer: Timer?
+
+    func startAutoRefresh(expiresIn: Int) {
+        // Refresh 1 minute before expiry
+        let refreshInterval = max(TimeInterval(expiresIn - 60), 30)
+
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: false) { [weak self] _ in
+            Task {
+                try await self?.refreshAccessToken()
+            }
+        }
+    }
+
+    func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+}
+```
+
+### Legacy Token Flow
+
+For backwards compatibility, the old pairing token flow still works:
+- QR code pairing token can be used directly for WebSocket/API
+- `/api/pair/refresh` regenerates the QR code pairing token
+- This is simpler but requires re-scanning QR when token expires
 
 ---
 
@@ -296,12 +446,65 @@ EOF
 
 ---
 
+## Future: Cloud Relay Preparation
+
+The current token structure is forward-compatible with a future Cloud Relay mode. Key points for iOS developers:
+
+### Token Payload Structure (v1)
+
+The decoded token payload includes fields for future cloud integration:
+
+```json
+{
+  "v": 1,
+  "type": "pairing",
+  "server_id": "abc123...",
+  "agent_id": "abc123...",
+  "mode": "local",
+  "issued_at": 1735516800,
+  "expires_at": 1735520400,
+  "nonce": "xyz789..."
+}
+```
+
+### Mode Field
+
+| Mode | Description | Validation |
+|------|-------------|------------|
+| `local` | Current behavior | Validate with local agent |
+| `cloud` | Future Cloud Relay | Validate with cloud (JWT) |
+
+### Preparing for Cloud Relay
+
+1. **Store the `mode` field** when parsing tokens
+2. **Use `agent_id`** instead of `server_id` in new code (they're currently identical)
+3. **Plan for JWT tokens** (`cdev_c_*` prefix) which will be cloud-issued
+4. **Consider device registration** - future versions may require device fingerprinting
+
+When Cloud Relay launches, the QR code will include:
+```json
+{
+  "ws": "wss://relay.cdev.io/ws",
+  "http": "https://relay.cdev.io",
+  "session": "...",
+  "repo": "cdev",
+  "token": "cdev_c_<jwt_token>",
+  "mode": "cloud",
+  "agent_id": "abc123..."
+}
+```
+
+For detailed token architecture, see [TOKEN-ARCHITECTURE.md](../security/TOKEN-ARCHITECTURE.md).
+
+---
+
 ## Related Files
 
 - Server pairing handler: `internal/server/http/pairing.go`
 - Token manager: `internal/security/token.go`
+- Token architecture: `docs/security/TOKEN-ARCHITECTURE.md`
 - Config example: `configs/config.example.yaml`
 
 ---
 
-*cdev iOS Pairing Integration Guide v1.0*
+*cdev iOS Pairing Integration Guide v1.1*

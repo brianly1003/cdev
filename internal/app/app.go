@@ -477,6 +477,12 @@ func (a *App) Start(ctx context.Context) error {
 	)
 	a.httpServer.SetPairingHandler(pairingHandler)
 
+	// Create auth handler for token exchange and refresh
+	if tokenManager != nil {
+		authHandler := httpserver.NewAuthHandler(tokenManager)
+		a.httpServer.SetAuthHandler(authHandler)
+	}
+
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
 	// Set WebSocket handler for port consolidation

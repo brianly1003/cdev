@@ -144,6 +144,21 @@ func (s *Server) SetPairingHandler(handler *PairingHandler) {
 	log.Info().Msg("pairing routes registered: /pair, /api/pair/info, /api/pair/qr, /api/pair/refresh")
 }
 
+// SetAuthHandler sets up authentication endpoints for token exchange and refresh.
+// Must be called before Start() to enable token refresh functionality.
+func (s *Server) SetAuthHandler(handler *AuthHandler) {
+	if handler == nil {
+		log.Warn().Msg("auth handler is nil, auth routes will not be available")
+		return
+	}
+
+	// Register auth routes (no authentication required - they handle their own validation)
+	s.mux.HandleFunc("/api/auth/exchange", handler.HandleExchange)
+	s.mux.HandleFunc("/api/auth/refresh", handler.HandleRefresh)
+
+	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh")
+}
+
 // requestLoggingMiddleware logs all incoming requests for debugging.
 func requestLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

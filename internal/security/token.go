@@ -19,6 +19,18 @@ import (
 const (
 	PairingTokenPrefix = "cdev_p_" // Pairing token (for initial connection)
 	SessionTokenPrefix = "cdev_s_" // Session token (for ongoing communication)
+	RefreshTokenPrefix = "cdev_r_" // Refresh token (for obtaining new access tokens)
+
+	// Future Cloud Relay token prefixes (reserved)
+	// DeviceTokenPrefix  = "cdev_d_" // Device identity token (long-lived)
+	// AgentTokenPrefix   = "cdev_a_" // Agent registration token
+	// ChannelTokenPrefix = "cdev_c_" // Cloud channel token (JWT)
+)
+
+// Default token expiry durations
+const (
+	DefaultAccessTokenExpiry  = 15 * 60      // 15 minutes
+	DefaultRefreshTokenExpiry = 7 * 24 * 3600 // 7 days
 )
 
 // Common errors
@@ -36,15 +48,36 @@ type TokenType string
 const (
 	TokenTypePairing TokenType = "pairing"
 	TokenTypeSession TokenType = "session"
+	TokenTypeRefresh TokenType = "refresh"
+	TokenTypeAccess  TokenType = "access" // Alias for session (clearer semantics)
+)
+
+// TokenMode indicates how the token should be validated.
+type TokenMode string
+
+const (
+	TokenModeLocal TokenMode = "local" // Validated by local agent (current)
+	TokenModeCloud TokenMode = "cloud" // Validated by cloud relay (future)
 )
 
 // TokenPayload is the data encoded in a token.
+// Fields are designed to be forward-compatible with Cloud Relay.
 type TokenPayload struct {
+	// Version for payload format migration (default 1)
+	Version int `json:"v,omitempty"`
+
+	// Core fields
 	Type      TokenType `json:"type"`
-	ServerID  string    `json:"server_id"`
+	ServerID  string    `json:"server_id"`  // Local agent ID (legacy name for compatibility)
 	IssuedAt  int64     `json:"issued_at"`
 	ExpiresAt int64     `json:"expires_at"`
 	Nonce     string    `json:"nonce"`
+
+	// Cloud Relay fields (optional, for future use)
+	Mode     TokenMode `json:"mode,omitempty"`      // "local" or "cloud"
+	AgentID  string    `json:"agent_id,omitempty"`  // Alias for ServerID (semantic name)
+	DeviceID string    `json:"device_id,omitempty"` // Client device fingerprint
+	UserID   string    `json:"user_id,omitempty"`   // Cloud user ID (future)
 }
 
 // TokenManager handles token generation and validation.
@@ -67,7 +100,12 @@ type secretData struct {
 // NewTokenManager creates a new token manager with a persisted server secret.
 // The secret is stored in ~/.cdev/token_secret.json and reused across restarts.
 func NewTokenManager(expirySecs int) (*TokenManager, error) {
-	secretPath := getSecretPath()
+	return NewTokenManagerWithPath(expirySecs, getSecretPath())
+}
+
+// NewTokenManagerWithPath creates a token manager with a custom secret path.
+// This is primarily useful for testing with isolated configurations.
+func NewTokenManagerWithPath(expirySecs int, secretPath string) (*TokenManager, error) {
 
 	var serverID string
 	var secret []byte
@@ -161,6 +199,101 @@ func (tm *TokenManager) GenerateSessionToken() (string, time.Time, error) {
 	return tm.generateToken(TokenTypeSession, 300)
 }
 
+// GenerateAccessToken generates a new access token.
+func (tm *TokenManager) GenerateAccessToken() (string, time.Time, error) {
+	return tm.generateToken(TokenTypeAccess, DefaultAccessTokenExpiry)
+}
+
+// GenerateRefreshToken generates a new refresh token.
+func (tm *TokenManager) GenerateRefreshToken() (string, time.Time, error) {
+	return tm.generateToken(TokenTypeRefresh, DefaultRefreshTokenExpiry)
+}
+
+// TokenPair represents an access token and refresh token pair.
+type TokenPair struct {
+	AccessToken        string    `json:"access_token"`
+	AccessTokenExpiry  time.Time `json:"access_token_expires_at"`
+	RefreshToken       string    `json:"refresh_token"`
+	RefreshTokenExpiry time.Time `json:"refresh_token_expires_at"`
+}
+
+// GenerateTokenPair generates a new access/refresh token pair.
+// This is typically called after initial pairing.
+func (tm *TokenManager) GenerateTokenPair() (*TokenPair, error) {
+	accessToken, accessExpiry, err := tm.GenerateAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	refreshToken, refreshExpiry, err := tm.GenerateRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	return &TokenPair{
+		AccessToken:        accessToken,
+		AccessTokenExpiry:  accessExpiry,
+		RefreshToken:       refreshToken,
+		RefreshTokenExpiry: refreshExpiry,
+	}, nil
+}
+
+// RefreshTokenPair validates a refresh token and issues a new token pair.
+// The old refresh token is revoked after successful refresh.
+func (tm *TokenManager) RefreshTokenPair(refreshToken string) (*TokenPair, error) {
+	// Validate the refresh token
+	payload, err := tm.ValidateToken(refreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	// Ensure it's a refresh token
+	if payload.Type != TokenTypeRefresh {
+		return nil, fmt.Errorf("invalid token type: expected refresh, got %s", payload.Type)
+	}
+
+	// Generate new token pair
+	pair, err := tm.GenerateTokenPair()
+	if err != nil {
+		return nil, err
+	}
+
+	// Revoke the old refresh token (one-time use)
+	tm.mu.Lock()
+	tm.revokedNonces[payload.Nonce] = time.Now()
+	tm.mu.Unlock()
+
+	return pair, nil
+}
+
+// ExchangePairingToken exchanges a valid pairing token for an access/refresh token pair.
+// The pairing token is revoked after successful exchange.
+func (tm *TokenManager) ExchangePairingToken(pairingToken string) (*TokenPair, error) {
+	// Validate the pairing token
+	payload, err := tm.ValidateToken(pairingToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pairing token: %w", err)
+	}
+
+	// Ensure it's a pairing token
+	if payload.Type != TokenTypePairing {
+		return nil, fmt.Errorf("invalid token type: expected pairing, got %s", payload.Type)
+	}
+
+	// Generate new token pair
+	pair, err := tm.GenerateTokenPair()
+	if err != nil {
+		return nil, err
+	}
+
+	// Revoke the pairing token (one-time use)
+	tm.mu.Lock()
+	tm.revokedNonces[payload.Nonce] = time.Now()
+	tm.mu.Unlock()
+
+	return pair, nil
+}
+
 // generateToken creates a token of the specified type.
 func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (string, time.Time, error) {
 	nonce, err := generateRandomString(16)
@@ -172,11 +305,14 @@ func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (stri
 	expiresAt := now.Add(time.Duration(expirySecs) * time.Second)
 
 	payload := TokenPayload{
+		Version:   1,
 		Type:      tokenType,
 		ServerID:  tm.serverID,
+		AgentID:   tm.serverID, // Same as ServerID for local mode
 		IssuedAt:  now.Unix(),
 		ExpiresAt: expiresAt.Unix(),
 		Nonce:     nonce,
+		Mode:      TokenModeLocal,
 	}
 
 	// Encode payload
@@ -203,8 +339,15 @@ func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (stri
 	}
 
 	// Encode as base64 with prefix
-	prefix := PairingTokenPrefix
-	if tokenType == TokenTypeSession {
+	var prefix string
+	switch tokenType {
+	case TokenTypePairing:
+		prefix = PairingTokenPrefix
+	case TokenTypeSession, TokenTypeAccess:
+		prefix = SessionTokenPrefix
+	case TokenTypeRefresh:
+		prefix = RefreshTokenPrefix
+	default:
 		prefix = SessionTokenPrefix
 	}
 
@@ -225,6 +368,9 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 	case len(token) > len(SessionTokenPrefix) && token[:len(SessionTokenPrefix)] == SessionTokenPrefix:
 		expectedType = TokenTypeSession
 		tokenData = token[len(SessionTokenPrefix):]
+	case len(token) > len(RefreshTokenPrefix) && token[:len(RefreshTokenPrefix)] == RefreshTokenPrefix:
+		expectedType = TokenTypeRefresh
+		tokenData = token[len(RefreshTokenPrefix):]
 	default:
 		return nil, ErrInvalidFormat
 	}
@@ -273,8 +419,12 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 		return nil, ErrInvalidToken
 	}
 
-	// Verify token type
-	if payload.Type != expectedType {
+	// Verify token type (access and session both use session prefix)
+	validType := payload.Type == expectedType
+	if expectedType == TokenTypeSession && payload.Type == TokenTypeAccess {
+		validType = true
+	}
+	if !validType {
 		return nil, ErrInvalidFormat
 	}
 
