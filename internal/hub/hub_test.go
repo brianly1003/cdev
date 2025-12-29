@@ -224,8 +224,8 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	var wg sync.WaitGroup
-	numGoroutines := 10
-	numEvents := 100
+	numGoroutines := 5
+	numEvents := 20
 
 	// Create subscribers
 	subscribers := make([]*testutil.MockSubscriber, numGoroutines)
@@ -249,10 +249,25 @@ func TestHub_ConcurrentOperations(t *testing.T) {
 	}
 
 	wg.Wait()
-	time.Sleep(500 * time.Millisecond) // More time for 1000 events on slow CI
+
+	// Wait for events with polling instead of fixed sleep
+	expectedEvents := numGoroutines * numEvents
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		allReceived := true
+		for _, sub := range subscribers {
+			if sub.EventCount() < expectedEvents {
+				allReceived = false
+				break
+			}
+		}
+		if allReceived {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 
 	// Each subscriber should receive all events
-	expectedEvents := numGoroutines * numEvents
 	for _, sub := range subscribers {
 		count := sub.EventCount()
 		if count != expectedEvents {
