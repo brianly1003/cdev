@@ -83,7 +83,10 @@ changelog:
 release:
   github:
     owner: brianly1003
-    name: cdev
+    # RELEASE TARGET: Choose one of the following:
+    # - "cdev-releases" : Use when cdev repo is PRIVATE (current)
+    # - "cdev"          : Use when cdev repo is PUBLIC (switch to this later)
+    name: cdev-releases
   draft: false
   prerelease: auto
   mode: replace
@@ -101,11 +104,6 @@ release:
     brew install cdev
     ```
 
-    **Go Install:**
-    ```bash
-    go install github.com/brianly1003/cdev/cmd/cdev@v{{.Version}}
-    ```
-
     **Manual Download:**
     Download the appropriate binary for your platform below.
 
@@ -118,7 +116,13 @@ brews:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/brianly1003/cdev"
+    # HOMEBREW DOWNLOAD URL:
+    # - When cdev is PRIVATE: Use url_template pointing to cdev-releases (current)
+    # - When cdev is PUBLIC:  Remove url_template and homepage lines below (GoReleaser auto-generates)
+    url_template: "https://github.com/brianly1003/cdev-releases/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    homepage: "https://github.com/brianly1003/cdev-releases"
+    # When PUBLIC, change homepage back to:
+    # homepage: "https://github.com/brianly1003/cdev"
     description: "Claude Code Development Agent - Remote monitoring and control of Claude Code CLI sessions"
     license: "MIT"
     install: |
