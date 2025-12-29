@@ -2106,15 +2106,43 @@ func (t *Tracker) GetStatus(ctx context.Context) (*Status, error) {
 	status.RepoName = t.repoName
 	status.RepoRoot = t.repoRoot
 
+	// Get remotes first (needed for state calculation in all cases)
+	remoteResult, _ := t.RemoteList(ctx)
+	if remoteResult != nil {
+		status.Remotes = remoteResult.Remotes
+	}
+
 	headCmd := exec.CommandContext(ctx, t.command, "rev-parse", "HEAD")
 	headCmd.Dir = t.repoRoot
 	if _, err := headCmd.Output(); err != nil {
 		status.HasCommits = false
-		status.State = GitStateInitialized
 		branchCmd := exec.CommandContext(ctx, t.command, "branch", "--show-current")
 		branchCmd.Dir = t.repoRoot
 		if branchOutput, err := branchCmd.Output(); err == nil {
 			status.Branch = strings.TrimSpace(string(branchOutput))
+		}
+		// Get untracked files even for repos without commits
+		statusCmd := exec.CommandContext(ctx, t.command, "status", "--porcelain", "-uall")
+		statusCmd.Dir = t.repoRoot
+		if statusOutput, err := statusCmd.Output(); err == nil {
+			lines := strings.Split(strings.TrimSuffix(string(statusOutput), "\n"), "\n")
+			for _, line := range lines {
+				if len(line) < 3 {
+					continue
+				}
+				staged := line[0]
+				unstaged := line[1]
+				path := strings.TrimLeft(line[2:], " ")
+				if staged == '?' && unstaged == '?' {
+					status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?"})
+				}
+			}
+		}
+		// Set state based on remotes for repos without commits
+		if len(status.Remotes) == 0 {
+			status.State = GitStateInitialized
+		} else {
+			status.State = GitStateNoPush // Has remote but no commits to push
 		}
 		return status, nil
 	}
@@ -2167,11 +2195,6 @@ func (t *Tracker) GetStatus(ctx context.Context) (*Status, error) {
 				}
 			}
 		}
-	}
-
-	remoteResult, _ := t.RemoteList(ctx)
-	if remoteResult != nil {
-		status.Remotes = remoteResult.Remotes
 	}
 
 	if len(status.Remotes) == 0 {
