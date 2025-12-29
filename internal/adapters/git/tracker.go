@@ -2028,6 +2028,7 @@ type SetUpstreamResult struct {
 }
 
 // SetUpstream sets the upstream tracking branch.
+// If the branch has no commits yet, it will use `git push -u` to create the remote branch and set upstream.
 func (t *Tracker) SetUpstream(ctx context.Context, branch string, upstream string) (*SetUpstreamResult, error) {
 	if !t.IsGitRepo() {
 		return nil, domain.ErrNotGitRepo
@@ -2038,11 +2039,48 @@ func (t *Tracker) SetUpstream(ctx context.Context, branch string, upstream strin
 		branch = currentBranch
 	}
 
+	// Try standard set-upstream-to first
 	cmd := exec.CommandContext(ctx, t.command, "branch", "--set-upstream-to="+upstream, branch)
 	cmd.Dir = t.repoRoot
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return &SetUpstreamResult{Success: false, Error: strings.TrimSpace(string(output))}, nil
+		errMsg := strings.TrimSpace(string(output))
+
+		// If failed due to no commits, try git push -u instead
+		if strings.Contains(errMsg, "no commit") || strings.Contains(errMsg, "does not exist") {
+			// Parse upstream to get remote and branch (e.g., "origin/main" -> "origin", "main")
+			parts := strings.SplitN(upstream, "/", 2)
+			if len(parts) != 2 {
+				return &SetUpstreamResult{Success: false, Error: "Invalid upstream format. Expected 'remote/branch' (e.g., 'origin/main')"}, nil
+			}
+			remoteName := parts[0]
+			remoteBranch := parts[1]
+
+			// Use git push -u to create remote branch and set upstream
+			pushCmd := exec.CommandContext(ctx, t.command, "push", "-u", remoteName, branch+":"+remoteBranch)
+			pushCmd.Dir = t.repoRoot
+			pushOutput, pushErr := pushCmd.CombinedOutput()
+			if pushErr != nil {
+				pushErrMsg := strings.TrimSpace(string(pushOutput))
+				// If push fails due to no commits, return helpful message
+				if strings.Contains(pushErrMsg, "src refspec") || strings.Contains(pushErrMsg, "does not match any") {
+					return &SetUpstreamResult{
+						Success: false,
+						Error:   "Cannot set upstream: branch has no commits yet. Please create a commit first.",
+					}, nil
+				}
+				return &SetUpstreamResult{Success: false, Error: pushErrMsg}, nil
+			}
+
+			return &SetUpstreamResult{
+				Success:  true,
+				Branch:   branch,
+				Upstream: upstream,
+				Message:  fmt.Sprintf("Pushed and set '%s' to track '%s'", branch, upstream),
+			}, nil
+		}
+
+		return &SetUpstreamResult{Success: false, Error: errMsg}, nil
 	}
 
 	return &SetUpstreamResult{
