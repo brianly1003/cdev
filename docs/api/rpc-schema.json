@@ -675,7 +675,7 @@
             "path": { "type": "string" },
             "auto_start": { "type": "boolean" },
             "is_git_repo": { "type": "boolean" },
-            "git_state": { "type": "string", "enum": ["no_git", "git_initialized", "no_remote", "no_push", "synced", "diverged", "conflict"] },
+            "git_state": { "type": "string", "enum": ["no_git", "git_init", "no_remote", "no_push", "synced", "diverged", "conflict"] },
             "sessions": { "type": "array" }
           }
         }
@@ -858,12 +858,65 @@
     {
       "name": "workspace/list",
       "summary": "List all workspaces",
-      "description": "Returns a list of all configured workspaces.",
-      "params": [],
+      "description": "Returns a list of all configured workspaces with optional git status information.",
+      "params": [
+        {
+          "name": "include_git",
+          "description": "Include git status for each workspace (default: false)",
+          "required": false,
+          "schema": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "git_limit",
+          "description": "Limit git status fetching to first N workspaces (0 = all)",
+          "required": false,
+          "schema": {
+            "default": 0,
+            "type": "integer"
+          }
+        }
+      ],
       "result": {
         "name": "workspaces",
         "schema": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "path": { "type": "string" },
+                  "auto_start": { "type": "boolean" },
+                  "created_at": { "type": "string" },
+                  "is_git_repo": { "type": "boolean" },
+                  "git_state": { "type": "string", "enum": ["no_git", "git_init", "no_remote", "no_push", "synced", "diverged", "conflict"] },
+                  "git": {
+                    "type": "object",
+                    "properties": {
+                      "initialized": { "type": "boolean" },
+                      "has_remotes": { "type": "boolean" },
+                      "branch": { "type": "string" },
+                      "state": { "type": "string" },
+                      "ahead": { "type": "integer" },
+                      "behind": { "type": "integer" },
+                      "staged_count": { "type": "integer" },
+                      "unstaged_count": { "type": "integer" },
+                      "untracked_count": { "type": "integer" },
+                      "has_conflicts": { "type": "boolean" }
+                    }
+                  },
+                  "sessions": { "type": "array" },
+                  "running_sessions": { "type": "integer" }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1828,7 +1881,7 @@
     {
       "name": "workspace/git/state",
       "summary": "Get git state with state machine",
-      "description": "Returns the full git status including state machine (noGit, gitInit, noRemote, noPush, synced, diverged, conflict).",
+      "description": "Returns the full git status including state machine (no_git, git_init, no_remote, no_push, synced, diverged, conflict).",
       "params": [
         {
           "name": "workspace_id",
@@ -1841,7 +1894,24 @@
       "result": {
         "name": "result",
         "schema": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "is_git_repo": { "type": "boolean" },
+            "state": {
+              "type": "string",
+              "enum": ["no_git", "git_init", "no_remote", "no_push", "synced", "diverged", "conflict"]
+            },
+            "branch": { "type": "string" },
+            "upstream": { "type": "string" },
+            "ahead": { "type": "integer" },
+            "behind": { "type": "integer" },
+            "has_commits": { "type": "boolean" },
+            "has_conflicts": { "type": "boolean" },
+            "staged": { "type": "array" },
+            "unstaged": { "type": "array" },
+            "untracked": { "type": "array" },
+            "remotes": { "type": "array" }
+          }
         }
       }
     },

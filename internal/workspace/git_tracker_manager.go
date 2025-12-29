@@ -184,6 +184,9 @@ func (m *GitTrackerManager) GetTracker(workspaceID string) (*git.Tracker, error)
 	m.mu.RUnlock()
 
 	if !ok {
+		m.logger.Debug("GetTracker: workspace not registered",
+			"workspace_id", workspaceID,
+		)
 		return nil, fmt.Errorf("workspace not registered: %s", workspaceID)
 	}
 
@@ -193,6 +196,9 @@ func (m *GitTrackerManager) GetTracker(workspaceID string) (*git.Tracker, error)
 
 	// Lazy initialization
 	if !ct.initialized {
+		m.logger.Debug("GetTracker: performing lazy initialization",
+			"workspace_id", workspaceID,
+		)
 		m.initializeTracker(ct)
 	}
 
@@ -201,14 +207,26 @@ func (m *GitTrackerManager) GetTracker(workspaceID string) (*git.Tracker, error)
 
 	// Check if initialization failed
 	if ct.initError != nil {
+		m.logger.Debug("GetTracker: returning init error",
+			"workspace_id", workspaceID,
+			"error", ct.initError,
+		)
 		return nil, ct.initError
 	}
 
 	// Return nil for non-git repos (not an error)
 	if !ct.info.IsGitRepo {
+		m.logger.Debug("GetTracker: workspace is not a git repo",
+			"workspace_id", workspaceID,
+			"state", ct.info.State,
+		)
 		return nil, nil
 	}
 
+	m.logger.Debug("GetTracker: returning tracker",
+		"workspace_id", workspaceID,
+		"repo_name", ct.info.RepoName,
+	)
 	return ct.tracker, nil
 }
 
@@ -257,11 +275,21 @@ func (m *GitTrackerManager) RefreshTracker(workspaceID string) error {
 	m.mu.RUnlock()
 
 	if !ok {
+		m.logger.Warn("RefreshTracker: workspace not registered",
+			"workspace_id", workspaceID,
+		)
 		return fmt.Errorf("workspace not registered: %s", workspaceID)
 	}
 
 	ct.mu.Lock()
 	defer ct.mu.Unlock()
+
+	m.logger.Info("RefreshTracker: refreshing tracker",
+		"workspace_id", workspaceID,
+		"path", ct.info.Path,
+		"previous_state", ct.info.State,
+		"previous_is_git_repo", ct.info.IsGitRepo,
+	)
 
 	// Force re-initialization
 	ct.initialized = false
@@ -269,6 +297,13 @@ func (m *GitTrackerManager) RefreshTracker(workspaceID string) error {
 	ct.tracker = nil
 
 	m.initializeTracker(ct)
+
+	m.logger.Info("RefreshTracker: completed",
+		"workspace_id", workspaceID,
+		"new_state", ct.info.State,
+		"new_is_git_repo", ct.info.IsGitRepo,
+		"init_error", ct.initError,
+	)
 
 	if ct.initError != nil {
 		return ct.initError
@@ -317,9 +352,10 @@ func (m *GitTrackerManager) initializeTracker(ct *cachedTracker) {
 		ct.info.State = TrackerStateNotGit
 		ct.info.LastError = ""
 		ct.tracker = nil
-		m.logger.Debug("Workspace is not a git repository",
+		m.logger.Info("Workspace is not a git repository (after init check)",
 			"workspace_id", ct.info.WorkspaceID,
 			"path", ct.info.Path,
+			"git_command", m.gitCommand,
 		)
 		return
 	}
@@ -332,10 +368,11 @@ func (m *GitTrackerManager) initializeTracker(ct *cachedTracker) {
 	ct.info.LastError = ""
 	ct.initError = nil
 
-	m.logger.Debug("Initialized git tracker",
+	m.logger.Info("Initialized git tracker successfully",
 		"workspace_id", ct.info.WorkspaceID,
 		"path", ct.info.Path,
 		"repo_name", ct.info.RepoName,
+		"state", ct.info.State,
 	)
 }
 

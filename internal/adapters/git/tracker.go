@@ -55,7 +55,21 @@ func (t *Tracker) detectRepo() {
 	output, err := cmd.Output()
 	if err != nil {
 		t.isRepo = false
-		log.Warn().Str("path", t.repoPath).Msg("not a git repository")
+		// Get stderr for more details
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			log.Warn().
+				Str("path", t.repoPath).
+				Str("command", t.command).
+				Str("stderr", string(exitErr.Stderr)).
+				Err(err).
+				Msg("not a git repository")
+		} else {
+			log.Warn().
+				Str("path", t.repoPath).
+				Str("command", t.command).
+				Err(err).
+				Msg("not a git repository")
+		}
 		return
 	}
 

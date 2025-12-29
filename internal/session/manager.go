@@ -2120,12 +2120,17 @@ func (m *Manager) GitInit(workspaceID string, initialBranch string, initialCommi
 		return nil, err
 	}
 
-	// If successful, register/refresh the tracker in GitTrackerManager
-	if result.Success && m.gitTrackerManager != nil {
-		// Re-register workspace to update the tracker now that it's a git repo
-		_ = m.gitTrackerManager.RegisterWorkspace(&ws.Definition)
+	// Refresh the tracker in GitTrackerManager to update cached state
+	// Do this even on failure (e.g., "already a git repo") to sync the state
+	if m.gitTrackerManager != nil {
+		if err := m.gitTrackerManager.RefreshTracker(workspaceID); err != nil {
+			m.logger.Warn("Failed to refresh git tracker after init",
+				"workspace_id", workspaceID,
+				"error", err,
+			)
+		}
 
-		// Emit git_status_changed to update clients (state changes from no_git to git_init/no_remote)
+		// Emit git_status_changed to update clients
 		m.emitGitStatusChanged(m.ctx, workspaceID, tracker)
 	}
 
