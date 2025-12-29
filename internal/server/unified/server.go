@@ -19,18 +19,17 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/rpc/transport"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/brianly1003/cdev/internal/server/common"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins (configure for production)
-	},
-}
+// Default buffer sizes for WebSocket upgrader
+const (
+	wsReadBufferSize  = 1024
+	wsWriteBufferSize = 1024
+)
 
 // Protocol represents the detected protocol type.
 type Protocol int
@@ -94,6 +93,11 @@ type Server struct {
 	heartbeatDone chan struct{}
 	heartbeatSeq  int64
 	startTime     time.Time
+
+	// Security
+	tokenManager  *security.TokenManager
+	originChecker *security.OriginChecker
+	requireAuth   bool
 }
 
 // NewServer creates a new unified server.
@@ -129,6 +133,23 @@ func (s *Server) SetStatusProvider(provider common.StatusProvider) {
 // SetDisconnectHandler sets the handler for client disconnect cleanup.
 func (s *Server) SetDisconnectHandler(handler ClientDisconnectHandler) {
 	s.disconnectHandler = handler
+}
+
+// SetSecurity configures security settings for the server.
+func (s *Server) SetSecurity(tokenManager *security.TokenManager, originChecker *security.OriginChecker, requireAuth bool) {
+	s.tokenManager = tokenManager
+	s.originChecker = originChecker
+	s.requireAuth = requireAuth
+}
+
+// TokenManager returns the server's token manager (for pairing endpoints).
+func (s *Server) TokenManager() *security.TokenManager {
+	return s.tokenManager
+}
+
+// RequireAuth returns whether authentication is required.
+func (s *Server) RequireAuth() bool {
+	return s.requireAuth
 }
 
 // Start starts the unified server with its own HTTP server.
@@ -194,7 +215,26 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Str("sec_websocket_key", r.Header.Get("Sec-WebSocket-Key")).
 		Msg("processing WebSocket upgrade")
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// Create upgrader with security checks
+	wsUpgrader := websocket.Upgrader{
+		ReadBufferSize:  wsReadBufferSize,
+		WriteBufferSize: wsWriteBufferSize,
+		CheckOrigin:     s.checkOrigin,
+	}
+
+	// Validate token if authentication is required
+	if s.requireAuth {
+		if err := s.validateTokenFromRequest(r); err != nil {
+			log.Warn().
+				Err(err).
+				Str("remote_addr", r.RemoteAddr).
+				Msg("WebSocket authentication failed")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -464,6 +504,74 @@ func (s *Server) broadcastHeartbeat() {
 	}
 
 	s.Broadcast(data)
+}
+
+// checkOrigin validates the origin header for WebSocket connections.
+func (s *Server) checkOrigin(r *http.Request) bool {
+	// If origin checker is configured, use it
+	if s.originChecker != nil {
+		return s.originChecker.CheckOrigin(r)
+	}
+
+	// Default: allow localhost origins only
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // Same-origin request
+	}
+
+	// Default localhost check
+	return isLocalhostOrigin(origin)
+}
+
+// isLocalhostOrigin checks if an origin is from localhost.
+func isLocalhostOrigin(origin string) bool {
+	// Common localhost origins
+	localhostOrigins := []string{
+		"http://localhost",
+		"https://localhost",
+		"http://127.0.0.1",
+		"https://127.0.0.1",
+		"http://[::1]",
+		"https://[::1]",
+	}
+
+	for _, allowed := range localhostOrigins {
+		if origin == allowed || (len(origin) > len(allowed) && origin[:len(allowed)+1] == allowed+":") {
+			return true
+		}
+	}
+	return false
+}
+
+// validateTokenFromRequest extracts and validates a token from the request.
+// Token can be in Authorization header (Bearer token) or query param (?token=xxx).
+func (s *Server) validateTokenFromRequest(r *http.Request) error {
+	if s.tokenManager == nil {
+		return fmt.Errorf("token manager not configured")
+	}
+
+	token := ""
+
+	// Check Authorization header first
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		const bearerPrefix = "Bearer "
+		if len(authHeader) > len(bearerPrefix) && authHeader[:len(bearerPrefix)] == bearerPrefix {
+			token = authHeader[len(bearerPrefix):]
+		}
+	}
+
+	// Fall back to query parameter
+	if token == "" {
+		token = r.URL.Query().Get("token")
+	}
+
+	if token == "" {
+		return fmt.Errorf("no token provided")
+	}
+
+	_, err := s.tokenManager.ValidateToken(token)
+	return err
 }
 
 // UnifiedClient represents a client that can speak either protocol.

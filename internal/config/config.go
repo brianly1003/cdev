@@ -21,6 +21,7 @@ type Config struct {
 	Limits     LimitsConfig     `mapstructure:"limits"`
 	Pairing    PairingConfig    `mapstructure:"pairing"`
 	Indexer    IndexerConfig    `mapstructure:"indexer"`
+	Security   SecurityConfig   `mapstructure:"security"`
 }
 
 // ServerConfig holds server-related configuration.
@@ -84,6 +85,14 @@ type PairingConfig struct {
 type IndexerConfig struct {
 	Enabled         bool     `mapstructure:"enabled"`
 	SkipDirectories []string `mapstructure:"skip_directories"`
+}
+
+// SecurityConfig holds security-related configuration.
+type SecurityConfig struct {
+	RequireAuth       bool     `mapstructure:"require_auth"`        // If true, require token for WebSocket connections
+	TokenExpirySecs   int      `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
+	AllowedOrigins    []string `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
+	BindLocalhostOnly bool     `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
 }
 
 // Load loads configuration from files and environment.
@@ -180,6 +189,12 @@ func setDefaults(v *viper.Viper) {
 	// Indexer defaults - uses centralized patterns from defaults.go
 	v.SetDefault("indexer.enabled", true)
 	v.SetDefault("indexer.skip_directories", DefaultSkipDirectories)
+
+	// Security defaults
+	v.SetDefault("security.require_auth", false)       // No auth required by default (local development)
+	v.SetDefault("security.token_expiry_secs", 3600)   // 1 hour
+	v.SetDefault("security.allowed_origins", []string{})
+	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
 }
 
 // postProcess applies post-processing to configuration.

@@ -127,6 +127,23 @@ func (s *Server) SetImageStorage(storage *imagestorage.Storage) {
 	log.Info().Msg("image upload routes registered: /api/images, /api/images/validate, /api/images/stats, /api/images/all")
 }
 
+// SetPairingHandler sets up pairing endpoints for mobile app connection.
+// Must be called before Start() to enable pairing functionality.
+func (s *Server) SetPairingHandler(handler *PairingHandler) {
+	if handler == nil {
+		log.Warn().Msg("pairing handler is nil, pairing routes will not be available")
+		return
+	}
+
+	// Register pairing routes
+	s.mux.HandleFunc("/pair", handler.HandlePairPage)
+	s.mux.HandleFunc("/api/pair/info", handler.HandlePairInfo)
+	s.mux.HandleFunc("/api/pair/qr", handler.HandlePairQR)
+	s.mux.HandleFunc("/api/pair/refresh", handler.HandlePairRefresh)
+
+	log.Info().Msg("pairing routes registered: /pair, /api/pair/info, /api/pair/qr, /api/pair/refresh")
+}
+
 // requestLoggingMiddleware logs all incoming requests for debugging.
 func requestLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
