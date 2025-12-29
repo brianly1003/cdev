@@ -52,6 +52,8 @@ func (h *Hub) Start() error {
 		return nil
 	}
 	h.running = true
+	// Recreate done channel in case hub was previously stopped
+	h.done = make(chan struct{})
 	h.mu.Unlock()
 
 	log.Debug().Msg("event hub started")
