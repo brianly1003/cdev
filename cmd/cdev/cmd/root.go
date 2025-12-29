@@ -23,10 +23,10 @@ var rootCmd = &cobra.Command{
 	Use:   "cdev",
 	Short: "Mobile AI Coding Monitor & Controller Agent",
 	Long: `cdev is a lightweight daemon that enables remote monitoring and
-control of Claude Code CLI sessions from mobile devices.
+control of AI coding agents (Claude Code, Codex, Gemini CLI) from mobile devices.
 
-It watches your repository for changes, streams Claude CLI output in real-time,
-and generates git diffs - all accessible via WebSocket from your iOS app.`,
+It watches your repository for changes, streams AI agent output in real-time,
+and generates git diffs - all accessible via WebSocket from your mobile app.`,
 	SilenceUsage: true,
 }
 

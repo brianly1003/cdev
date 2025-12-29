@@ -2650,7 +2650,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "cdev API",
-	Description:      "Mobile AI Coding Monitor & Controller Agent API.\nEnables remote monitoring and control of Claude Code CLI sessions from mobile devices.",
+	Description:      "Mobile AI Coding Monitor & Controller Agent API.\nEnables remote monitoring and control of AI coding agents from mobile devices.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

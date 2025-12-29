@@ -43,9 +43,34 @@ jobs:
           version: "~> v2"
           args: release --clean
         env:
-          # Use PAT instead of GITHUB_TOKEN to publish to cdev-releases repo
           GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Mirror release to cdev-release
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          RELEASE_REPO="brianly1003/cdev-release"
+
+          echo "Mirroring release $TAG to $RELEASE_REPO..."
+
+          # Create release in cdev-release repo (or update if exists)
+          gh release create "$TAG" \
+            --repo "$RELEASE_REPO" \
+            --title "v${TAG#v}" \
+            --notes "Release mirrored from brianly1003/Cdev. See https://github.com/brianly1003/Cdev/releases/tag/$TAG for details." \
+            || gh release edit "$TAG" --repo "$RELEASE_REPO" --title "v${TAG#v}"
+
+          # Upload all artifacts from dist/
+          for file in dist/*.tar.gz dist/*.zip dist/checksums.txt; do
+            if [ -f "$file" ]; then
+              echo "Uploading $(basename $file)..."
+              gh release upload "$TAG" "$file" --repo "$RELEASE_REPO" --clobber
+            fi
+          done
+
+          echo "Release mirrored successfully!"
 
   # Optional: Build and push Docker image
   # docker:

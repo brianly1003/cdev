@@ -31,11 +31,11 @@
 
 ### Purpose
 
-`cdev` is a lightweight Go daemon that enables remote monitoring and control of Claude Code CLI sessions. It serves as the bridge between the developer's laptop and mobile devices, allowing supervision of AI-assisted coding from anywhere.
+`cdev` is a lightweight Go daemon that enables remote monitoring and control of AI coding agents (Claude Code, Codex, Gemini CLI, etc.). It serves as the bridge between the developer's laptop and mobile devices, allowing supervision of AI-assisted coding from anywhere.
 
 ### POC Goals
 
-1. Spawn and manage Claude Code CLI processes
+1. Spawn and manage AI coding agent CLI processes
 2. Stream stdout/stderr in real-time
 3. Watch file system changes in the repository
 4. Generate and stream Git diffs

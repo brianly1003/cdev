@@ -83,18 +83,18 @@ changelog:
 release:
   github:
     owner: brianly1003
-    # RELEASE TARGET: Choose one of the following:
-    # - "cdev-releases" : Use when cdev repo is PRIVATE (current)
-    # - "cdev"          : Use when cdev repo is PUBLIC (switch to this later)
-    name: cdev-releases
+    name: Cdev
   draft: false
   prerelease: auto
   mode: replace
+  replace_existing_artifacts: true
+  # Note: Release is also mirrored to cdev-release repo via GitHub Actions
+  # Homebrew tap downloads from cdev-release
   name_template: "v{{.Version}}"
   header: |
     ## cdev v{{.Version}}
 
-    Claude Code Development Agent - Remote monitoring and control of Claude Code CLI sessions.
+    AI Coding Agent Server - Remote monitoring and control of AI coding agents from mobile devices.
 
     ### Installation
 
@@ -116,14 +116,10 @@ brews:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    # HOMEBREW DOWNLOAD URL:
-    # - When cdev is PRIVATE: Use url_template pointing to cdev-releases (current)
-    # - When cdev is PUBLIC:  Remove url_template and homepage lines below (GoReleaser auto-generates)
-    url_template: "https://github.com/brianly1003/cdev-releases/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    homepage: "https://github.com/brianly1003/cdev-releases"
-    # When PUBLIC, change homepage back to:
-    # homepage: "https://github.com/brianly1003/cdev"
-    description: "Claude Code Development Agent - Remote monitoring and control of Claude Code CLI sessions"
+    # Homebrew downloads from cdev-release (public repo for distribution)
+    url_template: "https://github.com/brianly1003/cdev-release/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    homepage: "https://github.com/brianly1003/Cdev"
+    description: "AI Coding Agent Server - Remote monitoring and control of AI coding agents from mobile devices"
     license: "MIT"
     install: |
       bin.install "cdev"

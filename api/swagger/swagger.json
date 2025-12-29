@@ -4,7 +4,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Mobile AI Coding Monitor \u0026 Controller Agent API.\nEnables remote monitoring and control of Claude Code CLI sessions from mobile devices.",
+        "description": "Mobile AI Coding Monitor \u0026 Controller Agent API.\nEnables remote monitoring and control of AI coding agents from mobile devices.",
         "title": "cdev API",
         "contact": {
             "name": "Brian Ly",

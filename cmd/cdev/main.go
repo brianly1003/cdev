@@ -3,7 +3,7 @@
 //	@title			cdev API
 //	@version		1.0
 //	@description	Mobile AI Coding Monitor & Controller Agent API.
-//	@description	Enables remote monitoring and control of Claude Code CLI sessions from mobile devices.
+//	@description	Enables remote monitoring and control of AI coding agents from mobile devices.
 //
 //	@contact.name	Brian Ly
 //	@contact.url	https://github.com/brianly1003/cdev

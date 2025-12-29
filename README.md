@@ -23,11 +23,11 @@
 
 ## Overview
 
-`cdev` is a lightweight Go daemon that enables remote monitoring and control of Claude Code CLI sessions from mobile devices. It serves as the bridge between your development machine and the cdev mobile app.
+`cdev` is a lightweight Go daemon that enables remote monitoring and control of AI coding agents (Claude Code, Codex, Gemini CLI, etc.) from mobile devices. It serves as the bridge between your development machine and the cdev mobile app.
 
 ## Features
 
-- **Claude CLI Management**: Spawn, monitor, and control Claude Code CLI processes
+- **AI Agent Management**: Spawn, monitor, and control AI coding agents (Claude Code, Codex, Gemini CLI)
 - **Multi-Workspace Support**: Manage multiple repositories simultaneously with workspace manager
 - **Real-time Streaming**: Stream stdout/stderr output in real-time via WebSocket
 - **File Watching**: Monitor repository for file changes with debouncing
