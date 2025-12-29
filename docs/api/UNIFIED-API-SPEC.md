@@ -815,10 +815,10 @@ Get comprehensive git status including workspace state.
 **State Values:**
 | State | Description |
 |-------|-------------|
-| `noGit` | Directory is not a git repository |
-| `gitInit` | Git initialized but no commits yet |
-| `noRemote` | Has commits but no remote configured |
-| `noPush` | Has remote but no upstream set or never pushed |
+| `no_git` | Directory is not a git repository |
+| `git_init` | Git initialized but no commits yet |
+| `no_remote` | Has commits but no remote configured |
+| `no_push` | Has remote but no upstream set or never pushed |
 | `synced` | In sync with remote |
 | `diverged` | Local and remote have diverged |
 | `conflict` | Merge conflict in progress |
@@ -1058,6 +1058,109 @@ Stop watching the current session.
   "watching": false
 }
 ```
+
+---
+
+### Workspace Methods
+
+#### `workspace/list`
+List all configured workspaces with optional git status information.
+
+**Params:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| include_git | boolean | No | Include git status for each workspace (default: false) |
+| git_limit | integer | No | Limit git status fetching to first N workspaces (0 = all) |
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "workspace/list",
+  "params": {
+    "include_git": true,
+    "git_limit": 10
+  }
+}
+```
+
+**Result:**
+```json
+{
+  "workspaces": [
+    {
+      "id": "ws-abc12345",
+      "name": "my-project",
+      "path": "/Users/dev/Projects/my-project",
+      "port": 8767,
+      "auto_start": true,
+      "created_at": "2025-12-20T10:30:00Z",
+      "is_git_repo": true,
+      "git_state": "synced",
+      "git": {
+        "initialized": true,
+        "branch": "main",
+        "has_remotes": true,
+        "ahead": 0,
+        "behind": 0,
+        "staged_count": 0,
+        "unstaged_count": 2,
+        "untracked_count": 1,
+        "has_conflicts": false,
+        "state": "synced"
+      },
+      "sessions": []
+    }
+  ],
+  "count": 1
+}
+```
+
+**Workspace Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique workspace identifier (e.g., `ws-abc12345`) |
+| name | string | Workspace display name |
+| path | string | Absolute filesystem path |
+| port | integer | Assigned port number |
+| auto_start | boolean | Whether workspace starts automatically |
+| created_at | string | ISO 8601 timestamp of creation |
+| is_git_repo | boolean | Whether path is a git repository (only when `include_git: true`) |
+| git_state | string | Git state enum value (only when `include_git: true`) |
+| git | object | Detailed git info (only when `include_git: true`) |
+| sessions | array | Active sessions in this workspace |
+
+**Git Object Fields (when `include_git: true`):**
+| Field | Type | Description |
+|-------|------|-------------|
+| initialized | boolean | Whether git is initialized |
+| branch | string \| null | Current branch name |
+| has_remotes | boolean | Whether remote(s) are configured |
+| ahead | integer | Commits ahead of upstream |
+| behind | integer | Commits behind upstream |
+| staged_count | integer | Number of staged files |
+| unstaged_count | integer | Number of unstaged modified files |
+| untracked_count | integer | Number of untracked files |
+| has_conflicts | boolean | Whether merge conflicts exist |
+| state | string | Git state enum value |
+
+**Git State Values:**
+| Value | Description | Typical UI |
+|-------|-------------|------------|
+| `no_git` | Not a git repository | Gray / No icon |
+| `git_init` | Git initialized, no commits yet | Gray / Init icon |
+| `no_remote` | Has commits, no remote configured | Yellow / Local icon |
+| `no_push` | Has remote, never pushed | Yellow / Unpushed icon |
+| `synced` | In sync with remote | Green / Check icon |
+| `diverged` | Local and remote have diverged | Orange / Warning icon |
+| `conflict` | Has merge conflicts | Red / Conflict icon |
+
+**Performance Notes:**
+- Git status fetching uses parallel execution with max 10 concurrent operations
+- Expected latency: ~50-150ms per workspace when fetched in parallel
+- For 50 workspaces: ~500-800ms total (vs ~7.5s sequential)
+- Use `git_limit` to fetch only visible workspaces for better UX
 
 ---
 
