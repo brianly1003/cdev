@@ -15,85 +15,50 @@ func TestValidateServer(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      8766,
-				Host:          "127.0.0.1",
+				Port: 8766,
+				Host: "127.0.0.1",
 			},
 			wantErr: "",
 		},
 		{
 			name: "port too low",
 			cfg: ServerConfig{
-				WebSocketPort: 0,
-				HTTPPort:      8766,
-				Host:          "127.0.0.1",
+				Port: 0,
+				Host: "127.0.0.1",
 			},
-			wantErr: "websocket_port must be between 1 and 65535",
+			wantErr: "port must be between 1 and 65535",
 		},
 		{
 			name: "port too high",
 			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      70000,
-				Host:          "127.0.0.1",
+				Port: 70000,
+				Host: "127.0.0.1",
 			},
-			wantErr: "http_port must be between 1 and 65535",
-		},
-		{
-			name: "same ports",
-			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      8765,
-				Host:          "127.0.0.1",
-			},
-			wantErr: "must be different",
+			wantErr: "port must be between 1 and 65535",
 		},
 		{
 			name: "empty host",
 			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      8766,
-				Host:          "",
+				Port: 8766,
+				Host: "",
 			},
 			wantErr: "host cannot be empty",
 		},
 		{
-			name: "valid external ws url",
+			name: "valid external url",
 			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      8766,
-				Host:          "127.0.0.1",
-				ExternalWSURL: "wss://example.com/ws",
+				Port:        8766,
+				Host:        "127.0.0.1",
+				ExternalURL: "https://example.com",
 			},
 			wantErr: "",
 		},
 		{
-			name: "invalid external ws url scheme",
+			name: "invalid external url scheme",
 			cfg: ServerConfig{
-				WebSocketPort: 8765,
-				HTTPPort:      8766,
-				Host:          "127.0.0.1",
-				ExternalWSURL: "http://example.com/ws",
-			},
-			wantErr: "must use one of these schemes: ws, wss",
-		},
-		{
-			name: "valid external http url",
-			cfg: ServerConfig{
-				WebSocketPort:   8765,
-				HTTPPort:        8766,
-				Host:            "127.0.0.1",
-				ExternalHTTPURL: "https://example.com/api",
-			},
-			wantErr: "",
-		},
-		{
-			name: "invalid external http url scheme",
-			cfg: ServerConfig{
-				WebSocketPort:   8765,
-				HTTPPort:        8766,
-				Host:            "127.0.0.1",
-				ExternalHTTPURL: "wss://example.com/api",
+				Port:        8766,
+				Host:        "127.0.0.1",
+				ExternalURL: "wss://example.com",
 			},
 			wantErr: "must use one of these schemes: http, https",
 		},
@@ -459,9 +424,8 @@ func TestValidate_FullConfig(t *testing.T) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			WebSocketPort: 8765,
-			HTTPPort:      8766,
-			Host:          "127.0.0.1",
+			Port: 8766,
+			Host: "127.0.0.1",
 		},
 		Repository: RepositoryConfig{
 			Path: tempDir,

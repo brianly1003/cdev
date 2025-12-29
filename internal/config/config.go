@@ -26,12 +26,10 @@ type Config struct {
 
 // ServerConfig holds server-related configuration.
 type ServerConfig struct {
-	WebSocketPort   int    `mapstructure:"websocket_port"`
-	HTTPPort        int    `mapstructure:"http_port"`
-	Host            string `mapstructure:"host"`
-	ExternalWSURL   string `mapstructure:"external_ws_url"`   // Optional: public URL for WebSocket (e.g., wss://tunnel.devtunnels.ms)
-	ExternalHTTPURL string `mapstructure:"external_http_url"` // Optional: public URL for HTTP API (e.g., https://tunnel.devtunnels.ms)
-	Headless        bool   `mapstructure:"headless"`          // If true, run as background daemon; if false (default), run in terminal mode
+	Port        int    `mapstructure:"port"`         // Unified port for HTTP and WebSocket (default: 8766)
+	Host        string `mapstructure:"host"`         // Bind address (default: 127.0.0.1)
+	ExternalURL string `mapstructure:"external_url"` // Optional: public URL for tunnels (e.g., https://tunnel.devtunnels.ms)
+	Headless    bool   `mapstructure:"headless"`     // If true, run as background daemon; if false (default), run in terminal mode
 }
 
 // RepositoryConfig holds repository-related configuration.
@@ -146,9 +144,8 @@ func Load(configPath string) (*Config, error) {
 
 // setDefaults sets default configuration values.
 func setDefaults(v *viper.Viper) {
-	// Server defaults
-	v.SetDefault("server.websocket_port", 8765)
-	v.SetDefault("server.http_port", 8766)
+	// Server defaults - unified port for HTTP and WebSocket
+	v.SetDefault("server.port", 8766)
 	v.SetDefault("server.host", "127.0.0.1")
 
 	// Repository defaults

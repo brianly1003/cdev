@@ -298,22 +298,20 @@ func (a *App) Start(ctx context.Context) error {
 			repoName = a.gitTracker.GetRepoName()
 		}
 	}
-	// Use HTTPPort for both since WebSocket is now consolidated at /ws endpoint
+	// Create QR generator with unified port
 	a.qrGenerator = pairing.NewQRGenerator(
 		a.cfg.Server.Host,
-		a.cfg.Server.HTTPPort, // Same port for WebSocket (/ws endpoint)
-		a.cfg.Server.HTTPPort,
+		a.cfg.Server.Port,
 		a.sessionID,
 		repoName,
 	)
 
-	// Set external URLs if configured (for VS Code port forwarding, tunnels, etc.)
-	if a.cfg.Server.ExternalWSURL != "" || a.cfg.Server.ExternalHTTPURL != "" {
-		a.qrGenerator.SetExternalURLs(a.cfg.Server.ExternalWSURL, a.cfg.Server.ExternalHTTPURL)
+	// Set external URL if configured (for VS Code port forwarding, tunnels, etc.)
+	if a.cfg.Server.ExternalURL != "" {
+		a.qrGenerator.SetExternalURL(a.cfg.Server.ExternalURL)
 		log.Info().
-			Str("external_ws_url", a.cfg.Server.ExternalWSURL).
-			Str("external_http_url", a.cfg.Server.ExternalHTTPURL).
-			Msg("using external URLs for QR code")
+			Str("external_url", a.cfg.Server.ExternalURL).
+			Msg("using external URL for QR code")
 	}
 
 	// Log startup info
@@ -422,7 +420,7 @@ func (a *App) Start(ctx context.Context) error {
 	// For port consolidation, we use the HTTP server's port
 	a.unifiedServer = unified.NewServer(
 		a.cfg.Server.Host,
-		a.cfg.Server.HTTPPort,
+		a.cfg.Server.Port,
 		a.rpcDispatcher,
 		a.hub,
 	)
@@ -449,7 +447,7 @@ func (a *App) Start(ctx context.Context) error {
 	// Start HTTP server with unified WebSocket handler
 	a.httpServer = httpserver.New(
 		a.cfg.Server.Host,
-		a.cfg.Server.HTTPPort,
+		a.cfg.Server.Port,
 		a.getStatus,
 		a.claudeManager,
 		a.gitTracker,
@@ -925,18 +923,21 @@ func (a *App) getStatus() map[string]interface{} {
 func (a *App) printConnectionInfo() {
 	repoName := filepath.Base(a.cfg.Repository.Path)
 
-	// Determine which URLs to display (external URLs take precedence)
-	// With port consolidation, WebSocket is served at /ws on the HTTP port
-	wsURL := fmt.Sprintf("ws://%s:%d/ws", a.cfg.Server.Host, a.cfg.Server.HTTPPort)
-	httpURL := fmt.Sprintf("http://%s:%d", a.cfg.Server.Host, a.cfg.Server.HTTPPort)
+	// Determine which URLs to display (external URL takes precedence)
+	wsURL := fmt.Sprintf("ws://%s:%d/ws", a.cfg.Server.Host, a.cfg.Server.Port)
+	httpURL := fmt.Sprintf("http://%s:%d", a.cfg.Server.Host, a.cfg.Server.Port)
 	usingExternal := false
 
-	if a.cfg.Server.ExternalWSURL != "" {
-		wsURL = a.cfg.Server.ExternalWSURL
-		usingExternal = true
-	}
-	if a.cfg.Server.ExternalHTTPURL != "" {
-		httpURL = a.cfg.Server.ExternalHTTPURL
+	if a.cfg.Server.ExternalURL != "" {
+		httpURL = strings.TrimRight(a.cfg.Server.ExternalURL, "/")
+		// Derive WebSocket URL from HTTP URL
+		wsURL = httpURL
+		if strings.HasPrefix(wsURL, "https://") {
+			wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+		} else if strings.HasPrefix(wsURL, "http://") {
+			wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+		}
+		wsURL = wsURL + "/ws"
 		usingExternal = true
 	}
 

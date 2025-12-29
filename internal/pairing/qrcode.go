@@ -20,32 +20,29 @@ type PairingInfo struct {
 
 // QRGenerator generates QR codes for mobile pairing.
 type QRGenerator struct {
-	host            string
-	wsPort          int
-	httpPort        int
-	sessionID       string
-	repoName        string
-	token           string
-	externalWSURL   string // Optional: override WebSocket URL (for VS Code port forwarding)
-	externalHTTPURL string // Optional: override HTTP URL (for VS Code port forwarding)
+	host        string
+	port        int    // Unified port for HTTP and WebSocket
+	sessionID   string
+	repoName    string
+	token       string
+	externalURL string // Optional: override base URL (for VS Code port forwarding)
 }
 
 // NewQRGenerator creates a new QR code generator.
-func NewQRGenerator(host string, wsPort, httpPort int, sessionID, repoName string) *QRGenerator {
+func NewQRGenerator(host string, port int, sessionID, repoName string) *QRGenerator {
 	return &QRGenerator{
 		host:      host,
-		wsPort:    wsPort,
-		httpPort:  httpPort,
+		port:      port,
 		sessionID: sessionID,
 		repoName:  repoName,
 	}
 }
 
-// SetExternalURLs sets the external/public URLs for port forwarding scenarios.
-// When set, these URLs are used in the QR code instead of the local host:port URLs.
-func (g *QRGenerator) SetExternalURLs(wsURL, httpURL string) {
-	g.externalWSURL = wsURL
-	g.externalHTTPURL = httpURL
+// SetExternalURL sets the external/public URL for port forwarding scenarios.
+// When set, this URL is used in the QR code instead of the local host:port URL.
+// WebSocket URL is auto-derived (https→wss, append /ws).
+func (g *QRGenerator) SetExternalURL(externalURL string) {
+	g.externalURL = externalURL
 }
 
 // SetToken sets the pairing token.
@@ -54,26 +51,23 @@ func (g *QRGenerator) SetToken(token string) {
 }
 
 // GetPairingInfo returns the pairing information.
-// If external URLs are set, they are used instead of local host:port URLs.
-// Note: With port consolidation, WebSocket is now served at /ws on the HTTP port.
+// If external URL is set, it's used instead of local host:port URL.
+// WebSocket URL is derived from HTTP URL (scheme conversion + /ws path).
 func (g *QRGenerator) GetPairingInfo() *PairingInfo {
-	// For port consolidation, WebSocket uses the HTTP port with /ws path
-	// If wsPort is 0 or same as httpPort, use the consolidated endpoint
-	var wsURL string
-	if g.wsPort == 0 || g.wsPort == g.httpPort {
-		wsURL = fmt.Sprintf("ws://%s:%d/ws", g.host, g.httpPort)
-	} else {
-		// Legacy mode: separate WebSocket port (deprecated)
-		wsURL = fmt.Sprintf("ws://%s:%d", g.host, g.wsPort)
-	}
-	httpURL := fmt.Sprintf("http://%s:%d", g.host, g.httpPort)
+	httpURL := fmt.Sprintf("http://%s:%d", g.host, g.port)
+	wsURL := fmt.Sprintf("ws://%s:%d/ws", g.host, g.port)
 
-	// Use external URLs if configured (for VS Code port forwarding, etc.)
-	if g.externalWSURL != "" {
-		wsURL = g.externalWSURL
-	}
-	if g.externalHTTPURL != "" {
-		httpURL = g.externalHTTPURL
+	// Use external URL if configured (for VS Code port forwarding, etc.)
+	if g.externalURL != "" {
+		httpURL = strings.TrimRight(g.externalURL, "/")
+		// Derive WebSocket URL from HTTP URL
+		wsURL = httpURL
+		if strings.HasPrefix(wsURL, "https://") {
+			wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+		} else if strings.HasPrefix(wsURL, "http://") {
+			wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+		}
+		wsURL = wsURL + "/ws"
 	}
 
 	return &PairingInfo{

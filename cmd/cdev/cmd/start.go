@@ -16,13 +16,10 @@ import (
 )
 
 var (
-	repoPath        string
-	wsPort          int
-	httpPort        int
-	externalURL     string // Single URL that auto-derives WS and HTTP
-	externalWSURL   string
-	externalHTTPURL string
-	headless        bool
+	repoPath    string
+	port        int
+	externalURL string // Single URL that auto-derives WS and HTTP URLs
+	headless    bool
 )
 
 // startCmd represents the start command.
@@ -49,29 +46,21 @@ Example:
   cdev start                           # Terminal mode (default)
   cdev start --headless                # Headless/daemon mode
   cdev start --repo /path/to/project
-  cdev start --ws-port 8765 --http-port 8766
+  cdev start --port 8766               # Custom port
 
 VS Code Port Forwarding:
   When using VS Code port forwarding, just copy the forwarded URL and pass it:
 
   cdev start --external-url https://your-tunnel.devtunnels.ms
 
-  This auto-derives both HTTP and WebSocket URLs from the single URL.
-  Or set them individually if needed:
-
-  cdev start \
-    --external-ws-url wss://your-tunnel.devtunnels.ms/ws \
-    --external-http-url https://your-tunnel.devtunnels.ms`,
+  This auto-derives both HTTP and WebSocket URLs from the single URL.`,
 	RunE: runStart,
 }
 
 func init() {
 	startCmd.Flags().StringVar(&repoPath, "repo", "", "path to repository (default: current directory)")
-	startCmd.Flags().IntVar(&wsPort, "ws-port", 0, "WebSocket port (default: 8765)")
-	startCmd.Flags().IntVar(&httpPort, "http-port", 0, "HTTP port (default: 8766)")
-	startCmd.Flags().StringVar(&externalURL, "external-url", "", "external URL for QR code - auto-derives WS and HTTP URLs (e.g., https://tunnel.devtunnels.ms)")
-	startCmd.Flags().StringVar(&externalWSURL, "external-ws-url", "", "external WebSocket URL for QR code (e.g., wss://tunnel.devtunnels.ms/ws)")
-	startCmd.Flags().StringVar(&externalHTTPURL, "external-http-url", "", "external HTTP URL for QR code (e.g., https://tunnel.devtunnels.ms)")
+	startCmd.Flags().IntVar(&port, "port", 0, "server port for HTTP and WebSocket (default: 8766)")
+	startCmd.Flags().StringVar(&externalURL, "external-url", "", "external URL for tunnels - auto-derives WS and HTTP URLs (e.g., https://tunnel.devtunnels.ms)")
 	startCmd.Flags().BoolVar(&headless, "headless", false, "run in headless mode (no terminal UI, daemon mode)")
 }
 
@@ -86,33 +75,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 	if repoPath != "" {
 		cfg.Repository.Path = repoPath
 	}
-	if wsPort != 0 {
-		cfg.Server.WebSocketPort = wsPort
+	if port != 0 {
+		cfg.Server.Port = port
 	}
-	if httpPort != 0 {
-		cfg.Server.HTTPPort = httpPort
-	}
-
-	// Auto-derive WS and HTTP URLs from single external URL
 	if externalURL != "" {
-		httpURL, wsURL := deriveExternalURLs(externalURL)
-		cfg.Server.ExternalHTTPURL = httpURL
-		cfg.Server.ExternalWSURL = wsURL
-		log.Info().
-			Str("external_url", externalURL).
-			Str("http_url", httpURL).
-			Str("ws_url", wsURL).
-			Msg("auto-derived external URLs")
+		cfg.Server.ExternalURL = externalURL
 	}
-
-	// Individual URL flags override auto-derived ones
-	if externalWSURL != "" {
-		cfg.Server.ExternalWSURL = externalWSURL
-	}
-	if externalHTTPURL != "" {
-		cfg.Server.ExternalHTTPURL = externalHTTPURL
-	}
-	// Headless flag (default is false = terminal mode)
 	cfg.Server.Headless = headless
 
 	// Re-validate after overrides
@@ -132,8 +100,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		Str("version", version).
 		Str("mode", mode).
 		Str("repo", cfg.Repository.Path).
-		Int("ws_port", cfg.Server.WebSocketPort).
-		Int("http_port", cfg.Server.HTTPPort).
+		Int("port", cfg.Server.Port).
 		Msg("starting cdev")
 
 	// Create application
@@ -191,8 +158,7 @@ func printConfig(cfg *config.Config) {
 	fmt.Println("Current Configuration:")
 	fmt.Println("----------------------")
 	fmt.Printf("Repository Path: %s\n", cfg.Repository.Path)
-	fmt.Printf("WebSocket Port:  %d\n", cfg.Server.WebSocketPort)
-	fmt.Printf("HTTP Port:       %d\n", cfg.Server.HTTPPort)
+	fmt.Printf("Port:            %d\n", cfg.Server.Port)
 	fmt.Printf("Host:            %s\n", cfg.Server.Host)
 	fmt.Printf("Watcher Enabled: %t\n", cfg.Watcher.Enabled)
 	fmt.Printf("Git Enabled:     %t\n", cfg.Git.Enabled)

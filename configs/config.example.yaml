@@ -3,15 +3,14 @@
 
 # Server settings
 server:
-  websocket_port: 8765
-  http_port: 8766
+  # Unified port for HTTP API and WebSocket connections
+  port: 8766
   host: "127.0.0.1"  # Bind to localhost only (recommended for security)
 
-  # External URLs for VS Code port forwarding / tunnels
-  # When set, the QR code will contain these URLs instead of localhost URLs
-  # This enables mobile devices to connect through public tunnel URLs
-  # external_ws_url: "wss://your-tunnel-8765.devtunnels.ms"
-  # external_http_url: "https://your-tunnel-8766.devtunnels.ms"
+  # External URL for VS Code port forwarding / tunnels
+  # When set, the QR code will contain this URL instead of localhost
+  # WebSocket URL is auto-derived (https→wss, append /ws)
+  # external_url: "https://your-tunnel.devtunnels.ms"
 
 # File watcher settings
 watcher:

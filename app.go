@@ -67,8 +67,8 @@ func (d *DesktopApp) startup(ctx context.Context) {
 		// Create default config manually
 		cfg = &config.Config{
 			Server: config.ServerConfig{
-				HTTPPort: 8766,
-				Host:     "0.0.0.0",
+				Port: 8766,
+				Host: "0.0.0.0",
 			},
 			Repository: config.RepositoryConfig{
 				Path: "",
@@ -234,7 +234,7 @@ func (d *DesktopApp) setActiveRepository(id string) {
 func (d *DesktopApp) GetConnectionStatus() ConnectionStatus {
 	status := ConnectionStatus{
 		ServerRunning:    true,
-		ServerPort:       d.config.Server.HTTPPort,
+		ServerPort:       d.config.Server.Port,
 		ServerAddress:    d.getServerAddress(),
 		ConnectedClients: 0, // TODO: Get from WebSocket hub
 		ClaudeState:      "idle",
@@ -256,8 +256,8 @@ func (d *DesktopApp) GetConnectionStatus() ConnectionStatus {
 func (d *DesktopApp) GetQRCodeData() (string, error) {
 	// Build connection URL
 	addr := d.getServerAddress()
-	wsURL := fmt.Sprintf("ws://%s:%d/ws", addr, d.config.Server.HTTPPort)
-	httpURL := fmt.Sprintf("http://%s:%d", addr, d.config.Server.HTTPPort)
+	wsURL := fmt.Sprintf("ws://%s:%d/ws", addr, d.config.Server.Port)
+	httpURL := fmt.Sprintf("http://%s:%d", addr, d.config.Server.Port)
 
 	// Get repo name
 	repoName := "unknown"
@@ -296,8 +296,8 @@ func (d *DesktopApp) GetQRCodeData() (string, error) {
 func (d *DesktopApp) GetConnectionURLs() map[string]string {
 	addr := d.getServerAddress()
 	return map[string]string{
-		"websocket": fmt.Sprintf("ws://%s:%d/ws", addr, d.config.Server.HTTPPort),
-		"http":      fmt.Sprintf("http://%s:%d", addr, d.config.Server.HTTPPort),
+		"websocket": fmt.Sprintf("ws://%s:%d/ws", addr, d.config.Server.Port),
+		"http":      fmt.Sprintf("http://%s:%d", addr, d.config.Server.Port),
 	}
 }
 
@@ -313,7 +313,7 @@ func (d *DesktopApp) getServerAddress() string {
 // GetConfig returns current configuration as a map for frontend
 func (d *DesktopApp) GetConfig() map[string]interface{} {
 	return map[string]interface{}{
-		"http_port":        d.config.Server.HTTPPort,
+		"http_port":        d.config.Server.Port,
 		"host":             d.config.Server.Host,
 		"claude_command":   d.config.Claude.Command,
 		"skip_permissions": d.config.Claude.SkipPermissions,
@@ -326,7 +326,7 @@ func (d *DesktopApp) UpdateConfig(key string, value interface{}) error {
 	switch key {
 	case "http_port":
 		if v, ok := value.(float64); ok {
-			d.config.Server.HTTPPort = int(v)
+			d.config.Server.Port = int(v)
 		}
 	case "host":
 		if v, ok := value.(string); ok {

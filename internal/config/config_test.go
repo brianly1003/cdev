@@ -19,11 +19,8 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 
 	// Check default values
-	if cfg.Server.WebSocketPort != 8765 {
-		t.Errorf("default WebSocketPort = %d, want 8765", cfg.Server.WebSocketPort)
-	}
-	if cfg.Server.HTTPPort != 8766 {
-		t.Errorf("default HTTPPort = %d, want 8766", cfg.Server.HTTPPort)
+	if cfg.Server.Port != 8766 {
+		t.Errorf("default Port = %d, want 8766", cfg.Server.Port)
 	}
 	if cfg.Server.Host != "127.0.0.1" {
 		t.Errorf("default Host = %s, want 127.0.0.1", cfg.Server.Host)
@@ -56,8 +53,7 @@ func TestLoad_FromFile(t *testing.T) {
 	// Create a test config file
 	configContent := `
 server:
-  websocket_port: 9000
-  http_port: 9001
+  port: 9000
   host: "0.0.0.0"
 
 repository:
@@ -96,11 +92,8 @@ limits:
 	}
 
 	// Check loaded values
-	if cfg.Server.WebSocketPort != 9000 {
-		t.Errorf("WebSocketPort = %d, want 9000", cfg.Server.WebSocketPort)
-	}
-	if cfg.Server.HTTPPort != 9001 {
-		t.Errorf("HTTPPort = %d, want 9001", cfg.Server.HTTPPort)
+	if cfg.Server.Port != 9000 {
+		t.Errorf("Port = %d, want 9000", cfg.Server.Port)
 	}
 	if cfg.Server.Host != "0.0.0.0" {
 		t.Errorf("Host = %s, want 0.0.0.0", cfg.Server.Host)

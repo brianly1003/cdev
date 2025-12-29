@@ -38,29 +38,16 @@ func Validate(cfg *Config) error {
 }
 
 func validateServer(cfg *ServerConfig) error {
-	if cfg.WebSocketPort < 1 || cfg.WebSocketPort > 65535 {
-		return fmt.Errorf("server.websocket_port must be between 1 and 65535")
-	}
-	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
-		return fmt.Errorf("server.http_port must be between 1 and 65535")
-	}
-	if cfg.WebSocketPort == cfg.HTTPPort {
-		return fmt.Errorf("server.websocket_port and server.http_port must be different")
+	if cfg.Port < 1 || cfg.Port > 65535 {
+		return fmt.Errorf("server.port must be between 1 and 65535")
 	}
 	if cfg.Host == "" {
 		return fmt.Errorf("server.host cannot be empty")
 	}
 
-	// Validate external WebSocket URL if provided
-	if cfg.ExternalWSURL != "" {
-		if err := validateExternalURL(cfg.ExternalWSURL, "server.external_ws_url", []string{"ws", "wss"}); err != nil {
-			return err
-		}
-	}
-
-	// Validate external HTTP URL if provided
-	if cfg.ExternalHTTPURL != "" {
-		if err := validateExternalURL(cfg.ExternalHTTPURL, "server.external_http_url", []string{"http", "https"}); err != nil {
+	// Validate external URL if provided
+	if cfg.ExternalURL != "" {
+		if err := validateExternalURL(cfg.ExternalURL, "server.external_url", []string{"http", "https"}); err != nil {
 			return err
 		}
 	}

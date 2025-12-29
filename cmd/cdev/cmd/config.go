@@ -240,16 +240,12 @@ func getConfigValue(cfg *config.Config, key string) (interface{}, error) {
 			return nil, fmt.Errorf("invalid key: %s", key)
 		}
 		switch parts[1] {
-		case "http_port":
-			return cfg.Server.HTTPPort, nil
-		case "websocket_port":
-			return cfg.Server.WebSocketPort, nil
+		case "port":
+			return cfg.Server.Port, nil
 		case "host":
 			return cfg.Server.Host, nil
-		case "external_ws_url":
-			return cfg.Server.ExternalWSURL, nil
-		case "external_http_url":
-			return cfg.Server.ExternalHTTPURL, nil
+		case "external_url":
+			return cfg.Server.ExternalURL, nil
 		}
 	case "logging":
 		if len(parts) < 2 {
@@ -349,7 +345,7 @@ func parseValue(key string, value string) interface{} {
 	}
 
 	// Integer values for known int fields
-	intKeys := []string{"http_port", "websocket_port", "debounce_ms", "timeout_minutes",
+	intKeys := []string{"port", "debounce_ms", "timeout_minutes",
 		"max_file_size_kb", "max_diff_size_kb", "max_log_buffer", "max_prompt_len",
 		"token_expiry_secs"}
 	for _, k := range intKeys {
@@ -372,16 +368,15 @@ func writeDefaultConfig(path string) error {
 
 # Server settings
 server:
-  # Port for HTTP API and WebSocket connections (unified server)
-  http_port: 8766
+  # Unified port for HTTP API and WebSocket connections
+  port: 8766
 
   # Bind address (use 0.0.0.0 to allow external connections)
   host: "127.0.0.1"
 
-  # External URLs for VS Code port forwarding / tunnels
-  # When set, the QR code will contain these URLs instead of localhost URLs
-  # external_ws_url: "wss://your-tunnel.devtunnels.ms"
-  # external_http_url: "https://your-tunnel.devtunnels.ms"
+  # External URL for VS Code port forwarding / tunnels
+  # When set, the QR code will contain this URL instead of localhost
+  # external_url: "https://your-tunnel.devtunnels.ms"
 
 # Logging settings
 logging:

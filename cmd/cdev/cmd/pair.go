@@ -105,7 +105,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 }
 
 func getPairingFromServer(cfg *config.Config) (*serverPairingInfo, error) {
-	url := fmt.Sprintf("http://%s:%d/api/pair/info", cfg.Server.Host, cfg.Server.HTTPPort)
+	url := fmt.Sprintf("http://%s:%d/api/pair/info", cfg.Server.Host, cfg.Server.Port)
 
 	client := &http.Client{
 		Timeout: 2 * time.Second,
@@ -144,18 +144,17 @@ func generatePairingInfo(cfg *config.Config) *pairing.PairingInfo {
 		repoName = filepath.Base(cwd)
 	}
 
-	// Create QR generator
+	// Create QR generator with unified port
 	gen := pairing.NewQRGenerator(
 		cfg.Server.Host,
-		cfg.Server.HTTPPort, // WebSocket is on same port at /ws
-		cfg.Server.HTTPPort,
+		cfg.Server.Port,
 		sessionID,
 		repoName,
 	)
 
-	// Set external URLs if configured
-	if cfg.Server.ExternalWSURL != "" || cfg.Server.ExternalHTTPURL != "" {
-		gen.SetExternalURLs(cfg.Server.ExternalWSURL, cfg.Server.ExternalHTTPURL)
+	// Set external URL if configured
+	if cfg.Server.ExternalURL != "" {
+		gen.SetExternalURL(cfg.Server.ExternalURL)
 	}
 
 	return gen.GetPairingInfo()
@@ -177,8 +176,8 @@ func outputURL(info *pairing.PairingInfo) error {
 }
 
 func outputQR(info *pairing.PairingInfo) error {
-	// Create a temporary generator just to use PrintToTerminal
-	gen := pairing.NewQRGenerator("", 0, 0, "", "")
+	// Create a temporary generator (not really needed, but kept for potential future use)
+	gen := pairing.NewQRGenerator("", 0, "", "")
 
 	// Generate QR code from info
 	jsonData, err := json.Marshal(info)
