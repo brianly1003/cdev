@@ -2124,6 +2124,9 @@ func (m *Manager) GitInit(workspaceID string, initialBranch string, initialCommi
 	if result.Success && m.gitTrackerManager != nil {
 		// Re-register workspace to update the tracker now that it's a git repo
 		_ = m.gitTrackerManager.RegisterWorkspace(&ws.Definition)
+
+		// Emit git_status_changed to update clients (state changes from no_git to git_init/no_remote)
+		m.emitGitStatusChanged(m.ctx, workspaceID, tracker)
 	}
 
 	return result, nil
@@ -2135,7 +2138,12 @@ func (m *Manager) GitRemoteAdd(workspaceID string, name string, url string, fetc
 	if err != nil {
 		return nil, err
 	}
-	return tracker.RemoteAdd(m.ctx, name, url, fetch)
+	result, err := tracker.RemoteAdd(m.ctx, name, url, fetch)
+	if err == nil && result.Success {
+		// Emit git_status_changed to update clients (state changes from no_remote to no_push)
+		m.emitGitStatusChanged(m.ctx, workspaceID, tracker)
+	}
+	return result, err
 }
 
 // GitRemoteList lists remotes for a workspace.
@@ -2153,7 +2161,12 @@ func (m *Manager) GitRemoteRemove(workspaceID string, name string) (*git.RemoteR
 	if err != nil {
 		return nil, err
 	}
-	return tracker.RemoteRemove(m.ctx, name)
+	result, err := tracker.RemoteRemove(m.ctx, name)
+	if err == nil && result.Success {
+		// Emit git_status_changed to update clients (state may change if last remote removed)
+		m.emitGitStatusChanged(m.ctx, workspaceID, tracker)
+	}
+	return result, err
 }
 
 // GitSetUpstream sets the upstream for a branch.
@@ -2162,7 +2175,12 @@ func (m *Manager) GitSetUpstream(workspaceID string, branch string, upstream str
 	if err != nil {
 		return nil, err
 	}
-	return tracker.SetUpstream(m.ctx, branch, upstream)
+	result, err := tracker.SetUpstream(m.ctx, branch, upstream)
+	if err == nil && result.Success {
+		// Emit git_status_changed to update clients (state changes from no_push to synced/diverged)
+		m.emitGitStatusChanged(m.ctx, workspaceID, tracker)
+	}
+	return result, err
 }
 
 // GitGetStatus returns the comprehensive git status for a workspace.
