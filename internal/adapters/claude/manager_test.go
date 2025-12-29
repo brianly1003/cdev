@@ -41,17 +41,9 @@ func (h *mockEventHub) Publish(event events.Event) {
 }
 
 func (h *mockEventHub) Subscribe(sub ports.Subscriber) {}
-func (h *mockEventHub) Unsubscribe(id string)     {}
-func (h *mockEventHub) IsRunning() bool           { return h.started && !h.stopped }
-func (h *mockEventHub) SubscriberCount() int      { return 0 }
-
-func (h *mockEventHub) getEvents() []events.Event {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	result := make([]events.Event, len(h.events))
-	copy(result, h.events)
-	return result
-}
+func (h *mockEventHub) Unsubscribe(id string)          {}
+func (h *mockEventHub) IsRunning() bool                { return h.started && !h.stopped }
+func (h *mockEventHub) SubscriberCount() int           { return 0 }
 
 // --- Manager Tests ---
 

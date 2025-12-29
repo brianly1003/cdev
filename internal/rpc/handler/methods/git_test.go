@@ -167,7 +167,7 @@ func TestGitService_Status_NoProvider(t *testing.T) {
 	_, err := svc.Status(context.Background(), nil)
 
 	if err == nil {
-		t.Error("expected error for nil provider")
+		t.Fatal("expected error for nil provider")
 	}
 	if err.Code != message.NotAGitRepo {
 		t.Errorf("error code = %d, want %d", err.Code, message.NotAGitRepo)
@@ -183,7 +183,7 @@ func TestGitService_Status_Error(t *testing.T) {
 	_, err := svc.Status(context.Background(), nil)
 
 	if err == nil {
-		t.Error("expected error")
+		t.Fatal("expected error")
 	}
 	if err.Code != message.GitOperationFailed {
 		t.Errorf("error code = %d, want %d", err.Code, message.GitOperationFailed)
@@ -226,7 +226,7 @@ func TestGitService_Diff_InvalidParams(t *testing.T) {
 	_, err := svc.Diff(context.Background(), []byte(`{invalid`))
 
 	if err == nil {
-		t.Error("expected error for invalid params")
+		t.Fatal("expected error for invalid params")
 	}
 	if err.Code != message.InvalidParams {
 		t.Errorf("error code = %d, want %d", err.Code, message.InvalidParams)
@@ -268,7 +268,7 @@ func TestGitService_Stage_EmptyPaths(t *testing.T) {
 	_, err := svc.Stage(context.Background(), params)
 
 	if err == nil {
-		t.Error("expected error for empty paths")
+		t.Fatal("expected error for empty paths")
 	}
 	if err.Code != message.InvalidParams {
 		t.Errorf("error code = %d, want %d", err.Code, message.InvalidParams)

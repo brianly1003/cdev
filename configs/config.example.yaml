@@ -1,5 +1,5 @@
 # cdev Configuration
-# Copy this file to config.yaml and modify as needed
+# Copy this file to ~/.cdev/config.yaml and modify as needed
 
 # Server settings
 server:

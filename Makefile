@@ -313,9 +313,16 @@ vet:
 	$(GOVET) ./...
 
 # Run linter (requires golangci-lint)
+# Install: brew install golangci-lint OR go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+GOLANGCI_LINT := $(shell which golangci-lint 2>/dev/null || echo $(shell go env GOPATH)/bin/golangci-lint)
 lint:
-	@which golangci-lint > /dev/null || (echo "golangci-lint not installed. Run: brew install golangci-lint" && exit 1)
-	golangci-lint run
+	@if [ ! -x "$(GOLANGCI_LINT)" ]; then \
+		echo "golangci-lint not installed. Run one of:"; \
+		echo "  brew install golangci-lint"; \
+		echo "  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		exit 1; \
+	fi
+	$(GOLANGCI_LINT) run
 
 # Tidy dependencies
 tidy:

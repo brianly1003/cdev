@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -73,16 +72,3 @@ var versionCmd = &cobra.Command{
 	},
 }
 
-// configCmd displays or manages configuration.
-var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Display current configuration",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := loadConfig()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-			os.Exit(1)
-		}
-		printConfig(cfg)
-	},
-}
