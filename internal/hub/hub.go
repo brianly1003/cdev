@@ -70,17 +70,29 @@ func (h *Hub) Stop() error {
 		return nil
 	}
 	h.running = false
-	h.mu.Unlock()
 
-	close(h.done)
+	// Close done channel under lock to prevent double-close
+	// Save local reference and close while holding lock
+	done := h.done
+	h.done = nil // Prevent double close
 
-	// Close all subscribers
-	h.mu.Lock()
+	// Copy subscribers to close them outside the lock
+	subsToClose := make([]ports.Subscriber, 0, len(h.subscribers))
 	for _, sub := range h.subscribers {
-		_ = sub.Close()
+		subsToClose = append(subsToClose, sub)
 	}
 	h.subscribers = make(map[string]ports.Subscriber)
 	h.mu.Unlock()
+
+	// Close done channel if it wasn't already nil
+	if done != nil {
+		close(done)
+	}
+
+	// Close all subscribers outside the lock
+	for _, sub := range subsToClose {
+		_ = sub.Close()
+	}
 
 	log.Debug().Msg("event hub stopped")
 	return nil
@@ -88,9 +100,14 @@ func (h *Hub) Stop() error {
 
 // run is the main event loop.
 func (h *Hub) run() {
+	// Capture done channel locally to avoid races with concurrent Start() calls
+	h.mu.RLock()
+	done := h.done
+	h.mu.RUnlock()
+
 	for {
 		select {
-		case <-h.done:
+		case <-done:
 			return
 
 		case sub := <-h.register:
