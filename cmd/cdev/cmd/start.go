@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/brianly1003/cdev/internal/app"
@@ -164,28 +163,4 @@ func printConfig(cfg *config.Config) {
 	fmt.Printf("Git Enabled:     %t\n", cfg.Git.Enabled)
 	fmt.Printf("Log Level:       %s\n", cfg.Logging.Level)
 	fmt.Printf("Log Format:      %s\n", cfg.Logging.Format)
-}
-
-// deriveExternalURLs derives HTTP and WebSocket URLs from a single base URL.
-// Input: https://abc123x4-8766.asse.devtunnels.ms/ (or http://)
-// Output: httpURL = https://abc123x4-8766.asse.devtunnels.ms
-//
-//	wsURL   = wss://abc123x4-8766.asse.devtunnels.ms/ws
-func deriveExternalURLs(baseURL string) (httpURL, wsURL string) {
-	// Trim trailing slashes
-	baseURL = strings.TrimRight(baseURL, "/")
-
-	// HTTP URL is the base URL as-is
-	httpURL = baseURL
-
-	// WebSocket URL: convert scheme and append /ws
-	wsURL = baseURL
-	if strings.HasPrefix(wsURL, "https://") {
-		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
-	} else if strings.HasPrefix(wsURL, "http://") {
-		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
-	}
-	wsURL = wsURL + "/ws"
-
-	return httpURL, wsURL
 }
