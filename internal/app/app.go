@@ -55,6 +55,7 @@ type App struct {
 	unifiedServer   *unified.Server
 	rpcDispatcher   *handler.Dispatcher
 	qrGenerator     *pairing.QRGenerator
+	tokenManager    *security.TokenManager
 
 	// Multi-workspace support
 	sessionManager         *session.Manager
@@ -314,6 +315,25 @@ func (a *App) Start(ctx context.Context) error {
 			Msg("using external URL for QR code")
 	}
 
+	// Generate pairing token for QR code if auth is required (before printing QR)
+	if a.cfg.Security.RequireAuth {
+		tokenManager, err := security.NewTokenManager(a.cfg.Security.TokenExpirySecs)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create token manager for QR code")
+		} else {
+			a.tokenManager = tokenManager // Store for later reuse
+			token, expiresAt, err := tokenManager.GeneratePairingToken()
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to generate pairing token for QR code")
+			} else {
+				a.qrGenerator.SetToken(token)
+				log.Info().
+					Time("expires_at", expiresAt).
+					Msg("pairing token generated for QR code")
+			}
+		}
+	}
+
 	// Log startup info
 	log.Info().
 		Str("session_id", a.sessionID).
@@ -467,18 +487,23 @@ func (a *App) Start(ctx context.Context) error {
 	}
 
 	// Set up pairing handler for mobile app connection
-	tokenManager, err := security.NewTokenManager(a.cfg.Security.TokenExpirySecs)
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to create token manager, pairing will work without auth")
+	// Reuse tokenManager if already created for QR code, otherwise create new one
+	if a.tokenManager == nil {
+		tokenManager, err := security.NewTokenManager(a.cfg.Security.TokenExpirySecs)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create token manager, pairing will work without auth")
+		}
+		a.tokenManager = tokenManager
 	}
+
 	originChecker := security.NewOriginChecker(a.cfg.Security.AllowedOrigins, a.cfg.Security.BindLocalhostOnly)
 
 	// Configure security on unified server
-	a.unifiedServer.SetSecurity(tokenManager, originChecker, a.cfg.Security.RequireAuth)
+	a.unifiedServer.SetSecurity(a.tokenManager, originChecker, a.cfg.Security.RequireAuth)
 
 	// Create pairing handler with function to get current pairing info
 	pairingHandler := httpserver.NewPairingHandler(
-		tokenManager,
+		a.tokenManager,
 		a.cfg.Security.RequireAuth,
 		func() *pairing.PairingInfo {
 			if a.qrGenerator != nil {
@@ -490,8 +515,8 @@ func (a *App) Start(ctx context.Context) error {
 	a.httpServer.SetPairingHandler(pairingHandler)
 
 	// Create auth handler for token exchange and refresh
-	if tokenManager != nil {
-		authHandler := httpserver.NewAuthHandler(tokenManager)
+	if a.tokenManager != nil {
+		authHandler := httpserver.NewAuthHandler(a.tokenManager)
 		a.httpServer.SetAuthHandler(authHandler)
 	}
 

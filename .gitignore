@@ -53,3 +53,4 @@ frontend/dist/
 .env
 .env.local
 CLAUDE.md
+docs/samples

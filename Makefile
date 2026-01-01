@@ -148,25 +148,22 @@ build-linux-amd64-obfuscated:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GARBLE) $(GARBLE_FLAGS) build $(LDFLAGS_RELEASE) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/cdev
 
 # Run the application in TERMINAL mode (default, Claude runs in current terminal)
-# Usage: make run or make run REPO=/path/to/repo
+# Usage: make run or make run REPO=/path/to/repo EXTERNAL_URL=https://example.com
 REPO ?=
+EXTERNAL_URL ?=
 run: build
 	@echo "Starting cdev in TERMINAL mode (Claude will run in this terminal)..."
-ifneq ($(REPO),)
-	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
-else
-	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
-endif
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml \
+		$(if $(REPO),--repo $(REPO)) \
+		$(if $(EXTERNAL_URL),--external-url $(EXTERNAL_URL))
 
 # Run with DEADLOCK DETECTION enabled
-# Usage: make run-debug or make run-debug REPO=/path/to/repo
+# Usage: make run-debug or make run-debug REPO=/path/to/repo EXTERNAL_URL=https://example.com
 run-debug: build-debug
 	@echo "Starting cdev with DEADLOCK DETECTION enabled..."
-ifneq ($(REPO),)
-	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml --repo $(REPO)
-else
-	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml
-endif
+	CDEV_LOGGING_LEVEL=debug ./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml \
+		$(if $(REPO),--repo $(REPO)) \
+		$(if $(EXTERNAL_URL),--external-url $(EXTERNAL_URL))
 
 # Run the application in HEADLESS mode (Claude runs as background subprocess)
 # Usage: make run-headless or make run-headless REPO=/path/to/repo
@@ -400,6 +397,7 @@ help:
 	@echo "  TERMINAL MODE (default) - Claude runs in current terminal:"
 	@echo "    make run               Run in terminal mode (Claude visible in this terminal)"
 	@echo "    make run REPO=/path    Run with specific repo in terminal mode"
+	@echo "    make run EXTERNAL_URL=https://...  Run with external URL"
 	@echo ""
 	@echo "  HEADLESS MODE - Claude runs as background subprocess:"
 	@echo "    make run-headless      Run in headless mode (Claude as background process)"
@@ -412,6 +410,9 @@ help:
 	@echo "  DEBUG MODE (deadlock detection):"
 	@echo "    make run-debug         Run with go-deadlock to detect potential deadlocks"
 	@echo "    make run-debug REPO=/path  Run debug mode with specific repo"
+	@echo "    make run-debug EXTERNAL_URL=https://...  Run debug with external URL"
+	@echo ""
+	@echo "  Note: Set security.require_auth=true in config to auto-generate QR token"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test                  Run tests"
