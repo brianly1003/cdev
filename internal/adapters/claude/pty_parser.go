@@ -133,13 +133,19 @@ func NewPTYParser() *PTYParser {
 		promptEndPattern: regexp.MustCompile(`(?i)^\s*(?:Esc(?:ape)?\s+to\s+cancel|press\s+\d+|enter\s+to\s+confirm)`),
 
 		// Thinking patterns - matches Claude's various "processing" indicators
+		// All thinking indicators end with "(esc to interrupt)" - use that as the primary pattern
 		thinkingPatterns: []*regexp.Regexp{
-			regexp.MustCompile(`(?i)(?:Thinking|Scheming|Cooking|Analyzing|Processing|Considering|Baking)…?\.{0,3}`),
-			regexp.MustCompile(`(?i)(?:✢|✽|✻|✶|✳|·)\s*(?:Thinking|Scheming|Cooking|Considering|Baking)`),
+			// Primary pattern: anything with "(esc to interrupt)" suffix
+			regexp.MustCompile(`\(esc to interrupt\)`),
+			// Fallback patterns for older formats without the suffix:
+			// regexp.MustCompile(`(?i)(?:Thinking|Scheming|Cooking|Analyzing|Processing|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)…?\.{0,3}`),
+			// regexp.MustCompile(`(?i)(?:✢|✽|✻|✶|✳|·)\s*(?:Thinking|Scheming|Cooking|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)`),
 		},
 
-		// Error pattern
-		errorPattern: regexp.MustCompile(`(?i)(?:Error|Failed|Exception|Cannot|Unable to):\s*(.+)`),
+		// Error pattern - require word at start of line (after optional whitespace)
+		// or after common prefixes, to avoid false positives from grep commands
+		// that contain "error:" in their pattern argument
+		errorPattern: regexp.MustCompile(`(?i)^\s*(?:Error|Failed|Exception|Cannot|Unable to|RangeError|TypeError|SyntaxError):\s*(.+)`),
 
 		// Question pattern (ends with ?)
 		questionPattern: regexp.MustCompile(`\?\s*$`),
@@ -170,10 +176,19 @@ func (p *PTYParser) ProcessLine(rawLine string) (*PTYPermissionPrompt, PTYState)
 		}
 	}
 
-	// Check for error state
+	// Check for error state - only match if error is at start of line (not embedded in other text)
+	// This prevents false positives from grep commands or output containing "error:" mid-line
 	if p.errorPattern.MatchString(cleanLine) {
 		p.state = PTYStateError
 		return nil, p.state
+	}
+
+	// Reset state to idle when we see normal output patterns
+	// This ensures error/question states don't persist forever
+	if p.state == PTYStateError || p.state == PTYStateQuestion {
+		if p.isNormalOutput(cleanLine) {
+			p.state = PTYStateIdle
+		}
 	}
 
 	// Detect permission type from line
@@ -183,8 +198,13 @@ func (p *PTYParser) ProcessLine(rawLine string) (*PTYPermissionPrompt, PTYState)
 	p.buffer = append(p.buffer, cleanLine)
 
 	// Keep buffer at reasonable size
+	// If buffer overflows without detecting a prompt, clear stale prompt state
 	if len(p.buffer) > 30 {
 		p.buffer = p.buffer[len(p.buffer)-30:]
+		// Clear stale prompt type/target - if we've accumulated 30+ lines
+		// without completing a prompt, the detected type is probably stale
+		p.currentPromptType = ""
+		p.currentPromptTarget = ""
 	}
 
 	// Only try to detect permission prompt if NOT already in permission state
@@ -528,6 +548,48 @@ func (p *PTYParser) extractPreview() string {
 	}
 
 	return strings.Join(previewLines, "\n")
+}
+
+// isNormalOutput checks if a line represents normal Claude output
+// that should reset error/question states back to idle.
+func (p *PTYParser) isNormalOutput(line string) bool {
+	// Welcome banner patterns (box drawing characters)
+	if strings.HasPrefix(line, "╭") || strings.HasPrefix(line, "╰") || strings.HasPrefix(line, "│") {
+		return true
+	}
+
+	// Divider lines
+	if strings.HasPrefix(line, "─") {
+		return true
+	}
+
+	// User prompt patterns (> at start indicates prompt line)
+	if strings.HasPrefix(line, ">") || strings.HasPrefix(line, "❯") {
+		return true
+	}
+
+	// Claude output marker
+	if strings.HasPrefix(line, "⏺") {
+		return true
+	}
+
+	// File/command result indicators
+	if strings.HasPrefix(line, "⎿") {
+		return true
+	}
+
+	// Status line patterns
+	if strings.Contains(line, "? for shortcuts") {
+		return true
+	}
+
+	// Spinner patterns (not in thinking state) indicate processing is done
+	if strings.Contains(line, "Wrote") || strings.Contains(line, "Created") ||
+		strings.Contains(line, "Updated") || strings.Contains(line, "Deleted") {
+		return true
+	}
+
+	return false
 }
 
 // Reset clears the parser state.

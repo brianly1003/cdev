@@ -12,29 +12,55 @@ func TestPTYParser_ProcessLine_DetectsThinking(t *testing.T) {
 		input         string
 		expectedState PTYState
 	}{
+		// All Claude Code thinking indicators have "(esc to interrupt)" suffix
 		{
 			name:          "thinking indicator",
-			input:         "Thinking...",
-			expectedState: PTYStateThinking,
-		},
-		{
-			name:          "thinking with dots",
-			input:         "✢ Thinking...",
+			input:         "✢ Thinking… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
 			name:          "scheming indicator",
-			input:         "Scheming...",
+			input:         "✻ Scheming… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
 			name:          "cooking indicator",
-			input:         "Cooking...",
+			input:         "✶ Cooking… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "analyzing indicator",
-			input:         "Analyzing...",
+			name:          "imagining indicator",
+			input:         "✳ Imagining… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "sussing indicator",
+			input:         "· Sussing… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "finagling indicator",
+			input:         "✻ Finagling… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "vibing indicator",
+			input:         "✶ Vibing… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "mulling indicator",
+			input:         "✽ Mulling… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "deciphering indicator",
+			input:         "✢ Deciphering… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "any future verb",
+			input:         "✳ WhateverNewVerb… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 	}
@@ -439,10 +465,8 @@ func TestPTYParser_ConsideringState(t *testing.T) {
 		input         string
 		expectedState PTYState
 	}{
-		{"considering", "Considering…", PTYStateThinking},
-		{"considering_with_context", "· Considering… (esc to interrupt)", PTYStateThinking},
-		{"baking", "Baking…", PTYStateThinking},
-		{"baking_with_dot", "✻ Baking… (esc to interrupt)", PTYStateThinking},
+		{"considering", "· Considering… (esc to interrupt)", PTYStateThinking},
+		{"baking", "✻ Baking… (esc to interrupt)", PTYStateThinking},
 	}
 
 	for _, tt := range tests {
@@ -718,5 +742,124 @@ func TestPTYParser_PermissionPanelHeaders(t *testing.T) {
 					tt.line, parser.currentPromptType, tt.expectedType)
 			}
 		})
+	}
+}
+
+// TestPTYParser_StateResetOnNormalOutput tests that error/question states reset when normal output is seen
+func TestPTYParser_StateResetOnNormalOutput(t *testing.T) {
+	parser := NewPTYParser()
+
+	// First, trigger error state
+	parser.ProcessLine("Error: something went wrong")
+	if parser.GetState() != PTYStateError {
+		t.Errorf("Expected error state after error line, got %v", parser.GetState())
+	}
+
+	// Test that normal output resets error state
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"welcome_banner_top", "╭─── Claude Code v2.0.71 ───────────────"},
+		{"welcome_banner_bottom", "╰────────────────────────────────────────"},
+		{"welcome_banner_side", "│                 Welcome back Brian!                │"},
+		{"divider_line", "─────────────────────────────"},
+		{"user_prompt", "> create new text.txt"},
+		{"user_prompt_arrow", "❯ hello"},
+		{"claude_marker", "⏺ Write(text.txt)"},
+		{"result_indicator", "  ⎿  Wrote 1 lines to text.txt"},
+		{"shortcuts_help", "  ? for shortcuts"},
+		{"wrote_file", "Wrote 5 lines to file.txt"},
+		{"created_file", "Created text.txt in the current directory."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset and set to error state
+			parser.Reset()
+			parser.ProcessLine("Error: test error")
+
+			// Now process normal output
+			_, state := parser.ProcessLine(tt.input)
+
+			if state != PTYStateIdle {
+				t.Errorf("ProcessLine(%q) after error should reset to idle, got %v", tt.input, state)
+			}
+		})
+	}
+}
+
+// TestPTYParser_ErrorPatternStricter tests that error pattern doesn't match embedded errors
+func TestPTYParser_ErrorPatternStricter(t *testing.T) {
+	parser := NewPTYParser()
+
+	// These should NOT trigger error state (embedded in grep commands, etc.)
+	noError := []struct {
+		name  string
+		input string
+	}{
+		{"grep_error_pattern", `grep -E "(error:|BUILD FAILED)"`},
+		{"echo_error", `echo "error: something"`},
+		{"quoted_error", `"error:" in the output`},
+	}
+
+	for _, tt := range noError {
+		t.Run(tt.name, func(t *testing.T) {
+			parser.Reset()
+			_, state := parser.ProcessLine(tt.input)
+
+			if state == PTYStateError {
+				t.Errorf("ProcessLine(%q) should NOT trigger error state", tt.input)
+			}
+		})
+	}
+
+	// These SHOULD trigger error state
+	yesError := []struct {
+		name  string
+		input string
+	}{
+		{"error_at_start", "Error: something went wrong"},
+		{"range_error", "RangeError: Invalid time value"},
+		{"type_error", "TypeError: undefined is not a function"},
+		{"failed_at_start", "Failed: could not connect"},
+		{"indented_error", "    Error: indented error message"},
+	}
+
+	for _, tt := range yesError {
+		t.Run(tt.name, func(t *testing.T) {
+			parser.Reset()
+			_, state := parser.ProcessLine(tt.input)
+
+			if state != PTYStateError {
+				t.Errorf("ProcessLine(%q) SHOULD trigger error state, got %v", tt.input, state)
+			}
+		})
+	}
+}
+
+// TestPTYParser_StalePromptTypeClear tests that prompt type clears after buffer overflow
+func TestPTYParser_StalePromptTypeClear(t *testing.T) {
+	parser := NewPTYParser()
+
+	// Set a prompt type
+	parser.ProcessLine("Write(test.txt)")
+
+	// Verify prompt type was detected
+	if parser.currentPromptType != PermissionTypeWriteFile {
+		t.Errorf("Expected write_file type, got %v", parser.currentPromptType)
+	}
+
+	// Feed more than 30 lines without completing a prompt
+	for i := 0; i < 35; i++ {
+		parser.ProcessLine("some random line")
+	}
+
+	// After buffer overflow, prompt type should be cleared
+	if parser.currentPromptType != "" {
+		t.Errorf("Expected empty prompt type after buffer overflow, got %v", parser.currentPromptType)
+	}
+	if parser.currentPromptTarget != "" {
+		t.Errorf("Expected empty prompt target after buffer overflow, got %v", parser.currentPromptTarget)
 	}
 }
