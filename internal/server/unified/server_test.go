@@ -528,6 +528,86 @@ func TestUnifiedClient_Send_LegacyFormat(t *testing.T) {
 	}
 }
 
+// --- Localhost Address Tests ---
+
+func TestIsLocalhostAddr(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		want       bool
+	}{
+		{
+			name:       "IPv4 localhost with port",
+			remoteAddr: "127.0.0.1:12345",
+			want:       true,
+		},
+		{
+			name:       "IPv4 localhost without port",
+			remoteAddr: "127.0.0.1",
+			want:       true,
+		},
+		{
+			name:       "IPv6 localhost with port (bracket notation)",
+			remoteAddr: "[::1]:12345",
+			want:       true,
+		},
+		{
+			name:       "IPv6 localhost without bracket (not supported)",
+			remoteAddr: "::1",
+			want:       false, // Function expects [::1]:port format for IPv6
+		},
+		{
+			name:       "localhost string with port",
+			remoteAddr: "localhost:8080",
+			want:       true,
+		},
+		{
+			name:       "localhost string without port",
+			remoteAddr: "localhost",
+			want:       true,
+		},
+		{
+			name:       "private IP address",
+			remoteAddr: "192.168.1.1:12345",
+			want:       false,
+		},
+		{
+			name:       "another private IP",
+			remoteAddr: "10.0.0.1:8080",
+			want:       false,
+		},
+		{
+			name:       "public IP address",
+			remoteAddr: "8.8.8.8:443",
+			want:       false,
+		},
+		{
+			name:       "random hostname",
+			remoteAddr: "example.com:80",
+			want:       false,
+		},
+		{
+			name:       "empty string",
+			remoteAddr: "",
+			want:       false,
+		},
+		{
+			name:       "IPv4 127.0.0.2 (still loopback range)",
+			remoteAddr: "127.0.0.2:8080",
+			want:       false, // Only 127.0.0.1 is checked, not the whole range
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isLocalhostAddr(tt.remoteAddr)
+			if got != tt.want {
+				t.Errorf("isLocalhostAddr(%q) = %v, want %v", tt.remoteAddr, got, tt.want)
+			}
+		})
+	}
+}
+
 // --- Mock Status Provider ---
 
 type mockStatusProvider struct {

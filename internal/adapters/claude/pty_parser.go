@@ -133,10 +133,11 @@ func NewPTYParser() *PTYParser {
 		promptEndPattern: regexp.MustCompile(`(?i)^\s*(?:Esc(?:ape)?\s+to\s+cancel|press\s+\d+|enter\s+to\s+confirm)`),
 
 		// Thinking patterns - matches Claude's various "processing" indicators
-		// All thinking indicators end with "(esc to interrupt)" - use that as the primary pattern
+		// All thinking indicators end with "(esc to interrupt ...)" - use that as the primary pattern
 		thinkingPatterns: []*regexp.Regexp{
-			// Primary pattern: anything with "(esc to interrupt)" suffix
-			regexp.MustCompile(`\(esc to interrupt\)`),
+			// Primary pattern: "(esc to interrupt" followed by optional content and closing paren
+			// Handles both "(esc to interrupt)" and "(esc to interrupt · thinking)"
+			regexp.MustCompile(`\(esc to interrupt[^)]*\)`),
 			// Fallback patterns for older formats without the suffix:
 			// regexp.MustCompile(`(?i)(?:Thinking|Scheming|Cooking|Analyzing|Processing|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)…?\.{0,3}`),
 			// regexp.MustCompile(`(?i)(?:✢|✽|✻|✶|✳|·)\s*(?:Thinking|Scheming|Cooking|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)`),
@@ -219,7 +220,8 @@ func (p *PTYParser) ProcessLine(rawLine string) (*PTYPermissionPrompt, PTYState)
 	}
 
 	// Check if this looks like a question (ends with ?)
-	if p.questionPattern.MatchString(cleanLine) && !p.allowPattern.MatchString(cleanLine) {
+	// Exclude "Tip:" lines which often end with ? but aren't real questions
+	if p.questionPattern.MatchString(cleanLine) && !p.allowPattern.MatchString(cleanLine) && !strings.Contains(cleanLine, "Tip:") {
 		p.state = PTYStateQuestion
 	}
 

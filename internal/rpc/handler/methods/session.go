@@ -219,17 +219,6 @@ func (s *SessionService) RegisterMethods(r *handler.Registry) {
 		Errors: []string{"SessionNotFound"},
 	})
 
-	r.RegisterWithMeta("session/delete", s.DeleteSession, handler.MethodMeta{
-		Summary:     "Delete session(s)",
-		Description: "Deletes a specific session or all sessions if no session_id is provided.",
-		Params: []handler.OpenRPCParam{
-			{Name: "session_id", Description: "Session ID to delete (optional, deletes all if not provided)", Required: false, Schema: map[string]interface{}{"type": "string"}},
-			{Name: "agent_type", Description: "Agent type (optional)", Required: false, Schema: map[string]interface{}{"type": "string"}},
-		},
-		Result: &handler.OpenRPCResult{Name: "SessionDeleteResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionDeleteResult"}},
-		Errors: []string{"SessionNotFound"},
-	})
-
 	r.RegisterWithMeta("session/watch", s.WatchSession, handler.MethodMeta{
 		Summary:     "Start watching a session",
 		Description: "Starts watching a session for real-time updates. The client will receive notifications when new messages are added.",
@@ -516,65 +505,6 @@ func getOffsetFromCursor(afterID string, elements []SessionElement) int {
 		}
 	}
 	return 0
-}
-
-// DeleteSessionParams for session/delete method.
-type DeleteSessionParams struct {
-	SessionID string `json:"session_id,omitempty"`
-	AgentType string `json:"agent_type,omitempty"`
-}
-
-// DeleteSessionResult for session/delete method.
-type DeleteSessionResult struct {
-	Status    string `json:"status"`
-	SessionID string `json:"session_id,omitempty"`
-	Deleted   int    `json:"deleted,omitempty"`
-}
-
-// DeleteSession deletes a specific session or all sessions.
-func (s *SessionService) DeleteSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-	var p DeleteSessionParams
-	if params != nil {
-		if err := json.Unmarshal(params, &p); err != nil {
-			return nil, message.ErrInvalidParams("invalid params: " + err.Error())
-		}
-	}
-
-	if p.SessionID != "" {
-		// Delete specific session
-		for agentType, provider := range s.providers {
-			if p.AgentType != "" && p.AgentType != agentType {
-				continue
-			}
-
-			if err := provider.DeleteSession(ctx, p.SessionID); err == nil {
-				return DeleteSessionResult{
-					Status:    "deleted",
-					SessionID: p.SessionID,
-					Deleted:   1,
-				}, nil
-			}
-		}
-		return nil, message.ErrSessionNotFound(p.SessionID)
-	}
-
-	// Delete all sessions
-	totalDeleted := 0
-	for agentType, provider := range s.providers {
-		if p.AgentType != "" && p.AgentType != agentType {
-			continue
-		}
-
-		deleted, err := provider.DeleteAllSessions(ctx)
-		if err == nil {
-			totalDeleted += deleted
-		}
-	}
-
-	return DeleteSessionResult{
-		Status:  "deleted",
-		Deleted: totalDeleted,
-	}, nil
 }
 
 // WatchSessionParams for session/watch method.

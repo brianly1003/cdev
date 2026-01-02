@@ -187,7 +187,7 @@ func outputQR(info *pairing.PairingInfo) error {
 
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     cdev Pairing                           ║")
+	fmt.Println("║                     Cdev Pairing                           ║")
 	fmt.Println("╠════════════════════════════════════════════════════════════╣")
 	fmt.Printf("║  WebSocket: %-47s ║\n", truncate(info.WebSocket, 47))
 	fmt.Printf("║  HTTP:      %-47s ║\n", truncate(info.HTTP, 47))

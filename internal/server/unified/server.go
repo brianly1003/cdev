@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -223,7 +224,8 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate token if authentication is required
-	if s.requireAuth {
+	// Allow localhost connections without authentication (for hook commands)
+	if s.requireAuth && !isLocalhostAddr(r.RemoteAddr) {
 		if err := s.validateTokenFromRequest(r); err != nil {
 			log.Warn().
 				Err(err).
@@ -521,6 +523,27 @@ func (s *Server) checkOrigin(r *http.Request) bool {
 
 	// Default localhost check
 	return isLocalhostOrigin(origin)
+}
+
+// isLocalhostAddr checks if a remote address is from localhost.
+// Accepts addresses in format "ip:port" or just "ip".
+func isLocalhostAddr(remoteAddr string) bool {
+	// Extract IP part (handle "ip:port" format)
+	host := remoteAddr
+	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
+		// Check if this is IPv6 with brackets
+		if strings.Contains(remoteAddr, "[") {
+			// IPv6 format: [::1]:port
+			if bracketIdx := strings.Index(remoteAddr, "]"); bracketIdx != -1 {
+				host = remoteAddr[1:bracketIdx] // Extract IP between brackets
+			}
+		} else {
+			// IPv4 format: 127.0.0.1:port
+			host = remoteAddr[:idx]
+		}
+	}
+
+	return host == "127.0.0.1" || host == "::1" || host == "localhost"
 }
 
 // isLocalhostOrigin checks if an origin is from localhost.

@@ -12,16 +12,17 @@ import (
 
 // Config holds all configuration for the application.
 type Config struct {
-	Server     ServerConfig     `mapstructure:"server"`
-	Repository RepositoryConfig `mapstructure:"repository"`
-	Watcher    WatcherConfig    `mapstructure:"watcher"`
-	Claude     ClaudeConfig     `mapstructure:"claude"`
-	Git        GitConfig        `mapstructure:"git"`
-	Logging    LoggingConfig    `mapstructure:"logging"`
-	Limits     LimitsConfig     `mapstructure:"limits"`
-	Pairing    PairingConfig    `mapstructure:"pairing"`
-	Indexer    IndexerConfig    `mapstructure:"indexer"`
-	Security   SecurityConfig   `mapstructure:"security"`
+	Server      ServerConfig      `mapstructure:"server"`
+	Repository  RepositoryConfig  `mapstructure:"repository"`
+	Watcher     WatcherConfig     `mapstructure:"watcher"`
+	Claude      ClaudeConfig      `mapstructure:"claude"`
+	Git         GitConfig         `mapstructure:"git"`
+	Logging     LoggingConfig     `mapstructure:"logging"`
+	Limits      LimitsConfig      `mapstructure:"limits"`
+	Pairing     PairingConfig     `mapstructure:"pairing"`
+	Indexer     IndexerConfig     `mapstructure:"indexer"`
+	Security    SecurityConfig    `mapstructure:"security"`
+	Permissions PermissionsConfig `mapstructure:"permissions"`
 }
 
 // ServerConfig holds server-related configuration.
@@ -91,6 +92,18 @@ type SecurityConfig struct {
 	TokenExpirySecs   int      `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
 	AllowedOrigins    []string `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
 	BindLocalhostOnly bool     `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
+}
+
+// PermissionsConfig holds permission hook bridge configuration.
+type PermissionsConfig struct {
+	SessionMemory SessionMemoryConfig `mapstructure:"session_memory"`
+}
+
+// SessionMemoryConfig holds session memory configuration for the permission system.
+type SessionMemoryConfig struct {
+	Enabled     bool `mapstructure:"enabled"`      // Enable session memory for "Allow for Session" functionality
+	TTLSeconds  int  `mapstructure:"ttl_seconds"`  // Idle timeout for session memory in seconds (default: 3600)
+	MaxPatterns int  `mapstructure:"max_patterns"` // Max patterns per session (default: 100)
 }
 
 // Load loads configuration from files and environment.
@@ -192,6 +205,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
+
+	// Permissions defaults (hook bridge)
+	v.SetDefault("permissions.session_memory.enabled", true)
+	v.SetDefault("permissions.session_memory.ttl_seconds", 3600) // 1 hour idle timeout
+	v.SetDefault("permissions.session_memory.max_patterns", 100)
 }
 
 // postProcess applies post-processing to configuration.

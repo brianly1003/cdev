@@ -2370,6 +2370,40 @@ func getSessionsDir(repoPath string) string {
 	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }
 
+// DeleteHistorySession deletes a historical Claude session file.
+// This removes the .jsonl file from ~/.claude/projects/<encoded-path>/
+func (m *Manager) DeleteHistorySession(workspaceID, sessionID string) error {
+	// Get workspace path
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
+		return fmt.Errorf("workspace not found: %w", err)
+	}
+
+	// Get sessions directory for this workspace
+	sessionsDir := getSessionsDir(ws.Definition.Path)
+
+	// Construct session file path
+	sessionFile := filepath.Join(sessionsDir, sessionID+".jsonl")
+
+	// Check if file exists
+	if _, err := os.Stat(sessionFile); os.IsNotExist(err) {
+		return fmt.Errorf("session file not found: %s", sessionID)
+	}
+
+	// Delete the file
+	if err := os.Remove(sessionFile); err != nil {
+		return fmt.Errorf("failed to delete session file: %w", err)
+	}
+
+	m.logger.Info("Deleted historical session",
+		"workspace_id", workspaceID,
+		"session_id", sessionID,
+		"file", sessionFile,
+	)
+
+	return nil
+}
+
 // WatchInfo contains information about the currently watched session.
 type WatchInfo struct {
 	WorkspaceID string `json:"workspace_id"`

@@ -23,6 +23,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/hub"
 	"github.com/brianly1003/cdev/internal/pairing"
+	"github.com/brianly1003/cdev/internal/permission"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
 	"github.com/brianly1003/cdev/internal/security"
@@ -61,6 +62,9 @@ type App struct {
 	sessionManager         *session.Manager
 	workspaceConfigManager *workspace.ConfigManager
 	gitTrackerManager      *workspace.GitTrackerManager
+
+	// Permission hook bridge
+	permissionManager *permission.MemoryManager
 
 	// Terminal mode support (headless=false)
 	terminalRunner *terminal.Runner
@@ -272,6 +276,18 @@ func (a *App) Start(ctx context.Context) error {
 	// No workspaces are pre-loaded from config file
 	log.Info().Msg("multi-workspace support initialized (use workspace/add API to add workspaces)")
 
+	// Initialize Permission Memory Manager (for hook bridge "Allow for Session" functionality)
+	if a.cfg.Permissions.SessionMemory.Enabled {
+		permConfig := permission.SessionMemoryConfig{
+			Enabled:     true,
+			TTL:         time.Duration(a.cfg.Permissions.SessionMemory.TTLSeconds) * time.Second,
+			MaxPatterns: a.cfg.Permissions.SessionMemory.MaxPatterns,
+		}
+		a.permissionManager = permission.NewMemoryManager(permConfig, log.Logger)
+		a.permissionManager.StartCleanup(ctx)
+		log.Info().Msg("permission hook bridge enabled")
+	}
+
 	// Initialize Repository Indexer (only if repository.path is configured)
 	if a.cfg.Indexer.Enabled && a.cfg.Repository.Path != "" {
 		repoIndexer, err := repository.NewIndexer(a.cfg.Repository.Path, a.cfg.Indexer.SkipDirectories)
@@ -433,6 +449,16 @@ func (a *App) Start(ctx context.Context) error {
 	// Provider will be set after unified server is created
 	clientService := methods.NewClientService(nil)
 	clientService.RegisterMethods(rpcRegistry)
+
+	// Permission service (for hook bridge)
+	if a.permissionManager != nil {
+		permissionService := methods.NewPermissionService(
+			a.permissionManager,
+			a.hub,
+			methods.NewWorkspaceIDResolver(),
+		)
+		permissionService.RegisterMethods(rpcRegistry)
+	}
 
 	a.rpcDispatcher = handler.NewDispatcher(rpcRegistry)
 

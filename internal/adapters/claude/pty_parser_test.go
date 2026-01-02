@@ -863,3 +863,98 @@ func TestPTYParser_StalePromptTypeClear(t *testing.T) {
 		t.Errorf("Expected empty prompt target after buffer overflow, got %v", parser.currentPromptTarget)
 	}
 }
+
+// TestPTYParser_ThinkingWithMiddleDot tests that thinking patterns match spinner lines
+// with middle dot content like "(esc to interrupt · thinking)"
+func TestPTYParser_ThinkingWithMiddleDot(t *testing.T) {
+	parser := NewPTYParser()
+
+	tests := []struct {
+		name          string
+		input         string
+		expectedState PTYState
+	}{
+		{
+			name:          "standard esc to interrupt",
+			input:         "✢ Thinking… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "esc to interrupt with middle dot thinking",
+			input:         "✻ Flibbertigibbeting… (esc to interrupt · thinking)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "esc to interrupt with middle dot",
+			input:         "✶ Scheming… (esc to interrupt ·)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "esc to interrupt with extra text",
+			input:         "✳ Pondering… (esc to interrupt · processing)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "middle dot spinner symbol",
+			input:         "· Flibbertigibbeting… (esc to interrupt · thinking)",
+			expectedState: PTYStateThinking,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser.Reset()
+			_, state := parser.ProcessLine(tt.input)
+			if state != tt.expectedState {
+				t.Errorf("ProcessLine(%q) state = %v, want %v", tt.input, state, tt.expectedState)
+			}
+		})
+	}
+}
+
+// TestPTYParser_TipLineNotQuestion tests that "Tip:" lines ending with ? are not detected as questions
+func TestPTYParser_TipLineNotQuestion(t *testing.T) {
+	parser := NewPTYParser()
+
+	// Tip lines should NOT trigger question state even if they end with ?
+	tipLines := []struct {
+		name  string
+		input string
+	}{
+		{"tip with question", "  ⎿  Tip: Did you know you can drag and drop image files into your terminal?"},
+		{"tip shortcut", "Tip: Did you know about the shortcuts?"},
+		{"tip feature", "  Tip: Have you tried the new feature?"},
+	}
+
+	for _, tt := range tipLines {
+		t.Run(tt.name, func(t *testing.T) {
+			parser.Reset()
+			_, state := parser.ProcessLine(tt.input)
+
+			if state == PTYStateQuestion {
+				t.Errorf("ProcessLine(%q) should NOT trigger question state, got %v", tt.input, state)
+			}
+		})
+	}
+
+	// Real questions SHOULD trigger question state
+	realQuestions := []struct {
+		name  string
+		input string
+	}{
+		{"simple question", "What file should I edit?"},
+		{"user question", "Do you want me to proceed?"},
+		{"technical question", "Should I refactor this code?"},
+	}
+
+	for _, tt := range realQuestions {
+		t.Run(tt.name, func(t *testing.T) {
+			parser.Reset()
+			_, state := parser.ProcessLine(tt.input)
+
+			if state != PTYStateQuestion {
+				t.Errorf("ProcessLine(%q) should trigger question state, got %v", tt.input, state)
+			}
+		})
+	}
+}

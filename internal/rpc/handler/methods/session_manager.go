@@ -230,6 +230,19 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		},
 	})
 
+	registry.RegisterWithMeta("workspace/session/delete", s.DeleteHistorySession, handler.MethodMeta{
+		Summary:     "Delete a historical session file",
+		Description: "Deletes a Claude session file (.jsonl) from ~/.claude/projects/<encoded-path>/. This permanently removes the session history.",
+		Params: []handler.OpenRPCParam{
+			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string", "description": "Workspace ID"}},
+			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string", "description": "Session ID (UUID) to delete"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "delete_result",
+			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
 	// Git methods with workspace context
 	registry.RegisterWithMeta("git/status", s.GitStatus, handler.MethodMeta{
 		Summary:     "Get git status for a workspace",
@@ -1146,6 +1159,38 @@ func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params j
 	}
 
 	return result, nil
+}
+
+// DeleteHistorySession deletes a historical Claude session file.
+func (s *SessionManagerService) DeleteHistorySession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		WorkspaceID string `json:"workspace_id"`
+		SessionID   string `json:"session_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+	}
+
+	if p.WorkspaceID == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+	if p.SessionID == "" {
+		return nil, message.NewError(message.InvalidParams, "session_id is required")
+	}
+
+	if err := s.manager.DeleteHistorySession(p.WorkspaceID, p.SessionID); err != nil {
+		// Check if it's a "not found" error
+		if strings.Contains(err.Error(), "not found") {
+			return nil, message.NewError(message.SessionNotFound, err.Error())
+		}
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
+	return map[string]interface{}{
+		"status":       "deleted",
+		"workspace_id": p.WorkspaceID,
+		"session_id":   p.SessionID,
+	}, nil
 }
 
 // GitStatus returns git status for a workspace.

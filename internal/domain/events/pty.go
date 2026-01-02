@@ -20,12 +20,14 @@ type PTYOutputPayload struct {
 
 // PTYPermissionPayload represents a permission prompt from PTY mode.
 type PTYPermissionPayload struct {
-	Type        string            `json:"type"`        // "write_file", "edit_file", "bash_command"
-	Target      string            `json:"target"`      // filename or command
-	Description string            `json:"description"` // human-readable description
-	Preview     string            `json:"preview"`     // content preview
-	Options     []PTYPromptOption `json:"options"`     // available choices
+	ToolUseID   string            `json:"tool_use_id,omitempty"` // Claude's tool use ID (for hook bridge)
+	Type        string            `json:"type"`                  // "write_file", "edit_file", "bash_command"
+	Target      string            `json:"target"`                // filename or command
+	Description string            `json:"description"`           // human-readable description
+	Preview     string            `json:"preview"`               // content preview
+	Options     []PTYPromptOption `json:"options"`               // available choices
 	SessionID   string            `json:"session_id,omitempty"`
+	WorkspaceID string            `json:"workspace_id,omitempty"` // workspace ID (for hook bridge)
 }
 
 // PTYPromptOption represents a choice in a permission prompt.
@@ -126,10 +128,12 @@ func NewPTYSpinnerEventWithSession(text, symbol, message, sessionID string) *Bas
 // PTYPermissionResolvedPayload represents that a permission prompt was responded to.
 // This is broadcast to all devices so they can dismiss their permission popups.
 type PTYPermissionResolvedPayload struct {
+	ToolUseID   string `json:"tool_use_id,omitempty"` // Claude's tool use ID (for hook bridge correlation)
 	SessionID   string `json:"session_id"`
 	WorkspaceID string `json:"workspace_id,omitempty"`
 	ResolvedBy  string `json:"resolved_by,omitempty"` // Client ID that resolved the permission
 	Input       string `json:"input,omitempty"`       // The input that was sent (e.g., "1", "enter")
+	Decision    string `json:"decision,omitempty"`    // "allow" or "deny" (for hook bridge)
 }
 
 // NewPTYPermissionResolvedEvent creates a new pty_permission_resolved event.

@@ -170,7 +170,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cdev Pairing</title>
+    <title>Cdev Pairing</title>
     <style>
         /* Cdev Signature Design System - Eye-Friendly Edition */
         :root {
@@ -415,7 +415,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 <body>
     <div class="container">
         <div class="qr-section">
-            <h1>cdev Pairing</h1>
+            <h1>Cdev Pairing</h1>
             <p class="subtitle">Scan with cdev mobile app to connect</p>
 
             <div class="qr-wrapper">
