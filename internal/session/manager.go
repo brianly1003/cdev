@@ -2688,9 +2688,21 @@ startWatching:
 
 			shouldTrigger := false
 
+			// Ignore CHMOD-only events on index file - these are just metadata updates
+			// (access time, etc.) from git reading the file, not actual content changes.
+			// This prevents a feedback loop where git status touches the index file.
+			if fileName == "index" && event.Op == fsnotify.Chmod {
+				continue
+			}
+
+			// Ignore index.lock events - these are transient lock files
+			// created/removed during git operations, not meaningful state changes
+			if fileName == "index.lock" {
+				continue
+			}
+
 			// Check for specific trigger files in .git root
-			// Also check for index.lock as Git uses atomic rename
-			if gitTriggerFiles[fileName] || fileName == "index.lock" {
+			if gitTriggerFiles[fileName] {
 				shouldTrigger = true
 			}
 
