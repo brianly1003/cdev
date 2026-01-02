@@ -351,6 +351,19 @@ func (m *MemoryManager) GetAndRemovePendingRequest(toolUseID string) *Request {
 	return req
 }
 
+// ListPendingRequests returns all pending permission requests.
+// This is used when cdev-ios reconnects to get any permissions that were missed.
+func (m *MemoryManager) ListPendingRequests() []*Request {
+	m.pendingMu.RLock()
+	defer m.pendingMu.RUnlock()
+
+	requests := make([]*Request, 0, len(m.pending))
+	for _, req := range m.pending {
+		requests = append(requests, req)
+	}
+	return requests
+}
+
 // GetSessionStats returns statistics about session memory.
 // This method acquires locks in a consistent order to prevent deadlocks.
 func (m *MemoryManager) GetSessionStats() map[string]interface{} {

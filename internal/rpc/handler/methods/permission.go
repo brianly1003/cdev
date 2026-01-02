@@ -38,6 +38,9 @@ type PermissionManager interface {
 	// GetAndRemovePendingRequest atomically gets and removes a pending request.
 	GetAndRemovePendingRequest(toolUseID string) *permission.Request
 
+	// ListPendingRequests returns all pending permission requests.
+	ListPendingRequests() []*permission.Request
+
 	// GetSessionStats returns statistics about session memory.
 	GetSessionStats() map[string]interface{}
 }
@@ -45,6 +48,8 @@ type PermissionManager interface {
 // EventPublisher defines the interface for publishing events.
 type EventPublisher interface {
 	Publish(event events.Event)
+	// SubscriberCount returns the number of active subscribers.
+	SubscriberCount() int
 }
 
 // WorkspaceResolver resolves workspace ID from a path.
@@ -114,6 +119,18 @@ func (s *PermissionService) RegisterMethods(r *handler.Registry) {
 		Result: &handler.OpenRPCResult{
 			Name:   "StatsResult",
 			Schema: map[string]interface{}{"type": "object"},
+		},
+	})
+
+	r.RegisterWithMeta("permission/pending", s.Pending, handler.MethodMeta{
+		Summary:     "Get all pending permission requests",
+		Description: "Returns all pending permission requests. Call this on reconnect to catch any missed permissions.",
+		Params: []handler.OpenRPCParam{
+			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional: filter by session ID"}},
+		},
+		Result: &handler.OpenRPCResult{
+			Name:   "PendingResult",
+			Schema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{"requests": map[string]interface{}{"type": "array"}}},
 		},
 	})
 }
@@ -187,6 +204,21 @@ func (s *PermissionService) Request(ctx context.Context, params json.RawMessage)
 
 	// Publish event to mobile app
 	if s.publisher != nil {
+		// Check if any mobile clients are connected
+		// Subscriber count should be > 1 (the hook command itself is a subscriber)
+		subscriberCount := s.publisher.SubscriberCount()
+		if subscriberCount <= 1 {
+			// No mobile clients connected - return deny (user cannot approve)
+			s.manager.RemovePendingRequest(p.ToolUseID)
+			log.Warn().
+				Int("subscriber_count", subscriberCount).
+				Msg("No mobile clients connected - returning deny")
+			return &permission.Response{
+				Decision: permission.DecisionDeny,
+				Message:  "no_clients",
+			}, nil
+		}
+
 		event := s.createPermissionEvent(req)
 		log.Info().
 			Str("tool_use_id", req.ToolUseID).
@@ -194,6 +226,7 @@ func (s *PermissionService) Request(ctx context.Context, params json.RawMessage)
 			Str("session_id", req.SessionID).
 			Str("workspace_id", req.WorkspaceID).
 			Str("event_type", string(event.Type())).
+			Int("subscriber_count", subscriberCount).
 			Msg("Publishing pty_permission event to mobile app")
 		s.publisher.Publish(event)
 	} else {
@@ -207,13 +240,26 @@ func (s *PermissionService) Request(ctx context.Context, params json.RawMessage)
 	case response := <-req.ResponseChan:
 		return response, nil
 	case <-time.After(s.timeout):
-		// Timeout - remove the pending request
+		// Timeout - return deny (user did not respond in time)
 		s.manager.RemovePendingRequest(p.ToolUseID)
-		return nil, message.ErrInternalError("Timeout waiting for mobile response")
+		log.Warn().
+			Str("tool_use_id", p.ToolUseID).
+			Dur("timeout", s.timeout).
+			Msg("Permission request timed out - returning deny")
+		return &permission.Response{
+			Decision: permission.DecisionDeny,
+			Message:  "timeout",
+		}, nil
 	case <-ctx.Done():
-		// Context cancelled - remove the pending request
+		// Context cancelled - return deny
 		s.manager.RemovePendingRequest(p.ToolUseID)
-		return nil, message.ErrInternalError("Request cancelled")
+		log.Warn().
+			Str("tool_use_id", p.ToolUseID).
+			Msg("Permission request cancelled - returning deny")
+		return &permission.Response{
+			Decision: permission.DecisionDeny,
+			Message:  "cancelled",
+		}, nil
 	}
 }
 
@@ -346,6 +392,67 @@ func (s *PermissionService) Stats(ctx context.Context, params json.RawMessage) (
 	}
 
 	return s.manager.GetSessionStats(), nil
+}
+
+// PendingParams for permission/pending method.
+type PendingParams struct {
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// PendingRequestInfo is the response format for pending permission requests.
+type PendingRequestInfo struct {
+	ToolUseID   string                 `json:"tool_use_id"`
+	SessionID   string                 `json:"session_id"`
+	WorkspaceID string                 `json:"workspace_id"`
+	ToolName    string                 `json:"tool_name"`
+	ToolInput   map[string]interface{} `json:"tool_input"`
+	CreatedAt   string                 `json:"created_at"`
+}
+
+// Pending returns all pending permission requests.
+// Call this on reconnect to catch any missed permissions.
+func (s *PermissionService) Pending(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	log.Debug().Msg("permission/pending called")
+
+	if s.manager == nil {
+		return nil, message.ErrInternalError("Permission manager not available")
+	}
+
+	var p PendingParams
+	if params != nil && len(params) > 0 {
+		_ = json.Unmarshal(params, &p) // Optional params, ignore errors
+	}
+
+	// Get all pending requests
+	requests := s.manager.ListPendingRequests()
+
+	// Convert to response format, optionally filtering by session_id
+	result := make([]PendingRequestInfo, 0, len(requests))
+	for _, req := range requests {
+		// Filter by session_id if provided
+		if p.SessionID != "" && req.SessionID != p.SessionID {
+			continue
+		}
+
+		result = append(result, PendingRequestInfo{
+			ToolUseID:   req.ToolUseID,
+			SessionID:   req.SessionID,
+			WorkspaceID: req.WorkspaceID,
+			ToolName:    req.ToolName,
+			ToolInput:   req.ToolInput,
+			CreatedAt:   req.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	log.Info().
+		Int("count", len(result)).
+		Str("filter_session_id", p.SessionID).
+		Msg("Returning pending permission requests")
+
+	return map[string]interface{}{
+		"requests": result,
+		"count":    len(result),
+	}, nil
 }
 
 // WorkspaceIDResolver is a simple implementation that extracts workspace ID from path.

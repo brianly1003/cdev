@@ -396,6 +396,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		Message    struct {
 			Role       string          `json:"role"`
 			Content    json.RawMessage `json:"content"`
+			Model      string          `json:"model,omitempty"`      // Model used (e.g., "claude-opus-4-5-20251101")
 			StopReason string          `json:"stop_reason,omitempty"` // Also check inside message
 		} `json:"message"`
 	}
@@ -512,6 +513,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		Type:                raw.Type,
 		Role:                raw.Message.Role,
 		Content:             contentBlocks,
+		Model:               raw.Message.Model,
 		IsContextCompaction: isContextCompaction,
 		StopReason:          stopReason,
 	}

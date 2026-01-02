@@ -95,6 +95,16 @@ func (m *mockPermissionManager) GetSessionStats() map[string]interface{} {
 	return m.stats
 }
 
+func (m *mockPermissionManager) ListPendingRequests() []*permission.Request {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	requests := make([]*permission.Request, 0, len(m.pendingRequests))
+	for _, req := range m.pendingRequests {
+		requests = append(requests, req)
+	}
+	return requests
+}
+
 // SetMemoryDecision is a test helper to preset memory decisions
 func (m *mockPermissionManager) SetMemoryDecision(sessionID, toolName string, decision *permission.StoredDecision) {
 	m.mu.Lock()
@@ -106,13 +116,15 @@ func (m *mockPermissionManager) SetMemoryDecision(sessionID, toolName string, de
 // --- Mock Event Publisher ---
 
 type mockEventPublisher struct {
-	mu     sync.Mutex
-	events []events.Event
+	mu              sync.Mutex
+	events          []events.Event
+	subscriberCount int // Default 0, set to > 1 to simulate connected clients
 }
 
 func newMockEventPublisher() *mockEventPublisher {
 	return &mockEventPublisher{
-		events: make([]events.Event, 0),
+		events:          make([]events.Event, 0),
+		subscriberCount: 2, // Default to having clients connected
 	}
 }
 
@@ -120,6 +132,18 @@ func (p *mockEventPublisher) Publish(event events.Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.events = append(p.events, event)
+}
+
+func (p *mockEventPublisher) SubscriberCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.subscriberCount
+}
+
+func (p *mockEventPublisher) SetSubscriberCount(count int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.subscriberCount = count
 }
 
 func (p *mockEventPublisher) GetEvents() []events.Event {
@@ -250,13 +274,21 @@ func TestPermissionService_Request_Timeout(t *testing.T) {
 	}
 	paramsJSON, _ := json.Marshal(params)
 
-	_, err := service.Request(context.Background(), paramsJSON)
-	if err == nil {
-		t.Fatal("Expected timeout error, got nil")
+	result, err := service.Request(context.Background(), paramsJSON)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if err.Code != -32603 { // InternalError
-		t.Errorf("Error code = %d, want -32603", err.Code)
+	// Should return a deny response on timeout
+	resp, ok := result.(*permission.Response)
+	if !ok {
+		t.Fatalf("Expected *permission.Response, got %T", result)
+	}
+	if resp.Decision != permission.DecisionDeny {
+		t.Errorf("Decision = %s, want deny", resp.Decision)
+	}
+	if resp.Message != "timeout" {
+		t.Errorf("Message = %s, want timeout", resp.Message)
 	}
 }
 
@@ -551,9 +583,21 @@ func TestPermissionService_Request_ContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	_, err := service.Request(ctx, paramsJSON)
-	if err == nil {
-		t.Fatal("Expected error for cancelled context")
+	result, err := service.Request(ctx, paramsJSON)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should return a deny response on cancellation
+	resp, ok := result.(*permission.Response)
+	if !ok {
+		t.Fatalf("Expected *permission.Response, got %T", result)
+	}
+	if resp.Decision != permission.DecisionDeny {
+		t.Errorf("Decision = %s, want deny", resp.Decision)
+	}
+	if resp.Message != "cancelled" {
+		t.Errorf("Message = %s, want cancelled", resp.Message)
 	}
 }
 
