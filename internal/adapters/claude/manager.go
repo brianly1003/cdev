@@ -683,6 +683,33 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 
 	// Emit pty_permission event when a prompt is detected
 	if permissionPrompt != nil {
+		// Check if any mobile clients are connected before waiting for response
+		// Subscriber count > 1 means at least one mobile client (besides internal subscribers)
+		subscriberCount := 0
+		if m.hub != nil {
+			subscriberCount = m.hub.SubscriberCount()
+		}
+
+		if subscriberCount <= 1 {
+			// No mobile clients connected - auto-deny by sending escape
+			log.Warn().
+				Int("subscriber_count", subscriberCount).
+				Str("type", string(permissionPrompt.Type)).
+				Str("target", permissionPrompt.Target).
+				Msg("No mobile clients connected - auto-denying PTY permission")
+
+			// Send escape to cancel the permission prompt
+			// Don't store the permission since we're auto-denying
+			go func() {
+				// Small delay to let the prompt fully render
+				time.Sleep(100 * time.Millisecond)
+				if err := m.SendPTYInput("\x1b"); err != nil {
+					log.Warn().Err(err).Msg("Failed to send escape for auto-deny")
+				}
+			}()
+			return
+		}
+
 		// Store the permission for reconnect scenarios
 		m.mu.Lock()
 		m.lastPTYPermission = permissionPrompt
@@ -712,7 +739,8 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 			Str("type", string(permissionPrompt.Type)).
 			Str("target", permissionPrompt.Target).
 			Int("options", len(permissionPrompt.Options)).
-			Msg("PTY permission prompt detected")
+			Int("subscriber_count", subscriberCount).
+			Msg("PTY permission prompt detected - waiting for mobile response")
 	}
 
 	// Emit pty_state event only when state becomes idle (reduces noise)
