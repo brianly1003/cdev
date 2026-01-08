@@ -419,7 +419,7 @@ func (s *PermissionService) Pending(ctx context.Context, params json.RawMessage)
 	}
 
 	var p PendingParams
-	if params != nil && len(params) > 0 {
+	if len(params) > 0 {
 		_ = json.Unmarshal(params, &p) // Optional params, ignore errors
 	}
 
