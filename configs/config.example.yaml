@@ -127,3 +127,17 @@ indexer:
     - ".turbo"
     # Uncomment to skip build directories:
     # - "build"
+
+# Permission hook bridge settings
+# Used for "Allow for Session" functionality when using cdev as a Claude Code hook
+permissions:
+  session_memory:
+    enabled: true             # Enable session memory for permission patterns
+    ttl_seconds: 3600         # Idle timeout for remembered patterns (default: 1 hour)
+    max_patterns: 100         # Max patterns to remember per session
+
+# Debug and profiling endpoints
+# WARNING: Only enable in development or trusted environments
+debug:
+  enabled: false              # Enable /debug/* endpoints
+  pprof_enabled: true         # Enable /debug/pprof/* profiling (when debug is enabled)
