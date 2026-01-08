@@ -806,7 +806,7 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 			sessionID := m.sessionID
 			m.mu.Unlock()
 
-			log.Info().
+			log.Debug().
 				Str("symbol", symbol).
 				Str("message", message).
 				Str("session_id", sessionID).
