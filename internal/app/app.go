@@ -246,12 +246,11 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Initialize GitTrackerManager for cached git operations
 	// This provides lazy-init, cached git trackers for all workspaces
-	gitTrackerLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	gitTrackerConfig := workspace.GitTrackerManagerConfig{
 		GitCommand:          a.cfg.Git.Command,
 		HealthCheckInterval: 5 * time.Minute,
 		OperationTimeout:    30 * time.Second,
-		Logger:              gitTrackerLogger,
+		Logger:              a.newSlogLogger(),
 	}
 	a.gitTrackerManager = workspace.NewGitTrackerManager(gitTrackerConfig)
 
@@ -260,9 +259,7 @@ func (a *App) Start(ctx context.Context) error {
 	log.Info().Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).Msg("git tracker manager initialized")
 
 	// Session manager orchestrates Claude sessions across workspaces
-	// Create slog logger that wraps zerolog
-	slogLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	a.sessionManager = session.NewManager(a.hub, a.cfg, slogLogger)
+	a.sessionManager = session.NewManager(a.hub, a.cfg, a.newSlogLogger())
 
 	// Connect session manager to git tracker manager
 	a.sessionManager.SetGitTrackerManager(a.gitTrackerManager)
@@ -1203,4 +1200,38 @@ func (a *App) emitGitStatusChanged(ctx context.Context) {
 		Int("unstaged", len(status.Unstaged)).
 		Int("untracked", len(status.Untracked)).
 		Msg("Emitted git_status_changed")
+}
+
+// configLevelToSlog converts the config logging level string to slog.Level.
+// This ensures slog-based components respect the same log level as zerolog.
+func configLevelToSlog(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "trace", "debug":
+		return slog.LevelDebug
+	case "info", "":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error", "err", "fatal", "panic":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// newSlogLogger creates a slog.Logger that respects the app's logging configuration.
+// It uses stderr for consistency with zerolog output.
+func (a *App) newSlogLogger() *slog.Logger {
+	level := configLevelToSlog(a.cfg.Logging.Level)
+	opts := &slog.HandlerOptions{Level: level}
+
+	// Use text handler for console format, JSON handler otherwise
+	var handler slog.Handler
+	if a.cfg.Logging.Format == "console" {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	}
+
+	return slog.New(handler)
 }
