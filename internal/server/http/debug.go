@@ -68,7 +68,7 @@ func (h *DebugHandler) handleDebugIndex(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
-	fmt.Fprintf(w, `<!DOCTYPE html>
+	_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
 <html>
 <head>
     <title>cdev Debug</title>
@@ -93,7 +93,7 @@ func (h *DebugHandler) handleDebugIndex(w http.ResponseWriter, r *http.Request) 
 `)
 
 	if h.pprofEnabled {
-		fmt.Fprintf(w, `
+		_, _ = fmt.Fprintf(w, `
     <h2>Profiling (pprof)</h2>
     <ul>
         <li><a href="/debug/pprof/">/debug/pprof/</a> - pprof index (all profiles)</li>
@@ -115,13 +115,13 @@ func (h *DebugHandler) handleDebugIndex(w http.ResponseWriter, r *http.Request) 
 go tool trace trace.out</code></pre>
 `)
 	} else {
-		fmt.Fprintf(w, `
+		_, _ = fmt.Fprintf(w, `
     <h2>Profiling (pprof)</h2>
     <p class="disabled">pprof is disabled. Enable with <code>debug.pprof_enabled: true</code> in config.</p>
 `)
 	}
 
-	fmt.Fprintf(w, `
+	_, _ = fmt.Fprintf(w, `
 </body>
 </html>
 `)
