@@ -367,29 +367,6 @@ func TestTruncateString(t *testing.T) {
 	}
 }
 
-// --- sendErrorToClient Tests ---
-
-func TestApp_sendErrorToClient_NilServer(t *testing.T) {
-	cfg := &config.Config{}
-	app, _ := New(cfg, "1.0.0")
-	app.unifiedServer = nil
-
-	// Should not panic with nil server
-	app.sendErrorToClient("client-1", "ERROR_CODE", "error message", "req-1")
-}
-
-// --- sendEventToClient Tests ---
-
-func TestApp_sendEventToClient_NilServer(t *testing.T) {
-	cfg := &config.Config{}
-	app, _ := New(cfg, "1.0.0")
-	app.unifiedServer = nil
-
-	// Should not panic with nil server
-	// Note: We can't test this directly without creating a real event
-	// but we verify the nil check works by checking the code handles it
-}
-
 // --- handleFileChangeForGitDiff Tests ---
 
 func TestApp_handleFileChangeForGitDiff_DeletedFile(t *testing.T) {

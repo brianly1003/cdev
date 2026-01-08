@@ -19,7 +19,6 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/services/imagestorage"
-	"github.com/brianly1003/cdev/internal/domain/commands"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/hub"
 	"github.com/brianly1003/cdev/internal/pairing"
@@ -475,8 +474,6 @@ func (a *App) Start(ctx context.Context) error {
 		a.rpcDispatcher,
 		a.hub,
 	)
-	// Set legacy handler for backward compatibility with existing clients
-	a.unifiedServer.SetLegacyHandler(a.handleLegacyCommand)
 	// Set status provider for heartbeats
 	a.unifiedServer.SetStatusProvider(a)
 	// Set subscription provider (unified server manages filtered subscribers)
@@ -703,152 +700,6 @@ func (a *App) GetAgentStatus() string {
 // Implements common.StatusProvider.
 func (a *App) GetUptimeSeconds() int64 {
 	return a.UptimeSeconds()
-}
-
-// handleLegacyCommand handles incoming legacy WebSocket commands.
-// This is used by the unified server for backward compatibility.
-func (a *App) handleLegacyCommand(clientID string, cmd *commands.Command) {
-	log.Debug().
-		Str("client_id", clientID).
-		Str("command", string(cmd.Command)).
-		Msg("received legacy command")
-
-	ctx := context.Background()
-
-	switch cmd.Command {
-	case commands.CommandRunClaude:
-		payload, err := cmd.ParseRunClaudePayload()
-		if err != nil {
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "Invalid run_claude payload", cmd.RequestID)
-			return
-		}
-
-		// Determine session mode
-		var mode claude.SessionMode
-		switch payload.Mode {
-		case "continue":
-			mode = claude.SessionModeContinue
-			if payload.SessionID == "" {
-				a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "session_id is required when mode is 'continue'", cmd.RequestID)
-				return
-			}
-		case "", "new":
-			mode = claude.SessionModeNew
-		default:
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "Invalid mode. Must be 'new' or 'continue'", cmd.RequestID)
-			return
-		}
-
-		// Note: Legacy command handler doesn't support permission_mode, use empty string for default behavior
-		if err := a.claudeManager.StartWithSession(ctx, payload.Prompt, mode, payload.SessionID, ""); err != nil {
-			a.sendErrorToClient(clientID, "CLAUDE_ERROR", err.Error(), cmd.RequestID)
-			return
-		}
-
-	case commands.CommandStopClaude:
-		if err := a.claudeManager.Stop(ctx); err != nil {
-			a.sendErrorToClient(clientID, "CLAUDE_ERROR", err.Error(), cmd.RequestID)
-			return
-		}
-
-	case commands.CommandRespondToClaude:
-		payload, err := cmd.ParseRespondToClaudePayload()
-		if err != nil {
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "Invalid respond_to_claude payload", cmd.RequestID)
-			return
-		}
-		if err := a.claudeManager.SendResponse(payload.ToolUseID, payload.Response, payload.IsError); err != nil {
-			a.sendErrorToClient(clientID, "CLAUDE_ERROR", err.Error(), cmd.RequestID)
-			return
-		}
-
-	case commands.CommandGetStatus:
-		event := events.NewStatusResponseEvent(events.StatusResponsePayload{
-			ClaudeState:      a.claudeManager.State(),
-			ConnectedClients: a.unifiedServer.ClientCount(),
-			RepoPath:         a.cfg.Repository.Path,
-			RepoName:         filepath.Base(a.cfg.Repository.Path),
-			UptimeSeconds:    a.UptimeSeconds(),
-			AgentVersion:     a.version,
-			WatcherEnabled:   a.cfg.Watcher.Enabled,
-			GitEnabled:       a.cfg.Git.Enabled,
-		}, cmd.RequestID)
-		a.sendEventToClient(clientID, event)
-		return
-
-	case commands.CommandGetFile:
-		payload, err := cmd.ParseGetFilePayload()
-		if err != nil {
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "Invalid get_file payload", cmd.RequestID)
-			return
-		}
-		content, truncated, err := a.gitTracker.GetFileContent(ctx, payload.Path, a.cfg.Limits.MaxFileSizeKB)
-		if err != nil {
-			a.sendEventToClient(clientID, events.NewFileContentErrorEvent(payload.Path, err.Error(), cmd.RequestID))
-			return
-		}
-		a.sendEventToClient(clientID, events.NewFileContentEvent(payload.Path, content, int64(len(content)), truncated, cmd.RequestID))
-		return
-
-	case commands.CommandWatchSession:
-		payload, err := cmd.ParseWatchSessionPayload()
-		if err != nil {
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "Invalid watch_session payload", cmd.RequestID)
-			return
-		}
-		if payload.SessionID == "" {
-			a.sendErrorToClient(clientID, "INVALID_PAYLOAD", "session_id is required", cmd.RequestID)
-			return
-		}
-		if err := a.sessionStreamer.WatchSession(payload.SessionID); err != nil {
-			a.sendErrorToClient(clientID, "WATCH_FAILED", err.Error(), cmd.RequestID)
-			return
-		}
-		// Send confirmation
-		a.sendEventToClient(clientID, events.NewEvent("session_watch_started", map[string]interface{}{
-			"session_id": payload.SessionID,
-			"watching":   true,
-		}))
-		log.Info().Str("session_id", payload.SessionID).Str("client_id", clientID).Msg("client started watching session")
-		return
-
-	case commands.CommandUnwatchSession:
-		watchedSession := a.sessionStreamer.GetWatchedSession()
-		a.sessionStreamer.UnwatchSession()
-		// Send confirmation
-		a.sendEventToClient(clientID, events.NewEvent("session_watch_stopped", map[string]interface{}{
-			"session_id": watchedSession,
-			"watching":   false,
-			"reason":     "client_request",
-		}))
-		log.Info().Str("session_id", watchedSession).Str("client_id", clientID).Msg("client stopped watching session")
-		return
-
-	default:
-		a.sendErrorToClient(clientID, "UNKNOWN_COMMAND", fmt.Sprintf("Unknown command: %s", cmd.Command), cmd.RequestID)
-	}
-}
-
-// sendErrorToClient sends an error event to a specific client.
-func (a *App) sendErrorToClient(clientID, code, message, requestID string) {
-	event := events.NewErrorEvent(code, message, requestID, nil)
-	a.sendEventToClient(clientID, event)
-}
-
-// sendEventToClient sends an event to a specific client.
-func (a *App) sendEventToClient(clientID string, event events.Event) {
-	if a.unifiedServer == nil {
-		return
-	}
-	client := a.unifiedServer.GetClient(clientID)
-	if client == nil {
-		return
-	}
-	data, err := event.ToJSON()
-	if err != nil {
-		return
-	}
-	client.SendRaw(data)
 }
 
 // handleFileChangeForGitDiff generates a git diff when a file changes.

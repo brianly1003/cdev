@@ -1,5 +1,4 @@
-// Package unified provides a dual-protocol WebSocket server that supports
-// both the legacy command format and JSON-RPC 2.0.
+// Package unified provides a JSON-RPC 2.0 WebSocket server.
 package unified
 
 import (
@@ -12,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/brianly1003/cdev/internal/domain/commands"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/hub"
@@ -32,18 +30,6 @@ const (
 	wsWriteBufferSize = 1024
 )
 
-// Protocol represents the detected protocol type.
-type Protocol int
-
-const (
-	ProtocolUnknown Protocol = iota
-	ProtocolLegacy           // {"command": "...", "payload": {...}}
-	ProtocolJSONRPC          // {"jsonrpc": "2.0", "method": "...", ...}
-)
-
-// LegacyCommandHandler handles legacy commands.
-type LegacyCommandHandler func(clientID string, cmd *commands.Command)
-
 // SessionFocus represents which session a client is currently focused on.
 type SessionFocus struct {
 	ClientID    string
@@ -58,16 +44,13 @@ type ClientDisconnectHandler interface {
 	OnClientDisconnect(clientID string, subscribedWorkspaces []string)
 }
 
-// Server is a unified WebSocket server supporting dual protocols.
+// Server is a JSON-RPC 2.0 WebSocket server.
 type Server struct {
 	addr string
 
 	// RPC components
 	dispatcher *handler.Dispatcher
 	rpcServer  *rpc.Server
-
-	// Legacy handler
-	legacyHandler LegacyCommandHandler
 
 	// Event hub for broadcasting
 	hub ports.EventHub
@@ -119,11 +102,6 @@ func NewServer(host string, port int, dispatcher *handler.Dispatcher, eventHub p
 	s.rpcServer = rpc.NewServer(dispatcher, eventHub)
 
 	return s
-}
-
-// SetLegacyHandler sets the handler for legacy commands.
-func (s *Server) SetLegacyHandler(h LegacyCommandHandler) {
-	s.legacyHandler = h
 }
 
 // SetStatusProvider sets the status provider for heartbeats.
@@ -247,7 +225,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := NewUnifiedClient(conn, s.dispatcher, s.legacyHandler, func(id string) {
+	client := NewUnifiedClient(conn, s.dispatcher, func(id string) {
 		if s.hub != nil {
 			s.hub.Unsubscribe(id)
 		}
@@ -597,37 +575,32 @@ func (s *Server) validateTokenFromRequest(r *http.Request) error {
 	return err
 }
 
-// UnifiedClient represents a client that can speak either protocol.
+// UnifiedClient represents a JSON-RPC 2.0 WebSocket client.
 type UnifiedClient struct {
-	id            string
-	conn          *websocket.Conn
-	send          chan []byte
-	done          chan struct{}
-	dispatcher    *handler.Dispatcher
-	legacyHandler LegacyCommandHandler
-	onClose       func(id string)
+	id         string
+	conn       *websocket.Conn
+	send       chan []byte
+	done       chan struct{}
+	dispatcher *handler.Dispatcher
+	onClose    func(id string)
 
-	mu       sync.Mutex
-	closed   bool
-	protocol Protocol // Detected after first message
+	mu     sync.Mutex
+	closed bool
 }
 
 // NewUnifiedClient creates a new unified client.
 func NewUnifiedClient(
 	conn *websocket.Conn,
 	dispatcher *handler.Dispatcher,
-	legacyHandler LegacyCommandHandler,
 	onClose func(id string),
 ) *UnifiedClient {
 	return &UnifiedClient{
-		id:            transport.GenerateID(),
-		conn:          conn,
-		send:          make(chan []byte, common.SendBufferSize),
-		done:          make(chan struct{}),
-		dispatcher:    dispatcher,
-		legacyHandler: legacyHandler,
-		onClose:       onClose,
-		protocol:      ProtocolUnknown,
+		id:         transport.GenerateID(),
+		conn:       conn,
+		send:       make(chan []byte, common.SendBufferSize),
+		done:       make(chan struct{}),
+		dispatcher: dispatcher,
+		onClose:    onClose,
 	}
 }
 
@@ -683,30 +656,17 @@ func (c *UnifiedClient) Done() <-chan struct{} {
 	return c.done
 }
 
-// Send implements ports.Subscriber - converts events to appropriate format.
+// Send implements ports.Subscriber - converts events to JSON-RPC notification format.
 func (c *UnifiedClient) Send(event events.Event) error {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return fmt.Errorf("client closed")
 	}
-	protocol := c.protocol
 	c.mu.Unlock()
 
-	// Get event JSON
-	data, err := event.ToJSON()
-	if err != nil {
-		return err
-	}
-
-	// If client is using JSON-RPC, convert to notification format
-	if protocol == ProtocolJSONRPC {
-		return c.sendJSONRPCNotification(event)
-	}
-
-	// Legacy format or unknown - send as-is
-	c.SendRaw(data)
-	return nil
+	// Send as JSON-RPC notification
+	return c.sendJSONRPCNotification(event)
 }
 
 // sendJSONRPCNotification sends an event as a JSON-RPC notification.
@@ -770,29 +730,10 @@ func (c *UnifiedClient) readPump() {
 	}
 }
 
-// handleMessage detects protocol and routes appropriately.
+// handleMessage handles incoming JSON-RPC messages.
 func (c *UnifiedClient) handleMessage(data []byte) {
-	// Detect protocol from message
-	protocol := detectProtocol(data)
-
-	// Set client protocol on first message
-	c.mu.Lock()
-	if c.protocol == ProtocolUnknown {
-		c.protocol = protocol
-		log.Debug().
-			Str("client_id", c.id).
-			Str("protocol", protocolName(protocol)).
-			Msg("protocol detected")
-	}
-	c.mu.Unlock()
-
-	switch protocol {
-	case ProtocolJSONRPC:
-		c.handleJSONRPC(data)
-	case ProtocolLegacy:
-		c.handleLegacy(data)
-	default:
-		// Log the actual message for debugging
+	// Validate JSON-RPC format
+	if !message.IsJSONRPC(data) {
 		msgPreview := string(data)
 		if len(msgPreview) > 100 {
 			msgPreview = msgPreview[:100] + "..."
@@ -801,8 +742,11 @@ func (c *UnifiedClient) handleMessage(data []byte) {
 			Str("client_id", c.id).
 			Str("message", msgPreview).
 			Int("length", len(data)).
-			Msg("unknown protocol")
+			Msg("invalid message format - expected JSON-RPC 2.0")
+		return
 	}
+
+	c.handleJSONRPC(data)
 }
 
 // handleJSONRPC handles JSON-RPC messages.
@@ -826,63 +770,6 @@ func (c *UnifiedClient) handleJSONRPC(data []byte) {
 	}
 
 	c.SendRaw(response)
-}
-
-// handleLegacy handles legacy command messages.
-// DEPRECATED: Legacy command format is deprecated. Use JSON-RPC 2.0 instead.
-// Legacy support will be removed in version 3.0.
-func (c *UnifiedClient) handleLegacy(data []byte) {
-	if c.legacyHandler == nil {
-		log.Warn().Str("client_id", c.id).Msg("no handler for legacy commands")
-		return
-	}
-
-	cmd, err := commands.ParseCommand(data)
-	if err != nil {
-		log.Warn().Err(err).Str("client_id", c.id).Msg("failed to parse legacy command")
-		return
-	}
-
-	// Log deprecation warning
-	log.Warn().
-		Str("client_id", c.id).
-		Str("command", string(cmd.Command)).
-		Msg("DEPRECATED: Legacy command format is deprecated. Please migrate to JSON-RPC 2.0. Legacy support will be removed in version 3.0.")
-
-	// Send deprecation warning to client
-	c.sendDeprecationWarning(string(cmd.Command))
-
-	c.legacyHandler(c.id, cmd)
-}
-
-// sendDeprecationWarning sends a deprecation warning event to the client.
-func (c *UnifiedClient) sendDeprecationWarning(command string) {
-	warning := map[string]interface{}{
-		"event":     "deprecation_warning",
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"payload": map[string]interface{}{
-			"message":       "Legacy command format is deprecated. Please migrate to JSON-RPC 2.0.",
-			"command":       command,
-			"documentation": "See /api/rpc/discover for the JSON-RPC 2.0 API specification.",
-			"removal":       "Legacy support will be removed in version 3.0.",
-			"migration": map[string]string{
-				"run_claude":        "agent/run",
-				"stop_claude":       "agent/stop",
-				"respond_to_claude": "agent/respond",
-				"get_status":        "status/get",
-				"get_file":          "file/get",
-				"watch_session":     "session/watch",
-				"unwatch_session":   "session/unwatch",
-			},
-		},
-	}
-
-	data, err := json.Marshal(warning)
-	if err != nil {
-		return
-	}
-
-	c.SendRaw(data)
 }
 
 // writePump sends messages to the WebSocket connection.
@@ -917,40 +804,6 @@ func (c *UnifiedClient) writePump() {
 				return
 			}
 		}
-	}
-}
-
-// detectProtocol detects the protocol from a message.
-func detectProtocol(data []byte) Protocol {
-	if len(data) == 0 {
-		return ProtocolUnknown
-	}
-
-	// Quick check for JSON-RPC
-	if message.IsJSONRPC(data) {
-		return ProtocolJSONRPC
-	}
-
-	// Check for legacy command format
-	var msg struct {
-		Command string `json:"command"`
-	}
-	if err := json.Unmarshal(data, &msg); err == nil && msg.Command != "" {
-		return ProtocolLegacy
-	}
-
-	return ProtocolUnknown
-}
-
-// protocolName returns a human-readable protocol name.
-func protocolName(p Protocol) string {
-	switch p {
-	case ProtocolJSONRPC:
-		return "json-rpc"
-	case ProtocolLegacy:
-		return "legacy"
-	default:
-		return "unknown"
 	}
 }
 

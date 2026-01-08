@@ -1,6 +1,11 @@
 package git
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/brianly1003/cdev/internal/domain/ports"
@@ -827,5 +832,372 @@ func TestCheckoutResult(t *testing.T) {
 	}
 	if result.Branch != "new-feature" {
 		t.Errorf("Branch = %q, want new-feature", result.Branch)
+	}
+}
+
+// --- GetFileContent Security Tests ---
+
+func TestGetFileContent_PathTraversal(t *testing.T) {
+	// Create a temp directory to act as repo root
+	repoRoot := t.TempDir()
+
+	// Create a file inside the repo
+	testFile := filepath.Join(repoRoot, "allowed.txt")
+	if err := os.WriteFile(testFile, []byte("allowed content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file outside the repo (simulating sensitive file)
+	outsideDir := t.TempDir()
+	sensitiveFile := filepath.Join(outsideDir, "sensitive.txt")
+	if err := os.WriteFile(sensitiveFile, []byte("SECRET DATA"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	tests := []struct {
+		name        string
+		path        string
+		shouldError bool
+		errorMsg    string
+	}{
+		// Valid paths
+		{
+			name:        "valid file in root",
+			path:        "allowed.txt",
+			shouldError: false,
+		},
+		// Path traversal attacks
+		{
+			name:        "simple path traversal",
+			path:        "../sensitive.txt",
+			shouldError: true,
+			errorMsg:    "path outside repository",
+		},
+		{
+			name:        "double path traversal",
+			path:        "../../sensitive.txt",
+			shouldError: true,
+			errorMsg:    "path outside repository",
+		},
+		{
+			name:        "path traversal with subdir",
+			path:        "subdir/../../../sensitive.txt",
+			shouldError: true,
+			errorMsg:    "path outside repository",
+		},
+		{
+			name:        "absolute path to etc passwd",
+			path:        "/etc/passwd",
+			shouldError: true,
+			errorMsg:    "path outside repository",
+		},
+		{
+			name:        "path traversal with dot prefix",
+			path:        "./../sensitive.txt",
+			shouldError: true,
+			errorMsg:    "path outside repository",
+		},
+		{
+			name:        "encoded traversal attempt",
+			path:        "..%2F..%2Fetc%2Fpasswd",
+			shouldError: true, // Will fail as file not found (encoding not decoded)
+		},
+		{
+			name:        "null byte injection attempt",
+			path:        "allowed.txt\x00../sensitive.txt",
+			shouldError: true,
+		},
+		{
+			name:        "windows-style traversal",
+			path:        "..\\..\\sensitive.txt",
+			shouldError: true,
+		},
+		{
+			name:        "mixed slashes traversal",
+			path:        "../\\../sensitive.txt",
+			shouldError: true,
+		},
+		{
+			name:        "traversal at end",
+			path:        "subdir/..",
+			shouldError: true, // Will be directory or not found
+		},
+		{
+			name:        "multiple dots",
+			path:        ".../.../sensitive.txt",
+			shouldError: true, // File not found
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, _, err := tracker.GetFileContent(context.Background(), tt.path, 100)
+
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("GetFileContent(%q) should have returned error, got content: %q", tt.path, content)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("GetFileContent(%q) unexpected error: %v", tt.path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestGetFileContent_ValidReads(t *testing.T) {
+	repoRoot := t.TempDir()
+
+	// Create test files
+	if err := os.WriteFile(filepath.Join(repoRoot, "simple.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create subdirectory with file
+	subdir := filepath.Join(repoRoot, "src", "pkg")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subdir, "code.go"), []byte("package main"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create file with special characters in name
+	if err := os.WriteFile(filepath.Join(repoRoot, "file with spaces.txt"), []byte("spaced"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create unicode file
+	if err := os.WriteFile(filepath.Join(repoRoot, "unicode.txt"), []byte("日本語テキスト"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	tests := []struct {
+		name            string
+		path            string
+		expectedContent string
+	}{
+		{
+			name:            "simple file",
+			path:            "simple.txt",
+			expectedContent: "hello world",
+		},
+		{
+			name:            "file in subdirectory",
+			path:            "src/pkg/code.go",
+			expectedContent: "package main",
+		},
+		{
+			name:            "file with spaces",
+			path:            "file with spaces.txt",
+			expectedContent: "spaced",
+		},
+		{
+			name:            "unicode content",
+			path:            "unicode.txt",
+			expectedContent: "日本語テキスト",
+		},
+		{
+			name:            "path with dot prefix",
+			path:            "./simple.txt",
+			expectedContent: "hello world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, truncated, err := tracker.GetFileContent(context.Background(), tt.path, 100)
+
+			if err != nil {
+				t.Fatalf("GetFileContent(%q) error: %v", tt.path, err)
+			}
+			if truncated {
+				t.Error("File should not be truncated")
+			}
+			if content != tt.expectedContent {
+				t.Errorf("content = %q, want %q", content, tt.expectedContent)
+			}
+		})
+	}
+}
+
+func TestGetFileContent_FileNotFound(t *testing.T) {
+	repoRoot := t.TempDir()
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	_, _, err := tracker.GetFileContent(context.Background(), "nonexistent.txt", 100)
+	if err == nil {
+		t.Error("Expected error for nonexistent file")
+	}
+	if !strings.Contains(err.Error(), "file not found") {
+		t.Errorf("Error should mention 'file not found', got: %v", err)
+	}
+}
+
+func TestGetFileContent_DirectoryRejection(t *testing.T) {
+	repoRoot := t.TempDir()
+
+	// Create a subdirectory
+	subdir := filepath.Join(repoRoot, "subdir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	_, _, err := tracker.GetFileContent(context.Background(), "subdir", 100)
+	if err == nil {
+		t.Error("Expected error when trying to read a directory")
+	}
+	if !strings.Contains(err.Error(), "directory") {
+		t.Errorf("Error should mention 'directory', got: %v", err)
+	}
+}
+
+func TestGetFileContent_Truncation(t *testing.T) {
+	repoRoot := t.TempDir()
+
+	// Create a file larger than the limit
+	largeContent := strings.Repeat("x", 2048) // 2KB
+	if err := os.WriteFile(filepath.Join(repoRoot, "large.txt"), []byte(largeContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	// Read with 1KB limit
+	content, truncated, err := tracker.GetFileContent(context.Background(), "large.txt", 1)
+	if err != nil {
+		t.Fatalf("GetFileContent error: %v", err)
+	}
+	if !truncated {
+		t.Error("File should be truncated")
+	}
+	if len(content) != 1024 {
+		t.Errorf("Content length = %d, want 1024", len(content))
+	}
+
+	// Read with larger limit
+	content, truncated, err = tracker.GetFileContent(context.Background(), "large.txt", 10)
+	if err != nil {
+		t.Fatalf("GetFileContent error: %v", err)
+	}
+	if truncated {
+		t.Error("File should not be truncated with 10KB limit")
+	}
+	if len(content) != 2048 {
+		t.Errorf("Content length = %d, want 2048", len(content))
+	}
+}
+
+func TestGetFileContent_EmptyFile(t *testing.T) {
+	repoRoot := t.TempDir()
+
+	// Create an empty file
+	if err := os.WriteFile(filepath.Join(repoRoot, "empty.txt"), []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	content, truncated, err := tracker.GetFileContent(context.Background(), "empty.txt", 100)
+	if err != nil {
+		t.Fatalf("GetFileContent error: %v", err)
+	}
+	if truncated {
+		t.Error("Empty file should not be truncated")
+	}
+	if content != "" {
+		t.Errorf("Content should be empty, got %q", content)
+	}
+}
+
+func TestGetFileContent_SymlinkAttack(t *testing.T) {
+	// Skip on Windows where symlinks may require elevated privileges
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping symlink test on Windows")
+	}
+
+	repoRoot := t.TempDir()
+	outsideDir := t.TempDir()
+
+	// Create a sensitive file outside the repo
+	sensitiveFile := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(sensitiveFile, []byte("SECRET"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a symlink inside repo pointing outside
+	symlinkPath := filepath.Join(repoRoot, "evil_link")
+	if err := os.Symlink(sensitiveFile, symlinkPath); err != nil {
+		t.Skip("Cannot create symlink:", err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	// Note: The current implementation follows symlinks. This test documents the behavior.
+	// If symlink following should be blocked, this test would need to expect an error.
+	content, _, err := tracker.GetFileContent(context.Background(), "evil_link", 100)
+	if err != nil {
+		// If implementation blocks symlinks, this is expected
+		t.Logf("Symlink blocked (good for security): %v", err)
+	} else {
+		// If implementation follows symlinks, log a warning
+		t.Logf("WARNING: Symlink was followed, content: %q", content)
+	}
+}
+
+// Benchmark for GetFileContent
+func BenchmarkGetFileContent(b *testing.B) {
+	repoRoot := b.TempDir()
+
+	// Create a test file
+	content := strings.Repeat("benchmark content\n", 100)
+	if err := os.WriteFile(filepath.Join(repoRoot, "bench.txt"), []byte(content), 0644); err != nil {
+		b.Fatal(err)
+	}
+
+	tracker := &Tracker{
+		repoRoot: repoRoot,
+		repoPath: repoRoot,
+		isRepo:   true,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = tracker.GetFileContent(context.Background(), "bench.txt", 100)
 	}
 }

@@ -15,7 +15,6 @@ var (
 
 	// Global flags
 	cfgFile string
-	verbose bool
 )
 
 // rootCmd represents the base command when called without any subcommands.
@@ -40,6 +39,9 @@ func SetVersionInfo(v, bt, gc string) {
 	version = v
 	buildTime = bt
 	gitCommit = gc
+
+	// Set cobra's built-in version flag (-v, --version)
+	rootCmd.Version = fmt.Sprintf("%s\n  Build time: %s\n  Git commit: %s", version, buildTime, gitCommit)
 }
 
 func init() {
@@ -47,7 +49,6 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: ./config.yaml or ~/.cdev/config.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 
 	// Add subcommands
 	rootCmd.AddCommand(startCmd)

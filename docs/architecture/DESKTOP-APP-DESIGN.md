@@ -98,7 +98,7 @@ The **Portal Core** is the heart of cdev - a single, unified engine that powers 
 | **HTTP Server** | `internal/server/http/` | REST API endpoints |
 | **WebSocket Server** | `internal/server/websocket/` | Real-time event streaming |
 | **Domain Events** | `internal/domain/events/` | Event type definitions |
-| **Domain Commands** | `internal/domain/commands/` | Command type definitions |
+| **RPC Methods** | `internal/rpc/handler/methods/` | JSON-RPC 2.0 method handlers |
 | **App Orchestrator** | `internal/app/` | Wires everything together, lifecycle management |
 
 ### Entry Points

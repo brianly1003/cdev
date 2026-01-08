@@ -176,9 +176,6 @@ func outputURL(info *pairing.PairingInfo) error {
 }
 
 func outputQR(info *pairing.PairingInfo) error {
-	// Create a temporary generator (not really needed, but kept for potential future use)
-	gen := pairing.NewQRGenerator("", 0, "", "")
-
 	// Generate QR code from info
 	jsonData, err := json.Marshal(info)
 	if err != nil {
@@ -211,9 +208,6 @@ func outputQR(info *pairing.PairingInfo) error {
 		}
 	}
 	fmt.Println()
-
-	// Suppress unused variable warning
-	_ = gen
 
 	return nil
 }

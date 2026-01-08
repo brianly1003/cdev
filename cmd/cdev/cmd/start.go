@@ -19,6 +19,7 @@ var (
 	port        int
 	externalURL string // Single URL that auto-derives WS and HTTP URLs
 	headless    bool
+	verbose     bool
 )
 
 // startCmd represents the start command.
@@ -61,6 +62,7 @@ func init() {
 	startCmd.Flags().IntVar(&port, "port", 0, "server port for HTTP and WebSocket (default: 8766)")
 	startCmd.Flags().StringVar(&externalURL, "external-url", "", "external URL for tunnels - auto-derives WS and HTTP URLs (e.g., https://tunnel.devtunnels.ms)")
 	startCmd.Flags().BoolVar(&headless, "headless", false, "run in headless mode (no terminal UI, daemon mode)")
+	startCmd.Flags().BoolVar(&verbose, "verbose", false, "enable verbose/debug logging output")
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
