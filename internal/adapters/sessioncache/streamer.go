@@ -416,6 +416,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 			Content: []events.ClaudeMessageContent{
 				{Type: "text", Text: raw.Content},
 			},
+			Timestamp: raw.Timestamp,
 		}
 		s.hub.Publish(events.NewClaudeMessageEventFull(*payload))
 		return payload
@@ -516,6 +517,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		Model:               raw.Message.Model,
 		IsContextCompaction: isContextCompaction,
 		StopReason:          stopReason,
+		Timestamp:           raw.Timestamp,
 	}
 
 	// Log when we emit stop_reason for debugging

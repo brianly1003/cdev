@@ -53,16 +53,35 @@ git:
   diff_on_change: true  # Auto-generate diff on file change
 
 # Security settings
+# IMPORTANT: For production/remote access, set require_auth: true
 security:
   require_auth: false           # Set true to require token authentication for WebSocket connections
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
+  # Example for remote access via tunnel:
+  # allowed_origins:
+  #   - "https://your-app.example.com"
+  #   - "*.devtunnels.ms"
+
+  # Rate limiting (recommended for remote access)
+  rate_limit:
+    enabled: false              # Enable rate limiting
+    requests_per_minute: 100    # Max requests per minute per IP
 
 # Logging settings
 logging:
   level: "info"      # debug, info, warn, error
   format: "console"  # json, console
+
+  # Log rotation for Claude JSONL logs (.cdev/logs/claude_*.jsonl)
+  # Prevents disk exhaustion from long-running sessions
+  rotation:
+    enabled: true             # Enable log rotation
+    max_size_mb: 50           # Rotate when log exceeds this size (MB)
+    max_backups: 5            # Keep this many old log files
+    max_age_days: 30          # Delete logs older than this (0 = keep forever)
+    compress: true            # Gzip rotated log files
 
 # Resource limits
 limits:

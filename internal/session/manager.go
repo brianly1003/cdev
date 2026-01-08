@@ -587,6 +587,7 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 		ws.Definition.Path,
 		workspaceID,
 		sessionID,
+		&m.cfg.Logging.Rotation,
 	)
 	session.SetClaudeManager(claudeManager)
 
@@ -953,6 +954,7 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 		ws.Definition.Path,
 		workspaceID,
 		sessionID,
+		&m.cfg.Logging.Rotation,
 	)
 	session.SetClaudeManager(claudeManager)
 

@@ -615,8 +615,11 @@ func TestCorsMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	wrapped := corsMiddleware(handler)
+	// Create a server to access the corsMiddleware method
+	server := &Server{}
+	wrapped := server.corsMiddleware(handler)
 
+	// Request without Origin header (same-origin request)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 
@@ -625,9 +628,7 @@ func TestCorsMiddleware(t *testing.T) {
 	resp := w.Result()
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("expected CORS header Access-Control-Allow-Origin: *")
-	}
+	// No origin header means same-origin request, so no CORS headers needed
 	if resp.Header.Get("Access-Control-Allow-Methods") == "" {
 		t.Error("expected Access-Control-Allow-Methods header")
 	}
@@ -639,7 +640,8 @@ func TestCorsMiddleware_Options(t *testing.T) {
 		_, _ = w.Write([]byte("should not see this"))
 	})
 
-	wrapped := corsMiddleware(handler)
+	server := &Server{}
+	wrapped := server.corsMiddleware(handler)
 
 	req := httptest.NewRequest(http.MethodOptions, "/", nil)
 	w := httptest.NewRecorder()

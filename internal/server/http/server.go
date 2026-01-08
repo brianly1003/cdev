@@ -17,10 +17,12 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/claude"
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/repository"
-	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/rpc/handler"
+	"github.com/brianly1003/cdev/internal/security"
+	"github.com/brianly1003/cdev/internal/server/http/middleware"
 	"github.com/brianly1003/cdev/internal/services/imagestorage"
 	"github.com/rs/zerolog/log"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -47,6 +49,8 @@ type Server struct {
 	rpcRegistry   *handler.Registry
 	imageHandler  *ImageHandler
 	imageStorage  *imagestorage.Storage
+	originChecker *security.OriginChecker
+	rateLimiter   *middleware.RateLimiter
 }
 
 // New creates a new HTTP server.
@@ -258,8 +262,26 @@ func (tw *timeoutResponseWriter) Write(b []byte) (int, error) {
 	return tw.ResponseWriter.Write(b)
 }
 
-// corsMiddleware adds CORS headers for local development.
-func corsMiddleware(next http.Handler) http.Handler {
+// SetOriginChecker sets the origin checker for CORS validation.
+func (s *Server) SetOriginChecker(checker *security.OriginChecker) {
+	s.originChecker = checker
+}
+
+// SetRateLimiter sets the rate limiter for request throttling.
+func (s *Server) SetRateLimiter(limiter *middleware.RateLimiter) {
+	s.rateLimiter = limiter
+}
+
+// isLocalhostOrigin checks if an origin is from localhost.
+func isLocalhostOrigin(origin string) bool {
+	return strings.Contains(origin, "localhost") ||
+		strings.Contains(origin, "127.0.0.1") ||
+		strings.Contains(origin, "::1")
+}
+
+// corsMiddleware adds CORS headers with configurable origin checking.
+// Security: Uses OriginChecker instead of wildcard "*" for Access-Control-Allow-Origin.
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -268,11 +290,42 @@ func corsMiddleware(next http.Handler) http.Handler {
 			Str("method", r.Method).
 			Str("path", r.URL.Path).
 			Str("remote", r.RemoteAddr).
+			Str("origin", r.Header.Get("Origin")).
 			Msg("HTTP request received")
 
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		origin := r.Header.Get("Origin")
+
+		// Validate origin using OriginChecker if configured
+		if origin != "" {
+			if s.originChecker != nil {
+				if !s.originChecker.CheckOrigin(r) {
+					log.Warn().
+						Str("origin", origin).
+						Str("remote", r.RemoteAddr).
+						Msg("CORS request rejected - origin not allowed")
+					http.Error(w, "Origin not allowed", http.StatusForbidden)
+					return
+				}
+				// Set the specific origin that was validated (not wildcard)
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else {
+				// No checker configured - only allow localhost origins
+				if isLocalhostOrigin(origin) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				} else {
+					log.Warn().
+						Str("origin", origin).
+						Str("remote", r.RemoteAddr).
+						Msg("CORS request rejected - no origin checker and not localhost")
+					http.Error(w, "Origin not allowed", http.StatusForbidden)
+					return
+				}
+			}
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Auth-Token")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -313,11 +366,24 @@ func (s *Server) Start() error {
 		log.Debug().Msg("WebSocket handler registered at /ws")
 	}
 
+	// Build middleware chain from inside out:
+	// request -> logging -> rate limit (optional) -> timeout -> cors -> mux
+	var handler http.Handler = s.mux
+	handler = s.corsMiddleware(handler)
+	handler = timeoutMiddleware(10*time.Second, handler)
+
+	// Add rate limiting if configured
+	if s.rateLimiter != nil {
+		handler = middleware.RateLimitMiddleware(s.rateLimiter, middleware.IPKeyExtractor)(handler)
+		log.Info().Msg("Rate limiting enabled for HTTP server")
+	}
+
+	handler = requestLoggingMiddleware(handler)
+
 	// Create the http.Server with middleware chain
-	// Note: WebSocket upgrades bypass timeout middleware via path check
 	s.server = &http.Server{
 		Addr:    s.addr,
-		Handler: requestLoggingMiddleware(timeoutMiddleware(10*time.Second, corsMiddleware(s.mux))),
+		Handler: handler,
 	}
 
 	log.Info().Str("addr", s.addr).Msg("HTTP server starting")

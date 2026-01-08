@@ -15,12 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/creack/pty"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // SessionMode defines how to handle conversation sessions.
@@ -43,6 +45,7 @@ type Manager struct {
 	logDir          string
 	workDir         string
 	skipPermissions bool
+	rotationConfig  *config.LogRotationConfig
 
 	// Workspace/Session context for multi-workspace support
 	workspaceID string
@@ -55,7 +58,7 @@ type Manager struct {
 	stdin         io.WriteCloser
 	cancel        context.CancelFunc
 	pid           int
-	logFile       *os.File
+	logFile       io.WriteCloser // Changed from *os.File to support lumberjack rotation
 
 	// PTY mode for true interactive terminal support
 	ptmx      *os.File   // PTY master file descriptor
@@ -85,7 +88,7 @@ type Manager struct {
 }
 
 // NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
-func NewManager(command string, args []string, timeoutMinutes int, hub ports.EventHub, skipPermissions bool) *Manager {
+func NewManager(command string, args []string, timeoutMinutes int, hub ports.EventHub, skipPermissions bool, rotationConfig *config.LogRotationConfig) *Manager {
 	return &Manager{
 		command:         command,
 		args:            args,
@@ -95,12 +98,13 @@ func NewManager(command string, args []string, timeoutMinutes int, hub ports.Eve
 		logDir:          "", // Empty means no file logging
 		workDir:         "", // Empty means use current directory
 		skipPermissions: skipPermissions,
+		rotationConfig:  rotationConfig,
 	}
 }
 
 // NewManagerWithContext creates a new Claude CLI manager with workspace/session context.
 // This is the preferred constructor for multi-workspace support.
-func NewManagerWithContext(hub ports.EventHub, command string, args []string, timeoutMinutes int, skipPermissions bool, workDir, workspaceID, sessionID string) *Manager {
+func NewManagerWithContext(hub ports.EventHub, command string, args []string, timeoutMinutes int, skipPermissions bool, workDir, workspaceID, sessionID string, rotationConfig *config.LogRotationConfig) *Manager {
 	m := &Manager{
 		command:         command,
 		args:            args,
@@ -111,6 +115,7 @@ func NewManagerWithContext(hub ports.EventHub, command string, args []string, ti
 		skipPermissions: skipPermissions,
 		workspaceID:     workspaceID,
 		sessionID:       sessionID,
+		rotationConfig:  rotationConfig,
 	}
 
 	// Setup log directory in workspace
@@ -327,12 +332,28 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 			log.Warn().Err(err).Msg("failed to create log directory")
 		} else {
 			logPath := filepath.Join(m.logDir, fmt.Sprintf("claude_%d.jsonl", m.pid))
-			f, err := os.Create(logPath)
-			if err != nil {
-				log.Warn().Err(err).Msg("failed to create log file")
+			// Use lumberjack for log rotation if configured
+			if m.rotationConfig != nil && m.rotationConfig.Enabled {
+				m.logFile = &lumberjack.Logger{
+					Filename:   logPath,
+					MaxSize:    m.rotationConfig.MaxSizeMB,
+					MaxBackups: m.rotationConfig.MaxBackups,
+					MaxAge:     m.rotationConfig.MaxAgeDays,
+					Compress:   m.rotationConfig.Compress,
+				}
+				log.Info().
+					Str("path", logPath).
+					Int("max_mb", m.rotationConfig.MaxSizeMB).
+					Int("max_backups", m.rotationConfig.MaxBackups).
+					Msg("claude log file created with rotation")
 			} else {
-				m.logFile = f
-				log.Info().Str("path", logPath).Msg("claude log file created")
+				f, err := os.Create(logPath)
+				if err != nil {
+					log.Warn().Err(err).Msg("failed to create log file")
+				} else {
+					m.logFile = f
+					log.Info().Str("path", logPath).Msg("claude log file created")
+				}
 			}
 		}
 	}
@@ -512,12 +533,28 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 			log.Warn().Err(err).Msg("failed to create log directory")
 		} else {
 			logPath := filepath.Join(m.logDir, fmt.Sprintf("claude_%d.jsonl", m.pid))
-			f, err := os.Create(logPath)
-			if err != nil {
-				log.Warn().Err(err).Msg("failed to create log file")
+			// Use lumberjack for log rotation if configured
+			if m.rotationConfig != nil && m.rotationConfig.Enabled {
+				m.logFile = &lumberjack.Logger{
+					Filename:   logPath,
+					MaxSize:    m.rotationConfig.MaxSizeMB,
+					MaxBackups: m.rotationConfig.MaxBackups,
+					MaxAge:     m.rotationConfig.MaxAgeDays,
+					Compress:   m.rotationConfig.Compress,
+				}
+				log.Info().
+					Str("path", logPath).
+					Int("max_mb", m.rotationConfig.MaxSizeMB).
+					Int("max_backups", m.rotationConfig.MaxBackups).
+					Msg("claude log file created with rotation (PTY mode)")
 			} else {
-				m.logFile = f
-				log.Info().Str("path", logPath).Msg("claude log file created (PTY mode)")
+				f, err := os.Create(logPath)
+				if err != nil {
+					log.Warn().Err(err).Msg("failed to create log file")
+				} else {
+					m.logFile = f
+					log.Info().Str("path", logPath).Msg("claude log file created (PTY mode)")
+				}
 			}
 		}
 	}
@@ -793,7 +830,7 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 	// Write to log file if enabled
 	m.mu.RLock()
 	if m.logFile != nil {
-		_, _ = m.logFile.WriteString(line + "\n")
+		_, _ = m.logFile.Write([]byte(line + "\n"))
 	}
 	m.mu.RUnlock()
 
@@ -1055,7 +1092,7 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 		if m.logFile != nil {
 			if stream == events.StreamStdout {
 				// Write raw JSON line as-is for stdout (Claude's stream-json output)
-				_, _ = m.logFile.WriteString(line + "\n")
+				_, _ = m.logFile.Write([]byte(line + "\n"))
 			} else {
 				// Wrap stderr in JSON for consistent parsing
 				stderrEntry := map[string]interface{}{
@@ -1065,7 +1102,7 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 					"_timestamp": time.Now().UTC().Format(time.RFC3339),
 				}
 				if stderrJSON, err := json.Marshal(stderrEntry); err == nil {
-					_, _ = m.logFile.WriteString(string(stderrJSON) + "\n")
+					_, _ = m.logFile.Write([]byte(string(stderrJSON) + "\n"))
 				}
 			}
 		}
@@ -1142,7 +1179,7 @@ func (m *Manager) SendResponse(toolUseID string, response string, isError bool) 
 			"_timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 		if stdinJSON, err := json.Marshal(stdinEntry); err == nil {
-			_, _ = m.logFile.WriteString(string(stdinJSON) + "\n")
+			_, _ = m.logFile.Write([]byte(string(stdinJSON) + "\n"))
 		}
 	}
 
@@ -1392,13 +1429,15 @@ func generateToolDescription(toolName string, input json.RawMessage) string {
 // This is the full structure for parsing.
 type claudeStreamMessage struct {
 	Type      string `json:"type"`
-	Subtype   string `json:"subtype,omitempty"`    // "compact_boundary" for context compaction marker
-	UserType  string `json:"userType,omitempty"`   // "external" for auto-generated messages (context compaction)
-	SessionID string `json:"session_id,omitempty"` // snake_case in stream-json output
-	Content   string `json:"content,omitempty"`    // For system messages (e.g., "Conversation compacted")
+	Subtype   string `json:"subtype,omitempty"`   // "compact_boundary" for context compaction marker
+	UserType  string `json:"userType,omitempty"`  // "external" for auto-generated messages (context compaction)
+	SessionID string `json:"sessionId,omitempty"` // camelCase in JSONL files
+	Content   string `json:"content,omitempty"`   // For system messages (e.g., "Conversation compacted")
+	Timestamp string `json:"timestamp,omitempty"` // ISO 8601 timestamp from Claude CLI
 	Message   struct {
 		Content    json.RawMessage `json:"content"`
 		StopReason string          `json:"stop_reason"`
+		Model      string          `json:"model,omitempty"` // Model used (e.g., "claude-opus-4-5-20251101")
 		Usage      struct {
 			OutputTokens int `json:"output_tokens"`
 			InputTokens  int `json:"input_tokens"`
@@ -1436,6 +1475,8 @@ func (m *Manager) convertToClaudeMessagePayload(parsed *events.ParsedClaudeMessa
 		Type:                parsed.Type,
 		StopReason:          parsed.StopReason,
 		IsContextCompaction: parsed.IsContextCompaction,
+		Timestamp:           parsed.Timestamp,
+		Model:               parsed.Model,
 	}
 
 	// Set role based on type
@@ -1495,6 +1536,8 @@ func (m *Manager) parseClaudeJSON(line string) *events.ParsedClaudeMessage {
 		CostUSD:      msg.CostUSD,
 		DurationMS:   msg.DurationMS,
 		OutputTokens: msg.Message.Usage.OutputTokens,
+		Timestamp:    msg.Timestamp,
+		Model:        msg.Message.Model,
 	}
 
 	// Detect context compaction boundary (system message)
@@ -1625,6 +1668,7 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 		SessionID: sessionID,
 		Type:      "user",
 		Role:      "user",
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Content: []events.ClaudeMessageContent{
 			{
 				Type: "text",
@@ -1646,6 +1690,7 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 		SessionID: sessionID,
 		Type:      "user",
 		Role:      "user",
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Content: []events.ClaudeMessageContent{
 			{
 				Type: "text",

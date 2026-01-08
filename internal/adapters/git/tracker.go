@@ -359,10 +359,19 @@ func countDiffLines(diff string) (additions, deletions int) {
 }
 
 // GetFileContent returns the content of a file from the repository.
+// Security: Uses os.ReadFile instead of shell command, with proper path validation.
 func (t *Tracker) GetFileContent(ctx context.Context, path string, maxSizeKB int) (string, bool, error) {
-	fullPath := filepath.Join(t.repoRoot, path)
+	// Clean and normalize the path first
+	cleanPath := filepath.Clean(path)
 
-	// Validate path is within repo
+	// Explicit traversal check - reject any path with ".." components
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, string(filepath.Separator)+"..") {
+		return "", false, domain.ErrPathOutsideRepo
+	}
+
+	fullPath := filepath.Join(t.repoRoot, cleanPath)
+
+	// Resolve to absolute paths for comparison
 	absPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return "", false, err
@@ -373,31 +382,37 @@ func (t *Tracker) GetFileContent(ctx context.Context, path string, maxSizeKB int
 		return "", false, err
 	}
 
-	if !strings.HasPrefix(absPath, absRoot) {
+	// Ensure path is within repo (add separator to prevent prefix attack on similar dir names)
+	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
 		return "", false, domain.ErrPathOutsideRepo
 	}
 
-	// Read file
-	cmd := exec.CommandContext(ctx, "cat", fullPath)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return "", false, fmt.Errorf("failed to read file: %s", stderr.String())
+	// Check file exists and is not a directory
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, fmt.Errorf("file not found: %s", path)
+		}
+		return "", false, fmt.Errorf("failed to access file: %w", err)
+	}
+	if info.IsDir() {
+		return "", false, fmt.Errorf("path is a directory: %s", path)
 	}
 
-	content := stdout.String()
+	// Read file using os.ReadFile (safe, no shell execution)
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to read file: %w", err)
+	}
 
 	// Check if truncation needed
 	maxSize := maxSizeKB * 1024
-	truncated := false
-	if len(content) > maxSize {
+	truncated := len(content) > maxSize
+	if truncated {
 		content = content[:maxSize]
-		truncated = true
 	}
 
-	return content, truncated, nil
+	return string(content), truncated, nil
 }
 
 // EnhancedStatus represents enhanced git status with staging information.

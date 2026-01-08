@@ -56,6 +56,10 @@ type ParsedClaudeMessage struct {
 	// created by Claude Code when the context window was maxed out.
 	// Content starts with "This session is being continued from a previous conversation"
 	IsContextCompaction bool `json:"is_context_compaction,omitempty"`
+	// Timestamp is the ISO 8601 timestamp from the Claude CLI JSONL output
+	Timestamp string `json:"timestamp,omitempty"`
+	// Model is the model used (e.g., "claude-opus-4-5-20251101")
+	Model string `json:"model,omitempty"`
 }
 
 // ParsedContentBlock represents a single content block from Claude's output.
@@ -207,6 +211,8 @@ type ClaudeMessagePayload struct {
 	// the conversation was compacted/summarized.
 	// iOS should display this differently (e.g., as a system notice).
 	IsContextCompaction bool `json:"is_context_compaction,omitempty"`
+	// Timestamp is when this message was created (ISO 8601 format)
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
 // ClaudeMessageContent represents a content block in a claude_message.

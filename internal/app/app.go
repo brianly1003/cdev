@@ -28,6 +28,7 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
 	"github.com/brianly1003/cdev/internal/security"
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
+	httpMiddleware "github.com/brianly1003/cdev/internal/server/http/middleware"
 	"github.com/brianly1003/cdev/internal/server/unified"
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/terminal"
@@ -65,6 +66,9 @@ type App struct {
 
 	// Permission hook bridge
 	permissionManager *permission.MemoryManager
+
+	// Security
+	rateLimiter *httpMiddleware.RateLimiter
 
 	// Terminal mode support (headless=false)
 	terminalRunner *terminal.Runner
@@ -134,6 +138,7 @@ func (a *App) Start(ctx context.Context) error {
 		a.cfg.Claude.TimeoutMinutes,
 		a.hub,
 		a.cfg.Claude.SkipPermissions,
+		&a.cfg.Logging.Rotation,
 	)
 
 	// Legacy single-repo mode: Initialize repo-dependent components only if repository.path is configured
@@ -527,6 +532,20 @@ func (a *App) Start(ctx context.Context) error {
 	// Configure security on unified server
 	a.unifiedServer.SetSecurity(a.tokenManager, originChecker, a.cfg.Security.RequireAuth)
 
+	// Configure security on HTTP server (CORS origin checking)
+	a.httpServer.SetOriginChecker(originChecker)
+
+	// Configure rate limiting if enabled
+	if a.cfg.Security.RateLimit.Enabled {
+		rateLimiter := httpMiddleware.NewRateLimiter(
+			httpMiddleware.WithMaxRequests(a.cfg.Security.RateLimit.RequestsPerMinute),
+			httpMiddleware.WithWindow(time.Minute),
+		)
+		a.httpServer.SetRateLimiter(rateLimiter)
+		a.rateLimiter = rateLimiter
+		log.Info().Int("requests_per_minute", a.cfg.Security.RateLimit.RequestsPerMinute).Msg("rate limiting enabled")
+	}
+
 	// Create pairing handler with function to get current pairing info
 	pairingHandler := httpserver.NewPairingHandler(
 		a.tokenManager,
@@ -656,6 +675,11 @@ func (a *App) shutdown() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_ = a.httpServer.Stop(shutdownCtx)
 		cancel()
+	}
+
+	// Stop rate limiter (cleanup goroutine)
+	if a.rateLimiter != nil {
+		a.rateLimiter.Close()
 	}
 
 	// Stop hub

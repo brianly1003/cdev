@@ -49,7 +49,7 @@ func (h *mockEventHub) SubscriberCount() int           { return 0 }
 
 func TestNewManager(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", []string{"-p"}, 5, hub, false)
+	m := NewManager("claude", []string{"-p"}, 5, hub, false, nil)
 
 	if m == nil {
 		t.Fatal("NewManager returned nil")
@@ -70,7 +70,7 @@ func TestNewManager(t *testing.T) {
 
 func TestNewManager_WithSkipPermissions(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 10, hub, true)
+	m := NewManager("claude", nil, 10, hub, true, nil)
 
 	if !m.skipPermissions {
 		t.Error("skipPermissions should be true")
@@ -79,7 +79,7 @@ func TestNewManager_WithSkipPermissions(t *testing.T) {
 
 func TestNewManagerWithContext(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManagerWithContext(hub, "claude", []string{"-p"}, 5, false, "/tmp/workspace", "ws-123", "session-456")
+	m := NewManagerWithContext(hub, "claude", []string{"-p"}, 5, false, "/tmp/workspace", "ws-123", "session-456", nil)
 
 	if m == nil {
 		t.Fatal("NewManagerWithContext returned nil")
@@ -97,7 +97,7 @@ func TestNewManagerWithContext(t *testing.T) {
 
 func TestManager_WorkspaceID(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "ws-123", "")
+	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "ws-123", "", nil)
 
 	if m.WorkspaceID() != "ws-123" {
 		t.Errorf("WorkspaceID() = %s, want ws-123", m.WorkspaceID())
@@ -106,7 +106,7 @@ func TestManager_WorkspaceID(t *testing.T) {
 
 func TestManager_SessionID(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "", "session-123")
+	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "", "session-123", nil)
 
 	if m.SessionID() != "session-123" {
 		t.Errorf("SessionID() = %s, want session-123", m.SessionID())
@@ -115,7 +115,7 @@ func TestManager_SessionID(t *testing.T) {
 
 func TestManager_SetSessionID(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 5, hub, false)
+	m := NewManager("claude", nil, 5, hub, false, nil)
 
 	m.SetSessionID("new-session-id")
 
@@ -126,7 +126,7 @@ func TestManager_SetSessionID(t *testing.T) {
 
 func TestManager_SetSessionID_ThreadSafe(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 5, hub, false)
+	m := NewManager("claude", nil, 5, hub, false, nil)
 
 	var wg sync.WaitGroup
 	numGoroutines := 50
@@ -149,7 +149,7 @@ func TestManager_SetSessionID_ThreadSafe(t *testing.T) {
 
 func TestManager_State_Initial(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 5, hub, false)
+	m := NewManager("claude", nil, 5, hub, false, nil)
 
 	state := m.State()
 
@@ -160,7 +160,7 @@ func TestManager_State_Initial(t *testing.T) {
 
 func TestManager_IsRunning_Initial(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 5, hub, false)
+	m := NewManager("claude", nil, 5, hub, false, nil)
 
 	if m.IsRunning() {
 		t.Error("IsRunning() should be false initially")
@@ -169,7 +169,7 @@ func TestManager_IsRunning_Initial(t *testing.T) {
 
 func TestManager_PID_Initial(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManager("claude", nil, 5, hub, false)
+	m := NewManager("claude", nil, 5, hub, false, nil)
 
 	if m.PID() != 0 {
 		t.Errorf("PID() = %d, want 0", m.PID())
@@ -247,7 +247,7 @@ func TestPTYPermissionPrompt_Struct(t *testing.T) {
 
 func TestNewManager_NilHub(t *testing.T) {
 	// Manager should work with nil hub (just won't publish events)
-	m := NewManager("claude", nil, 5, nil, false)
+	m := NewManager("claude", nil, 5, nil, false, nil)
 
 	if m == nil {
 		t.Fatal("NewManager returned nil with nil hub")
@@ -274,7 +274,7 @@ func TestManager_Timeout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hub := newMockEventHub()
-			m := NewManager("claude", nil, tt.timeoutMinutes, hub, false)
+			m := NewManager("claude", nil, tt.timeoutMinutes, hub, false, nil)
 
 			if m.timeout != tt.expected {
 				t.Errorf("timeout = %v, want %v", m.timeout, tt.expected)
@@ -288,7 +288,7 @@ func TestManager_Timeout(t *testing.T) {
 func TestManager_Args(t *testing.T) {
 	hub := newMockEventHub()
 	args := []string{"-p", "--verbose", "--output-format", "stream-json"}
-	m := NewManager("claude", args, 5, hub, false)
+	m := NewManager("claude", args, 5, hub, false, nil)
 
 	if len(m.args) != len(args) {
 		t.Errorf("args length = %d, want %d", len(m.args), len(args))
@@ -305,7 +305,7 @@ func TestManager_Args(t *testing.T) {
 func TestManager_LogDir_WithWorkDir(t *testing.T) {
 	hub := newMockEventHub()
 	tempDir := t.TempDir()
-	m := NewManagerWithContext(hub, "claude", nil, 5, false, tempDir, "ws-123", "")
+	m := NewManagerWithContext(hub, "claude", nil, 5, false, tempDir, "ws-123", "", nil)
 
 	// logDir should be set to workDir/.cdev/logs
 	if m.logDir == "" {
@@ -315,7 +315,7 @@ func TestManager_LogDir_WithWorkDir(t *testing.T) {
 
 func TestManager_LogDir_NoWorkDir(t *testing.T) {
 	hub := newMockEventHub()
-	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "ws-123", "")
+	m := NewManagerWithContext(hub, "claude", nil, 5, false, "", "ws-123", "", nil)
 
 	if m.logDir != "" {
 		t.Error("logDir should be empty when workDir is not provided")

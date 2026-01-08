@@ -62,8 +62,18 @@ type GitConfig struct {
 
 // LoggingConfig holds logging configuration.
 type LoggingConfig struct {
-	Level  string `mapstructure:"level"`
-	Format string `mapstructure:"format"`
+	Level    string            `mapstructure:"level"`
+	Format   string            `mapstructure:"format"`
+	Rotation LogRotationConfig `mapstructure:"rotation"`
+}
+
+// LogRotationConfig holds log rotation configuration.
+type LogRotationConfig struct {
+	Enabled    bool `mapstructure:"enabled"`     // Enable log rotation for Claude JSONL logs
+	MaxSizeMB  int  `mapstructure:"max_size_mb"` // Max size in MB before rotation
+	MaxBackups int  `mapstructure:"max_backups"` // Number of old logs to keep
+	MaxAgeDays int  `mapstructure:"max_age_days"` // Days to keep old logs (0 = no limit)
+	Compress   bool `mapstructure:"compress"`    // Compress rotated logs with gzip
 }
 
 // LimitsConfig holds various limits.
@@ -88,10 +98,17 @@ type IndexerConfig struct {
 
 // SecurityConfig holds security-related configuration.
 type SecurityConfig struct {
-	RequireAuth       bool     `mapstructure:"require_auth"`        // If true, require token for WebSocket connections
-	TokenExpirySecs   int      `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
-	AllowedOrigins    []string `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
-	BindLocalhostOnly bool     `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
+	RequireAuth       bool            `mapstructure:"require_auth"`        // If true, require token for WebSocket connections
+	TokenExpirySecs   int             `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
+	AllowedOrigins    []string        `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
+	BindLocalhostOnly bool            `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
+	RateLimit         RateLimitConfig `mapstructure:"rate_limit"`          // Rate limiting configuration
+}
+
+// RateLimitConfig holds rate limiting configuration.
+type RateLimitConfig struct {
+	Enabled           bool `mapstructure:"enabled"`             // Enable rate limiting
+	RequestsPerMinute int  `mapstructure:"requests_per_minute"` // Max requests per minute per IP
 }
 
 // PermissionsConfig holds permission hook bridge configuration.
@@ -185,6 +202,11 @@ func setDefaults(v *viper.Viper) {
 	// Logging defaults
 	v.SetDefault("logging.level", "info")
 	v.SetDefault("logging.format", "console")
+	v.SetDefault("logging.rotation.enabled", true)
+	v.SetDefault("logging.rotation.max_size_mb", 50)
+	v.SetDefault("logging.rotation.max_backups", 5)
+	v.SetDefault("logging.rotation.max_age_days", 30)
+	v.SetDefault("logging.rotation.compress", true)
 
 	// Limits defaults
 	v.SetDefault("limits.max_file_size_kb", 200)
@@ -205,6 +227,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
+	v.SetDefault("security.rate_limit.enabled", false) // Disabled by default for local dev
+	v.SetDefault("security.rate_limit.requests_per_minute", 100)
 
 	// Permissions defaults (hook bridge)
 	v.SetDefault("permissions.session_memory.enabled", true)
