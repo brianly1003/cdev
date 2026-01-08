@@ -22,6 +22,98 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/auth/exchange": {
+            "post": {
+                "description": "Exchanges a valid pairing token for an access token and refresh token pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Exchange pairing token for access/refresh tokens",
+                "parameters": [
+                    {
+                        "description": "Pairing token to exchange",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.TokenExchangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.TokenPairResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "description": "Uses a valid refresh token to obtain a new access/refresh token pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.TokenRefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.TokenPairResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/claude/respond": {
             "post": {
                 "description": "Send a response to Claude's interactive prompt or permission request",
@@ -1066,6 +1158,86 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/pair/info": {
+            "get": {
+                "description": "Returns connection info for mobile app pairing (WebSocket URL, HTTP URL, session ID, token)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pairing"
+                ],
+                "summary": "Get pairing info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.PairingInfoResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pair/qr": {
+            "get": {
+                "description": "Returns a PNG QR code image containing connection info for mobile app",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "pairing"
+                ],
+                "summary": "Get pairing QR code",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "QR code size in pixels (default 256, max 512)",
+                        "name": "size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to generate QR code",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/pair/refresh": {
+            "post": {
+                "description": "Generates a new pairing token and revokes all previous tokens",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pairing"
+                ],
+                "summary": "Refresh pairing token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.PairingRefreshResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Token manager not available",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/repository/files/list": {
             "get": {
                 "description": "Returns a paginated list of files in a directory with filtering and sorting options",
@@ -1401,6 +1573,26 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/http.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pair": {
+            "get": {
+                "description": "Returns an HTML page with QR code for browser-based mobile app pairing",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "pairing"
+                ],
+                "summary": "Pairing page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -2042,6 +2234,43 @@ const docTemplate = `{
                 }
             }
         },
+        "http.PairingInfoResponse": {
+            "type": "object",
+            "properties": {
+                "http": {
+                    "type": "string"
+                },
+                "repo": {
+                    "type": "string"
+                },
+                "session": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "token_expires_at": {
+                    "type": "string"
+                },
+                "ws": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.PairingRefreshResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "http.RespondToClaudeRequest": {
             "type": "object",
             "required": [
@@ -2268,6 +2497,46 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "example": "stopped"
+                }
+            }
+        },
+        "http.TokenExchangeRequest": {
+            "type": "object",
+            "properties": {
+                "pairing_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.TokenPairResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "access_token_expires_at": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "description": "seconds until access token expires",
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "refresh_token_expires_at": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.TokenRefreshRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
                 }
             }
         },

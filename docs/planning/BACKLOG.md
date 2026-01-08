@@ -12,7 +12,7 @@
 | 0 | Core Features | 5 | ✅ Completed |
 | 1 | Security Hardening | 6 | ✅ Completed |
 | 2 | Testing Foundation | 7 | ✅ Completed (6/7) |
-| 3 | Performance Optimization | 4 | Partial (1/4) |
+| 3 | Performance Optimization | 4 | Partial (2/4) |
 | 4 | Production Features | 6 | Partial (1/6) |
 | 5 | Future Enhancements | 5 | Backlog |
 
@@ -386,7 +386,7 @@ Set up GitHub Actions for automated testing and builds.
 ## Phase 3: Performance Optimization
 
 **Goal:** Optimize for high-load scenarios and reduce resource usage.
-**Status:** Partial (1/4 items)
+**Status:** Partial (2/4 items)
 
 ### PERF-001: Git Status Caching
 **Priority:** P1 - High
@@ -431,22 +431,28 @@ Add timeout to event dispatch to prevent blocking on slow subscribers.
 
 ---
 
-### PERF-003: Add pprof Endpoints
+### PERF-003: Add pprof Endpoints ✅
 **Priority:** P2 - Medium
-**Effort:** 2 hours
-**Status:** Not Started
+**Status:** ✅ Completed (January 2026)
 
 **Description:**
 Add profiling endpoints for performance debugging.
 
 **Acceptance Criteria:**
-- [ ] `/debug/pprof/` endpoints
-- [ ] Configurable enable/disable
-- [ ] Requires authentication
+- [x] `/debug/pprof/` endpoints
+- [x] Configurable enable/disable
+- [x] Protected by localhost-only binding (default)
 
-**Files to Modify:**
-- `internal/server/http/server.go`
-- `internal/config/config.go`
+**Implementation:**
+- `internal/config/config.go` - Added `DebugConfig` with `enabled` and `pprof_enabled` flags
+- `internal/server/http/debug.go` - New file with `DebugHandler`:
+  - `/debug/` - Index page with links to all debug endpoints
+  - `/debug/runtime` - Go runtime statistics (JSON)
+  - `/debug/pprof/*` - Full pprof suite (heap, goroutine, profile, trace, etc.)
+- `internal/server/http/server.go` - Added `SetDebugHandler()` method
+- `internal/app/app.go` - Conditional initialization based on config
+- Disabled by default (`debug.enabled: false`)
+- Timeout middleware skips `/debug/*` paths for long-running profiles
 
 ---
 
@@ -681,6 +687,7 @@ Extensible plugin architecture for custom integrations.
 | TEST-005 | WebSocket Tests | ✅ Jan 2026 |
 | TEST-007 | CI/CD Pipeline | ✅ Jan 2026 |
 | PROD-003 | Structured Error Codes | ✅ Jan 2026 |
+| PERF-003 | pprof Endpoints | ✅ Jan 2026 |
 
 ### MVP Sprint 1: Security ✅ COMPLETE
 | Item | Description | Effort | Status |

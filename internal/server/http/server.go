@@ -163,6 +163,19 @@ func (s *Server) SetAuthHandler(handler *AuthHandler) {
 	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh")
 }
 
+// SetDebugHandler sets up debug and profiling endpoints.
+// Must be called before Start() to enable debug functionality.
+// Debug endpoints are automatically protected by localhost-only binding (default).
+func (s *Server) SetDebugHandler(handler *DebugHandler) {
+	if handler == nil {
+		log.Warn().Msg("debug handler is nil, debug routes will not be available")
+		return
+	}
+
+	// Register debug routes
+	handler.Register(s.mux)
+}
+
 // requestLoggingMiddleware logs all incoming requests for debugging.
 func requestLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -189,8 +202,10 @@ func requestLoggingMiddleware(next http.Handler) http.Handler {
 func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip timeout for certain paths that need longer processing
-		// (e.g., swagger UI, health checks, WebSocket upgrades)
-		if r.URL.Path == "/health" || r.URL.Path == "/ws" || strings.HasPrefix(r.URL.Path, "/swagger/") {
+		// (e.g., swagger UI, health checks, WebSocket upgrades, debug/pprof endpoints)
+		if r.URL.Path == "/health" || r.URL.Path == "/ws" ||
+			strings.HasPrefix(r.URL.Path, "/swagger/") ||
+			strings.HasPrefix(r.URL.Path, "/debug/") {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -23,6 +23,7 @@ type Config struct {
 	Indexer     IndexerConfig     `mapstructure:"indexer"`
 	Security    SecurityConfig    `mapstructure:"security"`
 	Permissions PermissionsConfig `mapstructure:"permissions"`
+	Debug       DebugConfig       `mapstructure:"debug"`
 }
 
 // ServerConfig holds server-related configuration.
@@ -121,6 +122,12 @@ type SessionMemoryConfig struct {
 	Enabled     bool `mapstructure:"enabled"`      // Enable session memory for "Allow for Session" functionality
 	TTLSeconds  int  `mapstructure:"ttl_seconds"`  // Idle timeout for session memory in seconds (default: 3600)
 	MaxPatterns int  `mapstructure:"max_patterns"` // Max patterns per session (default: 100)
+}
+
+// DebugConfig holds debug and profiling configuration.
+type DebugConfig struct {
+	Enabled      bool `mapstructure:"enabled"`       // Enable debug endpoints (default: false)
+	PprofEnabled bool `mapstructure:"pprof_enabled"` // Enable /debug/pprof/* endpoints (default: true when debug enabled)
 }
 
 // Load loads configuration from files and environment.
@@ -234,6 +241,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("permissions.session_memory.enabled", true)
 	v.SetDefault("permissions.session_memory.ttl_seconds", 3600) // 1 hour idle timeout
 	v.SetDefault("permissions.session_memory.max_patterns", 100)
+
+	// Debug defaults - disabled by default for security
+	v.SetDefault("debug.enabled", false)
+	v.SetDefault("debug.pprof_enabled", true) // When debug is enabled, pprof is on by default
 }
 
 // postProcess applies post-processing to configuration.

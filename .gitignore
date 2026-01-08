@@ -54,3 +54,4 @@ frontend/dist/
 .env.local
 CLAUDE.md
 docs/samples
+trace.out

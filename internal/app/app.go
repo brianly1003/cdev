@@ -559,6 +559,13 @@ func (a *App) Start(ctx context.Context) error {
 		a.httpServer.SetAuthHandler(authHandler)
 	}
 
+	// Create debug handler for pprof and runtime info (when enabled)
+	if a.cfg.Debug.Enabled {
+		debugHandler := httpserver.NewDebugHandler(a.cfg.Debug.PprofEnabled)
+		a.httpServer.SetDebugHandler(debugHandler)
+		log.Info().Bool("pprof", a.cfg.Debug.PprofEnabled).Msg("debug endpoints enabled")
+	}
+
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
 	// Set WebSocket handler for port consolidation
