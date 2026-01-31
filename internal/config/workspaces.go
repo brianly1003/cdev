@@ -112,6 +112,7 @@ func LoadWorkspaces(configPath string) (*WorkspacesConfig, error) {
 	}
 
 	// Post-process
+	sanitizeWorkspaceManagerConfig(&cfg.Manager)
 	if err := postProcessWorkspaces(&cfg); err != nil {
 		return nil, err
 	}
@@ -122,6 +123,55 @@ func LoadWorkspaces(configPath string) (*WorkspacesConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+// sanitizeWorkspaceManagerConfig fills invalid manager values with defaults.
+// This prevents invalid zero values from breaking workspace loading.
+func sanitizeWorkspaceManagerConfig(cfg *WorkspaceManagerConfig) {
+	defaults := createDefaultWorkspacesConfig().Manager
+
+	if cfg.Port < 1 || cfg.Port > 65535 {
+		cfg.Port = defaults.Port
+	}
+	if cfg.PortRangeStart < 1 || cfg.PortRangeStart > 65535 {
+		cfg.PortRangeStart = defaults.PortRangeStart
+	}
+	if cfg.PortRangeEnd < 1 || cfg.PortRangeEnd > 65535 {
+		cfg.PortRangeEnd = defaults.PortRangeEnd
+	}
+	if cfg.PortRangeStart >= cfg.PortRangeEnd {
+		cfg.PortRangeStart = defaults.PortRangeStart
+		cfg.PortRangeEnd = defaults.PortRangeEnd
+	}
+	if cfg.Port >= cfg.PortRangeStart && cfg.Port <= cfg.PortRangeEnd {
+		cfg.Port = defaults.Port
+		// Ensure ranges still valid after fixing port
+		if cfg.Port >= cfg.PortRangeStart && cfg.Port <= cfg.PortRangeEnd {
+			cfg.PortRangeStart = defaults.PortRangeStart
+			cfg.PortRangeEnd = defaults.PortRangeEnd
+		}
+	}
+	if cfg.MaxConcurrentWorkspaces < 1 || cfg.MaxConcurrentWorkspaces > 100 {
+		cfg.MaxConcurrentWorkspaces = defaults.MaxConcurrentWorkspaces
+	}
+	if cfg.AutoStopIdleMinutes < 0 {
+		cfg.AutoStopIdleMinutes = defaults.AutoStopIdleMinutes
+	}
+	if cfg.MaxRestartAttempts < 0 {
+		cfg.MaxRestartAttempts = defaults.MaxRestartAttempts
+	}
+	if cfg.RestartBackoffSeconds < 0 {
+		cfg.RestartBackoffSeconds = defaults.RestartBackoffSeconds
+	}
+	if cfg.PortRangeEnd-cfg.PortRangeStart+1 < cfg.MaxConcurrentWorkspaces {
+		cfg.MaxConcurrentWorkspaces = defaults.MaxConcurrentWorkspaces
+	}
+	if cfg.Host == "" {
+		cfg.Host = defaults.Host
+	}
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = defaults.LogLevel
+	}
 }
 
 // SaveWorkspaces saves the workspaces configuration
@@ -180,13 +230,18 @@ func createDefaultWorkspacesConfig() *WorkspacesConfig {
 				Format: "console",
 			},
 			Limits: LimitsConfig{
-				MaxFileSizeKB:  200,
-				MaxDiffSizeKB:  500,
-				MaxLogBuffer:   1000,
-				MaxPromptLen:   10000,
+				MaxFileSizeKB: 200,
+				MaxDiffSizeKB: 500,
+				MaxLogBuffer:  1000,
+				MaxPromptLen:  10000,
 			},
 		},
 	}
+}
+
+// DefaultWorkspacesConfig returns a copy of the default workspaces configuration.
+func DefaultWorkspacesConfig() *WorkspacesConfig {
+	return createDefaultWorkspacesConfig()
 }
 
 // setWorkspaceDefaults sets default values for workspace config

@@ -11,6 +11,7 @@ import (
 
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 // ConfigManager handles workspace configuration CRUD operations.
@@ -284,11 +285,30 @@ func (m *ConfigManager) saveConfig() error {
 		Workspaces: make([]config.WorkspaceDefinition, 0, len(m.workspaces)),
 	}
 
+	// Preserve manager/defaults from existing config (or fall back to defaults)
+	existingCfg, err := config.LoadWorkspaces(m.configPath)
+	if err == nil {
+		cfg.Manager = existingCfg.Manager
+		cfg.Defaults = existingCfg.Defaults
+	} else {
+		defaults := config.DefaultWorkspacesConfig()
+		cfg.Manager = defaults.Manager
+		cfg.Defaults = defaults.Defaults
+	}
+
 	for _, ws := range m.workspaces {
 		cfg.Workspaces = append(cfg.Workspaces, ws.Definition)
 	}
 
-	return config.SaveWorkspaces(m.configPath, cfg)
+	if err := config.SaveWorkspaces(m.configPath, cfg); err != nil {
+		log.Warn().Err(err).Str("workspaces_path", m.configPath).Msg("failed to save workspaces config")
+		return err
+	}
+	log.Info().
+		Str("workspaces_path", m.configPath).
+		Int("workspaces_saved", len(cfg.Workspaces)).
+		Msg("workspaces config saved")
+	return nil
 }
 
 // GetAllWorkspaceIDs returns all workspace IDs.

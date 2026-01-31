@@ -225,14 +225,20 @@ func (a *App) Start(ctx context.Context) error {
 	}
 
 	// Initialize Multi-Workspace Support
-	// Workspaces are managed dynamically via workspace/add API, not loaded from file
-	// The configPath is still used to persist workspaces when added via API
+	// Workspaces are managed dynamically via workspace/add API and persisted to workspaces.yaml
 	workspacesPath := config.DefaultWorkspacesPath()
-	emptyWorkspacesCfg := &config.WorkspacesConfig{
-		Workspaces: []config.WorkspaceDefinition{},
+	workspacesCfg, err := config.LoadWorkspaces(workspacesPath)
+	if err != nil {
+		log.Warn().Err(err).Str("workspaces_path", workspacesPath).Msg("failed to load workspaces config, starting with empty workspace list")
+		workspacesCfg = &config.WorkspacesConfig{
+			Workspaces: []config.WorkspaceDefinition{},
+		}
 	}
-	a.workspaceConfigManager = workspace.NewConfigManager(emptyWorkspacesCfg, workspacesPath)
-	log.Info().Msg("workspace manager initialized (workspaces added via API)")
+	a.workspaceConfigManager = workspace.NewConfigManager(workspacesCfg, workspacesPath)
+	log.Info().
+		Str("workspaces_path", workspacesPath).
+		Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).
+		Msg("workspace manager initialized")
 
 	// Initialize Image Storage Manager for per-workspace image uploads
 	pathResolver := workspace.NewImageStoragePathResolver(a.workspaceConfigManager)
@@ -273,6 +279,14 @@ func (a *App) Start(ctx context.Context) error {
 	// Connect session manager to git tracker manager
 	a.sessionManager.SetGitTrackerManager(a.gitTrackerManager)
 
+	// Register persisted workspaces with the session manager
+	registered := 0
+	for _, ws := range a.workspaceConfigManager.ListWorkspaces() {
+		a.sessionManager.RegisterWorkspace(ws)
+		registered++
+	}
+	log.Info().Int("workspaces_registered", registered).Msg("session manager workspace registration complete")
+
 	// Enable LIVE session support for the repository (only if path configured)
 	if a.cfg.Repository.Path != "" {
 		a.sessionManager.SetLiveSessionSupport(a.cfg.Repository.Path)
@@ -282,9 +296,8 @@ func (a *App) Start(ctx context.Context) error {
 		log.Warn().Err(err).Msg("failed to start session manager")
 	}
 
-	// Workspaces are added dynamically via workspace/add API
-	// No workspaces are pre-loaded from config file
-	log.Info().Msg("multi-workspace support initialized (use workspace/add API to add workspaces)")
+	// Workspaces are loaded from config and updated via workspace/add API
+	log.Info().Msg("multi-workspace support initialized (workspace/add persists updates)")
 
 	// Initialize Permission Memory Manager (for hook bridge "Allow for Session" functionality)
 	if a.cfg.Permissions.SessionMemory.Enabled {

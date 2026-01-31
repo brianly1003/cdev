@@ -703,11 +703,11 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 			if status == session.StatusRunning || status == session.StatusStarting {
 				// Check if there's a pending permission (e.g., trust folder prompt)
 				result := map[string]interface{}{
-					"session_id":         activeSessionID,
-					"workspace_id":       p.WorkspaceID,
-					"source":             "managed",
-					"status":             "existing",
-					"message":            "Returning existing active session (Claude still running)",
+					"session_id":             activeSessionID,
+					"workspace_id":           p.WorkspaceID,
+					"source":                 "managed",
+					"status":                 "existing",
+					"message":                "Returning existing active session (Claude still running)",
 					"has_pending_permission": false,
 				}
 
@@ -1155,6 +1155,9 @@ func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params j
 
 	result, err := s.manager.GetSessionMessages(p.WorkspaceID, p.SessionID, limit, p.Offset, order)
 	if err != nil {
+		if strings.Contains(err.Error(), "session not found") {
+			return nil, message.ErrSessionNotFound(p.SessionID)
+		}
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
@@ -1938,6 +1941,9 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 
 	info, err := s.manager.WatchWorkspaceSession(clientID, p.WorkspaceID, p.SessionID)
 	if err != nil {
+		if strings.Contains(err.Error(), "session not found") {
+			return nil, message.ErrSessionNotFound(p.SessionID)
+		}
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
@@ -1990,8 +1996,8 @@ type FileInfo struct {
 type DirectoryInfo struct {
 	Path             string    `json:"path"`
 	Name             string    `json:"name"`
-	FolderCount      int       `json:"folder_count"`       // Direct subdirectories count
-	FileCount        int       `json:"file_count"`         // Recursive file count
+	FolderCount      int       `json:"folder_count"` // Direct subdirectories count
+	FileCount        int       `json:"file_count"`   // Recursive file count
 	TotalSizeBytes   int64     `json:"total_size_bytes"`
 	TotalSizeDisplay string    `json:"total_size_display"` // Human readable: "35 KB"
 	LastModified     time.Time `json:"last_modified,omitempty"`
