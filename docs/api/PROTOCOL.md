@@ -1,8 +1,8 @@
 # cdev Protocol Specification
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 **Status:** Implemented
-**Last Updated:** 26 Dec 2025
+**Last Updated:** January 30, 2026
 
 ---
 
@@ -34,6 +34,29 @@ The cdev protocol defines the communication standard between cdev (server) and c
 | WebSocket | 8766 | Real-time events via `/ws` endpoint (JSON-RPC 2.0 + legacy) |
 
 **Note:** Port consolidation complete - single port 8766 serves all traffic.
+
+### Authentication
+
+When `security.require_auth = true` (default), **all HTTP and WebSocket endpoints require bearer auth**.
+
+```
+Authorization: Bearer <access-token>
+```
+
+**Unauthenticated allowlist** (for pairing + token exchange):
+- `/health`
+- `/pair`
+- `/api/pair/*`
+- `/api/auth/exchange`
+- `/api/auth/refresh`
+
+**Token flow (summary):**
+1. Pairing token is displayed in `/pair` or `/api/pair/info` (QR includes token).
+2. Exchange pairing token via `POST /api/auth/exchange`.
+3. Use returned access token for HTTP + WebSocket requests.
+4. Refresh via `POST /api/auth/refresh`.
+
+**Note:** Query‑string tokens are not supported.
 
 ---
 
@@ -842,8 +865,6 @@ In failed state: Retry every 60s
 | Issue | Description | Priority | Effort |
 |-------|-------------|----------|--------|
 | **Duplicate Events** | `claude_message` emitted from both manager.go and streamer.go | P0 | 2-3 days |
-| **No Authentication** | Anyone on LAN can connect and control | P0 | 1 week |
-| **CORS Allow-All** | Vulnerable to CSRF attacks | P0 | 1 day |
 
 ### High Priority
 
@@ -898,17 +919,17 @@ In failed state: Retry every 60s
 ### Week 2: Security & Versioning
 
 ```
-[ ] Add API key authentication
-    - Header: Authorization: Bearer <api-key>
-    - WebSocket: ?token=<api-key> query param
+[x] Require bearer auth for HTTP + WebSocket
+    - Header: Authorization: Bearer <access-token>
+    - Query-string tokens are not supported
 
 [ ] Add protocol version header
     - Header: X-Cdev-Protocol-Version: 1.0.0
     - Reject incompatible versions
 
-[ ] Restrict CORS origins
+[x] Restrict CORS origins
     - Allow localhost only by default
-    - Configurable whitelist
+    - Configurable allowlist
 ```
 
 ### Week 3: Polish
@@ -950,4 +971,4 @@ Key changes from 1.0 to 2.0:
 - [API-REFERENCE.md](./API-REFERENCE.md) - Detailed HTTP API documentation
 - [WEBSOCKET-STABILITY.md](./WEBSOCKET-STABILITY.md) - Mobile connection stability
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
-- [STRATEGIC-ROADMAP.md](./STRATEGIC-ROADMAP.md) - Product roadmap
+- [READINESS-ROADMAP-SOURCE-OF-TRUTH.md](../planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md) - Product readiness and roadmap

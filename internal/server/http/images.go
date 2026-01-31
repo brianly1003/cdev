@@ -2,6 +2,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,21 +11,34 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// ImageHandler handles image upload operations.
+// ImageHandler handles image upload operations with multi-workspace support.
 type ImageHandler struct {
-	storage     *imagestorage.Storage
+	manager     *imagestorage.Manager
 	rateLimiter *middleware.RateLimiter
 }
 
-// NewImageHandler creates a new ImageHandler.
-func NewImageHandler(storage *imagestorage.Storage) *ImageHandler {
+// NewImageHandler creates a new ImageHandler with multi-workspace support.
+func NewImageHandler(manager *imagestorage.Manager) *ImageHandler {
 	return &ImageHandler{
-		storage: storage,
+		manager: manager,
 		rateLimiter: middleware.NewRateLimiter(
 			middleware.WithMaxRequests(10),       // 10 uploads per minute
 			middleware.WithWindow(1*time.Minute), // 1 minute
 		),
 	}
+}
+
+// getStorage returns the storage for the request using workspace_id from query params.
+func (h *ImageHandler) getStorage(r *http.Request) (*imagestorage.Storage, error) {
+	if h.manager == nil {
+		return nil, fmt.Errorf("image storage manager not available")
+	}
+
+	workspaceID := r.URL.Query().Get("workspace_id")
+	if workspaceID == "" {
+		return nil, fmt.Errorf("workspace_id parameter is required")
+	}
+	return h.manager.GetStorage(workspaceID)
 }
 
 // Close cleans up resources.
@@ -74,9 +88,11 @@ func (h *ImageHandler) HandleImages(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503			{object}	ErrorResponse		"Image storage not available"
 //	@Router			/api/images [post]
 func (h *ImageHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
@@ -130,7 +146,7 @@ func (h *ImageHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store the image
-	img, err := h.storage.Store(file, mimeType)
+	img, err := storage.Store(file, mimeType)
 	if err != nil {
 		log.Error().Err(err).Str("filename", header.Filename).Msg("failed to store image")
 
@@ -203,9 +219,11 @@ func isValidImageID(id string) bool {
 
 // handleList handles GET /api/images - list all images or get single image.
 func (h *ImageHandler) handleList(w http.ResponseWriter, r *http.Request) {
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
@@ -221,7 +239,7 @@ func (h *ImageHandler) handleList(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		img, err := h.storage.Get(imageID)
+		img, err := storage.Get(imageID)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]string{
 				"error": "image_not_found",
@@ -242,8 +260,8 @@ func (h *ImageHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// List all images
-	images := h.storage.List()
-	stats := h.storage.GetStats()
+	images := storage.List()
+	stats := storage.GetStats()
 
 	imageList := make([]ImageInfoResponse, 0, len(images))
 	for _, img := range images {
@@ -268,9 +286,11 @@ func (h *ImageHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 // handleDelete handles DELETE /api/images?id=... - delete an image.
 func (h *ImageHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
@@ -293,7 +313,7 @@ func (h *ImageHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.storage.Delete(imageID); err != nil {
+	if err := storage.Delete(imageID); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "image_not_found",
 			"id":    imageID,
@@ -404,9 +424,11 @@ func (h *ImageHandler) ValidateImagePath(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
@@ -420,7 +442,7 @@ func (h *ImageHandler) ValidateImagePath(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.storage.ValidatePath(path); err != nil {
+	if err := storage.ValidatePath(path); err != nil {
 		writeJSON(w, http.StatusBadRequest, ImageValidateResponse{
 			Valid:   false,
 			Path:    path,
@@ -457,16 +479,18 @@ func (h *ImageHandler) HandleImageStats(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
 
-	stats := h.storage.GetStats()
+	stats := storage.GetStats()
 
-	canAccept, reason := h.storage.CanAcceptUpload(int64(imagestorage.MaxSingleImageMB * 1024 * 1024))
+	canAccept, reason := storage.CanAcceptUpload(int64(imagestorage.MaxSingleImageMB * 1024 * 1024))
 
 	writeJSON(w, http.StatusOK, ImageStatsResponse{
 		ImageCount:      stats.ImageCount,
@@ -505,17 +529,19 @@ func (h *ImageHandler) HandleClearImages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if h.storage == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "Image storage not available",
+	storage, err := h.getStorage(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": err.Error(),
 		})
 		return
 	}
 
-	statsBefore := h.storage.GetStats()
+	statsBefore := storage.GetStats()
 	countBefore := statsBefore.ImageCount
 
-	if err := h.storage.Clear(); err != nil {
+	if err := storage.Clear(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
 			"error":   "clear_failed",
 			"message": err.Error(),

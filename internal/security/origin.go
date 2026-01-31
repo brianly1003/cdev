@@ -92,10 +92,10 @@ func matchOrigin(origin, allowed string) bool {
 	// Handle wildcard subdomain matching (*.example.com)
 	if strings.HasPrefix(allowed, "*.") {
 		domain := allowed[2:] // Remove "*."
-
-		// Check if origin's host ends with the domain
 		originHost := parsedOrigin.Hostname()
-		if strings.HasSuffix(originHost, domain) || originHost == domain[1:] {
+
+		// Require subdomain boundary: *.example.com matches foo.example.com, not evil-example.com
+		if originHost != domain && strings.HasSuffix(originHost, "."+domain) {
 			return true
 		}
 	}

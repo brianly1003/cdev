@@ -121,19 +121,22 @@ type GitFileStatus struct {
 
 // GitDiffResponse represents the git diff response for a single file.
 type GitDiffResponse struct {
-	Path string `json:"path" example:"src/main.ts"`
-	Diff string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
+	Path       string `json:"path" example:"src/main.ts"`
+	Diff       string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
+	Truncated  bool   `json:"is_truncated,omitempty" example:"false"`
 }
 
 // GitDiffAllResponse represents the git diff response for all files.
 type GitDiffAllResponse struct {
-	Diffs []GitDiffItem `json:"diffs"`
+	Diffs          []GitDiffItem `json:"diffs"`
+	TruncatedPaths []string      `json:"truncated_paths,omitempty"`
 }
 
 // GitDiffItem represents a single file diff.
 type GitDiffItem struct {
-	Path string `json:"path" example:"src/main.ts"`
-	Diff string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
+	Path      string `json:"path" example:"src/main.ts"`
+	Diff      string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
+	Truncated bool   `json:"is_truncated,omitempty" example:"false"`
 }
 
 // ErrorResponse represents an error response.

@@ -12,55 +12,82 @@ func TestPTYParser_ProcessLine_DetectsThinking(t *testing.T) {
 		input         string
 		expectedState PTYState
 	}{
-		// All Claude Code thinking indicators have "(esc to interrupt)" suffix
+		// All Claude Code thinking indicators have "(esc to interrupt)" or "(ctrl+c to interrupt)" suffix
+		// Old format: "(esc to interrupt)"
 		{
-			name:          "thinking indicator",
+			name:          "thinking indicator (esc)",
 			input:         "✢ Thinking… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "scheming indicator",
+			name:          "scheming indicator (esc)",
 			input:         "✻ Scheming… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "cooking indicator",
+			name:          "cooking indicator (esc)",
 			input:         "✶ Cooking… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "imagining indicator",
+			name:          "imagining indicator (esc)",
 			input:         "✳ Imagining… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "sussing indicator",
+			name:          "sussing indicator (esc)",
 			input:         "· Sussing… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "finagling indicator",
+			name:          "finagling indicator (esc)",
 			input:         "✻ Finagling… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "vibing indicator",
+			name:          "vibing indicator (esc)",
 			input:         "✶ Vibing… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "mulling indicator",
+			name:          "mulling indicator (esc)",
 			input:         "✽ Mulling… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "deciphering indicator",
+			name:          "deciphering indicator (esc)",
 			input:         "✢ Deciphering… (esc to interrupt)",
 			expectedState: PTYStateThinking,
 		},
 		{
-			name:          "any future verb",
+			name:          "any future verb (esc)",
 			input:         "✳ WhateverNewVerb… (esc to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		// New format: "(ctrl+c to interrupt)" - Claude Code newer versions
+		{
+			name:          "thinking indicator (ctrl+c)",
+			input:         "✢ Thinking… (ctrl+c to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "scheming indicator (ctrl+c)",
+			input:         "✻ Scheming… (ctrl+c to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "vibing indicator (ctrl+c)",
+			input:         "✶ Vibing… (ctrl+c to interrupt)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "ctrl+c with middle dot thinking",
+			input:         "✳ Pondering… (ctrl+c to interrupt · thinking)",
+			expectedState: PTYStateThinking,
+		},
+		{
+			name:          "ctrl+c with extra content",
+			input:         "✽ Processing… (ctrl+c to interrupt · processing)",
 			expectedState: PTYStateThinking,
 		},
 	}

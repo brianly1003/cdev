@@ -243,7 +243,7 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 	scanner := bufio.NewScanner(file)
 	// Increase buffer for large lines
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 
 	messageCount := 0
 	foundSummary := false
@@ -341,7 +341,7 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 	scanner := bufio.NewScanner(file)
 	// Increase buffer for large lines
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()

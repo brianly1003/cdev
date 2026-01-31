@@ -51,6 +51,12 @@ const (
 
 	// Stream events
 	EventTypeStreamReadComplete EventType = "stream_read_complete" // JSONL file reader caught up to end
+
+	// Claude Hook events (from external Claude sessions via hooks)
+	EventTypeClaudeHookSession    EventType = "claude_hook_session"    // SessionStart hook
+	EventTypeClaudeHookPermission EventType = "claude_hook_permission" // Permission prompt notification
+	EventTypeClaudeHookToolStart  EventType = "claude_hook_tool_start" // PreToolUse hook
+	EventTypeClaudeHookToolEnd    EventType = "claude_hook_tool_end"   // PostToolUse hook
 )
 
 // Event is the base interface for all events.

@@ -1,9 +1,9 @@
 # Security Guide for cdev
 
 **Document Type:** Security Guidelines
-**Version:** 1.0.0
-**Date:** December 2025
-**Status:** Draft
+**Version:** 1.2.0
+**Date:** January 30, 2026
+**Status:** Active
 
 ---
 
@@ -24,67 +24,77 @@ cdev is designed to run on a developer's local machine and provide remote access
 
 ## Current Security Posture
 
-### Implemented Protections
+### Implemented Protections (Current)
 
 | Protection | Status | Notes |
 |------------|--------|-------|
-| Localhost binding | ✅ Active | Default: `127.0.0.1` only |
-| Path validation | ⚠️ Partial | String prefix check (fragile) |
-| File size limits | ✅ Active | 200KB default |
-| Command whitelist | ✅ Active | Only allowed commands processed |
+| Localhost binding | ✅ Active | Default `server.host = 127.0.0.1`; `security.bind_localhost_only = true` |
+| HTTP token auth | ✅ Active | Bearer token required for all HTTP endpoints (except pairing/auth/health allowlist) |
+| WebSocket token auth | ✅ Active | Bearer token required when `require_auth = true`; no localhost bypass |
+| Origin/CORS enforcement | ✅ Active | Origin checker enforced; no `*` wildcard responses |
+| File read limits | ✅ Active | `limits.max_file_size_kb` enforced with streaming read + truncation |
+| Image upload hardening | ✅ Active | Size caps, magic‑byte validation, per‑IP rate limiting |
+| Rate limiting | ⚠️ Partial | Optional global HTTP limiter + fixed image upload limiter |
+| Log rotation | ✅ Active | Claude JSONL logs rotate via lumberjack config |
+| Path validation | ✅ Active | `GetFileContent` and `/api/files/list` use Rel + symlink resolution to block escapes |
+| Diff size cap | ✅ Active | `limits.max_diff_size_kb` enforced for HTTP/RPC/event diffs |
+| Token-in-query removal | ✅ Active | Query-string tokens rejected; Authorization header only |
+| Debug/pprof default off | ✅ Active | `debug.pprof_enabled` defaults to `false` |
 
-### Known Vulnerabilities (To Be Fixed)
+### Outstanding Risks (Pending)
 
-| Vulnerability | Severity | Status |
-|---------------|----------|--------|
-| CORS allow-all | Critical | Open |
-| No authentication | Critical | Open |
-| File read via `cat` | High | Open |
-| Fragile path validation | High | Open |
-| No rate limiting | High | Open |
-| No log rotation | Medium | Open |
+| Risk | Severity | Status | Notes |
+|------|----------|--------|-------|
+| WebSocket message rate limiting | Medium | Open | Message flood protection not implemented |
+| No built‑in TLS | Medium | Open | Requires tunnel/reverse proxy for TLS termination |
 
 ---
 
 ## Security Configuration
 
-### Recommended `config.yaml` for Development
+### Recommended `config.yaml` (Local Dev or Tunnel)
 
 ```yaml
 server:
-  host: "127.0.0.1"  # Localhost only
-  websocket_port: 8765
-  http_port: 8766
+  host: "127.0.0.1"
+  port: 8766
 
-# When authentication is implemented:
-# security:
-#   enabled: true
-#   allowed_origins:
-#     - "http://localhost:3000"
-#     - "http://127.0.0.1:3000"
-#   rate_limit:
-#     requests_per_minute: 100
-#     claude_starts_per_minute: 5
+security:
+  require_auth: true
+  token_expiry_secs: 3600
+  bind_localhost_only: true
+  allowed_origins: []
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
 
 limits:
   max_file_size_kb: 200
   max_diff_size_kb: 500
-  max_prompt_length: 5000
+  max_prompt_len: 10000
+
+debug:
+  enabled: false
+  pprof_enabled: false
 
 logging:
   level: "info"
-  # Don't log sensitive data
-  redact_secrets: true
+  rotation:
+    enabled: true
+    max_size_mb: 50
+    max_backups: 5
+    max_age_days: 30
+    compress: true
 ```
 
 ### Environment Variables
 
-Never store sensitive data in config files. Use environment variables:
+Any config value can be overridden with `CDEV_`‑prefixed environment variables (Viper). Example:
 
 ```bash
-export CDEV_SECURITY_TOKEN="your-secret-token"
-export CDEV_TLS_CERT_PATH="/path/to/cert.pem"
-export CDEV_TLS_KEY_PATH="/path/to/key.pem"
+export CDEV_SERVER_HOST=127.0.0.1
+export CDEV_SECURITY_REQUIRE_AUTH=true
+export CDEV_SECURITY_RATE_LIMIT_ENABLED=true
 ```
 
 ---
@@ -103,6 +113,8 @@ export CDEV_TLS_KEY_PATH="/path/to/key.pem"
 - Use SSH tunneling for remote access
 - Use VPN for mobile access
 - Enable TLS when remote access is needed
+
+Note: There is no built-in TLS listener; use a tunnel or reverse proxy to add TLS.
 
 ```bash
 # Safe remote access via SSH tunnel
@@ -154,22 +166,27 @@ Claude CLI runs with the same permissions as the agent. Mitigations:
 
 ---
 
-## API Security (When Implemented)
+## API Security (Implemented)
 
 ### Token Authentication
 
 ```
-# HTTP Header
-X-Auth-Token: <token>
-
-# WebSocket Query Parameter
-ws://localhost:8765?token=<token>
-
-# WebSocket First Message
-{"type": "auth", "token": "<token>"}
+# WebSocket + HTTP Authorization header (required)
+Authorization: Bearer <token>
 ```
 
-### Token Generation
+**Note:** Query‑string tokens are no longer supported. All authenticated endpoints require the Authorization header.
+
+### Unauthenticated Allowlist
+
+These endpoints remain unauthenticated to support pairing and token exchange:
+- `/health`
+- `/pair`
+- `/api/pair/*`
+- `/api/auth/exchange`
+- `/api/auth/refresh`
+
+### Token Generation (Implemented)
 
 Tokens should be:
 - Minimum 32 bytes of cryptographically random data
@@ -189,14 +206,13 @@ func generateToken() (string, error) {
 }
 ```
 
-### Rate Limiting
+### Rate Limiting (Current)
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
-| All HTTP | 100 requests | 1 minute |
-| Claude start | 5 requests | 1 minute |
-| File read | 30 requests | 1 minute |
-| WebSocket messages | 60 messages | 1 minute |
+| HTTP (global) | `security.rate_limit.requests_per_minute` | 1 minute |
+| Image upload | 10 uploads / IP | 1 minute |
+| WebSocket messages | Not rate‑limited (message size capped) | N/A |
 
 ---
 
@@ -211,18 +227,18 @@ func generateToken() (string, error) {
 
 ### Before Remote Access
 
-- [ ] Enable authentication (when available)
-- [ ] Enable TLS (when available)
+- [ ] Ensure `security.require_auth = true` (HTTP still needs auth hardening)
 - [ ] Configure allowed origins
 - [ ] Enable rate limiting
-- [ ] Review logging configuration
+- [ ] Disable debug/pprof
+- [ ] Review logging configuration for sensitive data
 
 ### Regular Maintenance
 
 - [ ] Rotate authentication tokens
 - [ ] Review and clean old logs
 - [ ] Update dependencies
-- [ ] Review audit logs for anomalies
+- [ ] Review logs for anomalies
 
 ---
 
@@ -258,19 +274,19 @@ For security vulnerabilities, please:
 ## Security Roadmap
 
 ### Phase 1 (Immediate - P0)
-- [ ] Fix CORS configuration
-- [ ] Implement authentication
-- [ ] Fix file reading (`cat` → `os.ReadFile`)
-- [ ] Improve path validation
+- [ ] Fix CORS configuration (partial: main server fixed; OpenRPC/legacy still wildcard)
+- [ ] Implement authentication (partial: WebSocket only; HTTP pending)
+- [x] Fix file reading (`cat` → `os.ReadFile`)
+- [x] Improve path validation (Rel + symlink resolution for file read/list)
 
 ### Phase 2 (Short-term - P1)
-- [ ] Add rate limiting
-- [ ] Implement log rotation
+- [x] Add rate limiting (configurable HTTP + image upload)
+- [x] Implement log rotation (Claude JSONL)
 - [ ] Add TLS support
-- [ ] Security audit
+- [ ] Security audit (ongoing; track findings in this document)
 
 ### Phase 3 (Medium-term - P2)
-- [ ] JWT with expiration
+- [ ] JWT with expiration (current tokens are HMAC)
 - [ ] Audit logging
 - [ ] Secret detection in prompts
 - [ ] Container security hardening
@@ -283,23 +299,26 @@ For security vulnerabilities, please:
 
 | Vulnerability | Status |
 |--------------|--------|
-| A01 Broken Access Control | ⚠️ Needs auth |
-| A02 Cryptographic Failures | ⚠️ Needs TLS |
-| A03 Injection | ✅ Using exec.Command properly |
-| A05 Security Misconfiguration | ⚠️ CORS issue |
-| A06 Vulnerable Components | ✅ Dependencies current |
-| A07 Auth Failures | ⚠️ Needs auth |
-| A09 Security Logging | ⚠️ Basic logging only |
+| A01 Broken Access Control | ⚠️ HTTP auth missing |
+| A02 Cryptographic Failures | ⚠️ No TLS listener |
+| A03 Injection | ✅ Uses `exec.Command` (no shell) |
+| A05 Security Misconfiguration | ⚠️ OpenRPC CORS + debug config |
+| A06 Vulnerable Components | ⚠️ Not assessed here |
+| A07 Auth Failures | ⚠️ WebSocket only |
+| A09 Security Logging | ⚠️ No audit logs (rotation exists) |
 
 ---
 
 ## References
 
+- docs/security/IMAGE-UPLOAD-SECURITY-ANALYSIS.md
+- docs/security/TOKEN-ARCHITECTURE.md
+- docs/security/TUNNEL-PROXY-HARDENING.md
 - [OWASP Go Security Cheatsheet](https://cheatsheetseries.owasp.org/cheatsheets/Go_Security_Cheatsheet.html)
 - [CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
 - [CWE-352: CSRF](https://cwe.mitre.org/data/definitions/352.html)
 
 ---
 
-*Document Version: 1.0.0*
-*Generated: December 2025*
+*Document Version: 1.1.0*
+*Updated: January 30, 2026*

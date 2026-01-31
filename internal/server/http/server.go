@@ -33,28 +33,32 @@ type WebSocketHandler func(http.ResponseWriter, *http.Request)
 
 // Server is the HTTP API server.
 type Server struct {
-	server        *http.Server
-	mux           *http.ServeMux
-	addr          string
-	statusFn      func() map[string]interface{}
-	claudeManager *claude.Manager
-	gitTracker    *git.Tracker
-	sessionCache  *sessioncache.Cache
-	messageCache  *sessioncache.MessageCache
-	eventHub      ports.EventHub
-	repoIndexer   *repository.SQLiteIndexer
-	maxFileSizeKB int
-	repoPath      string
-	wsHandler     WebSocketHandler
-	rpcRegistry   *handler.Registry
-	imageHandler  *ImageHandler
-	imageStorage  *imagestorage.Storage
-	originChecker *security.OriginChecker
-	rateLimiter   *middleware.RateLimiter
+	server              *http.Server
+	mux                 *http.ServeMux
+	addr                string
+	statusFn            func() map[string]interface{}
+	claudeManager       *claude.Manager
+	gitTracker          *git.Tracker
+	sessionCache        *sessioncache.Cache
+	messageCache        *sessioncache.MessageCache
+	eventHub            ports.EventHub
+	repoIndexer         *repository.SQLiteIndexer
+	maxFileSizeKB       int
+	maxDiffSizeKB       int
+	repoPath            string
+	wsHandler           WebSocketHandler
+	rpcRegistry         *handler.Registry
+	imageHandler        *ImageHandler
+	imageStorageManager *imagestorage.Manager
+	originChecker       *security.OriginChecker
+	rateLimiter         *middleware.RateLimiter
+	tokenManager        *security.TokenManager
+	requireAuth         bool
+	authAllowlist       []string
 }
 
 // New creates a new HTTP server.
-func New(host string, port int, statusFn func() map[string]interface{}, claudeManager *claude.Manager, gitTracker *git.Tracker, sessionCache *sessioncache.Cache, messageCache *sessioncache.MessageCache, eventHub ports.EventHub, maxFileSizeKB int, repoPath string) *Server {
+func New(host string, port int, statusFn func() map[string]interface{}, claudeManager *claude.Manager, gitTracker *git.Tracker, sessionCache *sessioncache.Cache, messageCache *sessioncache.MessageCache, eventHub ports.EventHub, maxFileSizeKB int, maxDiffSizeKB int, repoPath string) *Server {
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	s := &Server{
@@ -66,8 +70,10 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 		messageCache:  messageCache,
 		eventHub:      eventHub,
 		maxFileSizeKB: maxFileSizeKB,
+		maxDiffSizeKB: maxDiffSizeKB,
 		repoPath:      repoPath,
 		mux:           http.NewServeMux(),
+		authAllowlist: defaultAuthAllowlist(),
 	}
 
 	s.mux.HandleFunc("/health", s.handleHealth)
@@ -112,23 +118,24 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 	return s
 }
 
-// SetImageStorage sets the image storage and registers image upload routes.
+// SetImageStorageManager sets the image storage manager for multi-workspace support.
+// The manager creates storage per-workspace on demand.
 // Must be called before Start() to enable image upload functionality.
-func (s *Server) SetImageStorage(storage *imagestorage.Storage) {
-	if storage == nil {
-		log.Warn().Msg("image storage is nil, image upload routes will not be available")
+func (s *Server) SetImageStorageManager(manager *imagestorage.Manager) {
+	if manager == nil {
+		log.Warn().Msg("image storage manager is nil, image upload will not be available")
 		return
 	}
-	s.imageStorage = storage
-	s.imageHandler = NewImageHandler(storage)
+	s.imageStorageManager = manager
+	s.imageHandler = NewImageHandler(manager)
 
-	// Register image routes
+	// Register image routes with workspace_id support
 	s.mux.HandleFunc("/api/images", s.imageHandler.HandleImages)
 	s.mux.HandleFunc("/api/images/validate", s.imageHandler.ValidateImagePath)
 	s.mux.HandleFunc("/api/images/stats", s.imageHandler.HandleImageStats)
 	s.mux.HandleFunc("/api/images/all", s.imageHandler.HandleClearImages)
 
-	log.Info().Msg("image upload routes registered: /api/images, /api/images/validate, /api/images/stats, /api/images/all")
+	log.Info().Msg("image upload routes registered: /api/images?workspace_id=xxx")
 }
 
 // SetPairingHandler sets up pairing endpoints for mobile app connection.
@@ -176,6 +183,20 @@ func (s *Server) SetDebugHandler(handler *DebugHandler) {
 	handler.Register(s.mux)
 }
 
+// SetHooksHandler sets up Claude hooks endpoints for receiving events from external Claude sessions.
+// This enables real-time event capture from Claude running in VS Code, Cursor, or terminal.
+func (s *Server) SetHooksHandler(handler *HooksHandler) {
+	if handler == nil {
+		log.Warn().Msg("hooks handler is nil, Claude hook routes will not be available")
+		return
+	}
+
+	// Register hooks routes - accepts events from Claude's hook system
+	s.mux.HandleFunc("/api/hooks/", handler.HandleHook)
+
+	log.Info().Msg("Claude hooks routes registered: /api/hooks/{hookType}")
+}
+
 // requestLoggingMiddleware logs all incoming requests for debugging.
 func requestLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -202,10 +223,12 @@ func requestLoggingMiddleware(next http.Handler) http.Handler {
 func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip timeout for certain paths that need longer processing
-		// (e.g., swagger UI, health checks, WebSocket upgrades, debug/pprof endpoints)
+		// (e.g., swagger UI, health checks, WebSocket upgrades, debug/pprof endpoints,
+		// permission requests that block waiting for mobile response)
 		if r.URL.Path == "/health" || r.URL.Path == "/ws" ||
 			strings.HasPrefix(r.URL.Path, "/swagger/") ||
-			strings.HasPrefix(r.URL.Path, "/debug/") {
+			strings.HasPrefix(r.URL.Path, "/debug/") ||
+			r.URL.Path == "/api/hooks/permission-request" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -287,6 +310,77 @@ func (s *Server) SetRateLimiter(limiter *middleware.RateLimiter) {
 	s.rateLimiter = limiter
 }
 
+// SetAuth configures HTTP authentication.
+func (s *Server) SetAuth(tokenManager *security.TokenManager, requireAuth bool) {
+	s.tokenManager = tokenManager
+	s.requireAuth = requireAuth
+}
+
+// SetAuthAllowlist overrides the default unauthenticated path allowlist.
+func (s *Server) SetAuthAllowlist(allowlist []string) {
+	s.authAllowlist = allowlist
+}
+
+func defaultAuthAllowlist() []string {
+	return []string{
+		"/health",
+		"/pair",
+		"/api/pair/",
+		"/api/auth/exchange",
+		"/api/auth/refresh",
+	}
+}
+
+func (s *Server) isAuthExempt(path string) bool {
+	for _, allowed := range s.authAllowlist {
+		if strings.HasPrefix(path, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractBearerToken(authHeader string) string {
+	const bearerPrefix = "Bearer "
+	if len(authHeader) > len(bearerPrefix) && strings.HasPrefix(authHeader, bearerPrefix) {
+		return strings.TrimSpace(authHeader[len(bearerPrefix):])
+	}
+	return ""
+}
+
+// authMiddleware enforces bearer token authentication for HTTP endpoints.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.requireAuth || s.tokenManager == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.Method == http.MethodOptions || s.isAuthExempt(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		token := extractBearerToken(r.Header.Get("Authorization"))
+		if token == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		payload, err := s.tokenManager.ValidateToken(token)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if payload.Type != security.TokenTypeSession && payload.Type != security.TokenTypeAccess {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // isLocalhostOrigin checks if an origin is from localhost.
 func isLocalhostOrigin(origin string) bool {
 	return strings.Contains(origin, "localhost") ||
@@ -340,7 +434,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Auth-Token")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -382,8 +476,9 @@ func (s *Server) Start() error {
 	}
 
 	// Build middleware chain from inside out:
-	// request -> logging -> rate limit (optional) -> timeout -> cors -> mux
+	// request -> logging -> rate limit (optional) -> timeout -> cors -> auth -> mux
 	var handler http.Handler = s.mux
+	handler = s.authMiddleware(handler)
 	handler = s.corsMiddleware(handler)
 	handler = timeoutMiddleware(10*time.Second, handler)
 
@@ -416,12 +511,14 @@ func (s *Server) Start() error {
 func (s *Server) Stop(ctx context.Context) error {
 	log.Info().Msg("HTTP server stopping")
 
-	// Close image handler and storage
+	// Close image handler
 	if s.imageHandler != nil {
 		s.imageHandler.Close()
 	}
-	if s.imageStorage != nil {
-		s.imageStorage.Close()
+
+	// Close image storage manager (closes all per-workspace storages)
+	if s.imageStorageManager != nil {
+		s.imageStorageManager.Close()
 	}
 
 	return s.server.Shutdown(ctx)
@@ -1109,7 +1206,38 @@ func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cleanRepoPath, _ := filepath.Abs(s.repoPath)
-	if !strings.HasPrefix(cleanAbsPath, cleanRepoPath) {
+	rel, err := filepath.Rel(cleanRepoPath, cleanAbsPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "Path outside repository",
+			"path":  relPath,
+		})
+		return
+	}
+
+	realRepoPath := cleanRepoPath
+	if resolvedRoot, err := filepath.EvalSymlinks(cleanRepoPath); err == nil {
+		realRepoPath = resolvedRoot
+	}
+
+	realPath, err := filepath.EvalSymlinks(cleanAbsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeJSON(w, http.StatusNotFound, map[string]string{
+				"error": "Directory not found",
+				"path":  relPath,
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "Invalid path format",
+			"path":  relPath,
+		})
+		return
+	}
+
+	relResolved, err := filepath.Rel(realRepoPath, realPath)
+	if err != nil || strings.HasPrefix(relResolved, "..") {
 		writeJSON(w, http.StatusForbidden, map[string]string{
 			"error": "Path outside repository",
 			"path":  relPath,
@@ -1118,7 +1246,7 @@ func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if directory exists
-	info, err := os.Stat(cleanAbsPath)
+	info, err := os.Stat(realPath)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{
 			"error": "Directory not found",
@@ -1136,7 +1264,7 @@ func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read directory entries
-	dirEntries, err := os.ReadDir(cleanAbsPath)
+	dirEntries, err := os.ReadDir(realPath)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to read directory: " + err.Error(),
@@ -1162,10 +1290,18 @@ func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 			Name: name,
 		}
 
-		if entry.IsDir() {
+		if entry.Type()&os.ModeSymlink != 0 {
+			fe.Type = "file"
+			if info, err := os.Lstat(filepath.Join(realPath, name)); err == nil {
+				size := info.Size()
+				fe.Size = &size
+				mod := info.ModTime().Format(time.RFC3339)
+				fe.Modified = &mod
+			}
+		} else if entry.IsDir() {
 			fe.Type = "directory"
 			// Count children (non-hidden)
-			childPath := filepath.Join(cleanAbsPath, name)
+			childPath := filepath.Join(realPath, name)
 			if childEntries, err := os.ReadDir(childPath); err == nil {
 				count := 0
 				for _, ce := range childEntries {
@@ -1275,8 +1411,17 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		truncatedPaths := []string{}
+		for filePath, diff := range diffs {
+			capped, truncated := git.TruncateDiff(diff, s.maxDiffSizeKB)
+			diffs[filePath] = capped
+			if truncated {
+				truncatedPaths = append(truncatedPaths, filePath)
+			}
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"diffs": diffs,
+			"diffs":           diffs,
+			"truncated_paths": truncatedPaths,
 		})
 		return
 	}
@@ -1312,11 +1457,13 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	capped, truncated := git.TruncateDiff(diff, s.maxDiffSizeKB)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"path":      path,
-		"diff":      diff,
-		"is_staged": isStaged,
-		"is_new":    isNew,
+		"path":         path,
+		"diff":         capped,
+		"is_staged":    isStaged,
+		"is_new":       isNew,
+		"is_truncated": truncated,
 	})
 }
 

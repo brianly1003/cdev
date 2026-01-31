@@ -34,6 +34,32 @@ type CachedMessage struct {
 	IsContextCompaction bool            `json:"is_context_compaction,omitempty"`
 	IsMeta              bool            `json:"is_meta,omitempty"`
 	LineNum             int             `json:"-"` // Line number in source file
+	// ImageMetadata contains image info from toolUseResult.file (for Read tool on images)
+	ImageMetadata *ImageMetadata `json:"image_metadata,omitempty"`
+}
+
+// ImageMetadata contains image information from Claude's toolUseResult.
+type ImageMetadata struct {
+	// FilePath is the path to the file that was read
+	FilePath string `json:"file_path,omitempty"`
+	// Type is the MIME type (e.g., "image/jpeg")
+	Type string `json:"type"`
+	// OriginalSize is the file size in bytes
+	OriginalSize int64 `json:"original_size"`
+	// Dimensions contains the image dimensions
+	Dimensions *ImageDimensions `json:"dimensions,omitempty"`
+}
+
+// ImageDimensions contains width/height info for images.
+type ImageDimensions struct {
+	// OriginalWidth is the original image width in pixels
+	OriginalWidth int `json:"original_width"`
+	// OriginalHeight is the original image height in pixels
+	OriginalHeight int `json:"original_height"`
+	// DisplayWidth is the scaled width for display
+	DisplayWidth int `json:"display_width"`
+	// DisplayHeight is the scaled height for display
+	DisplayHeight int `json:"display_height"`
 }
 
 // MessagesPage represents a paginated response.
@@ -49,7 +75,7 @@ type MessagesPage struct {
 
 // messageSchemaVersion tracks message cache schema changes.
 // Bump this when schema changes to force re-indexing.
-const messageSchemaVersion = 3 // Added is_meta column
+const messageSchemaVersion = 4 // Added image_metadata column
 
 // contextCompactionPrefix is the prefix for context compaction messages.
 const contextCompactionPrefix = "This session is being continued from a previous conversation"
@@ -135,6 +161,7 @@ func createMessageSchema(db *sql.DB) error {
 			message_json TEXT NOT NULL,
 			is_context_compaction INTEGER DEFAULT 0,
 			is_meta INTEGER DEFAULT 0,
+			image_metadata TEXT,
 			UNIQUE(session_id, line_num)
 		);
 
@@ -204,7 +231,7 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta
+		SELECT id, session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta, image_metadata
 		FROM messages
 		WHERE session_id = ?
 		ORDER BY line_num %s
@@ -221,10 +248,10 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 	for rows.Next() {
 		var m CachedMessage
 		var messageJSON string
-		var uuid, timestamp, gitBranch sql.NullString
+		var uuid, timestamp, gitBranch, imageMetadataJSON sql.NullString
 		var isContextCompaction, isMeta int
 
-		err := rows.Scan(&m.ID, &m.SessionID, &m.LineNum, &m.Type, &uuid, &timestamp, &gitBranch, &messageJSON, &isContextCompaction, &isMeta)
+		err := rows.Scan(&m.ID, &m.SessionID, &m.LineNum, &m.Type, &uuid, &timestamp, &gitBranch, &messageJSON, &isContextCompaction, &isMeta, &imageMetadataJSON)
 		if err != nil {
 			continue
 		}
@@ -235,6 +262,14 @@ func (mc *MessageCache) GetMessages(sessionID string, limit, offset int, order s
 		m.Message = json.RawMessage(messageJSON)
 		m.IsContextCompaction = isContextCompaction == 1
 		m.IsMeta = isMeta == 1
+
+		// Parse image metadata if present
+		if imageMetadataJSON.Valid && imageMetadataJSON.String != "" {
+			var metadata ImageMetadata
+			if err := json.Unmarshal([]byte(imageMetadataJSON.String), &metadata); err == nil {
+				m.ImageMetadata = &metadata
+			}
+		}
 
 		messages = append(messages, m)
 	}
@@ -307,8 +342,8 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 
 	// Prepare insert statement
 	stmt, err := tx.Prepare(`
-		INSERT INTO messages (session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO messages (session_id, line_num, type, uuid, timestamp, git_branch, message_json, is_context_compaction, is_meta, image_metadata)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -321,6 +356,9 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 
 	lineNum := 0
 	messageCount := 0
+
+	// Track tool_use calls to link file_path to tool_result
+	toolUseFilePaths := make(map[string]string) // tool_use_id -> file_path
 
 	for scanner.Scan() {
 		lineNum++
@@ -341,10 +379,45 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			Content   string          `json:"content,omitempty"`   // For system messages
 			IsMeta    bool            `json:"isMeta,omitempty"`    // True for system-generated metadata messages
 			Message   json.RawMessage `json:"message"`
+			// toolUseResult contains image metadata for Read tool results
+			ToolUseResult *struct {
+				Type string `json:"type"`
+				File *struct {
+					Type         string `json:"type"`
+					OriginalSize int64  `json:"originalSize"`
+					Dimensions   *struct {
+						OriginalWidth  int `json:"originalWidth"`
+						OriginalHeight int `json:"originalHeight"`
+						DisplayWidth   int `json:"displayWidth"`
+						DisplayHeight  int `json:"displayHeight"`
+					} `json:"dimensions,omitempty"`
+				} `json:"file,omitempty"`
+			} `json:"toolUseResult,omitempty"`
 		}
 
 		if err := json.Unmarshal([]byte(line), &raw); err != nil {
 			continue
+		}
+
+		// Extract file_path from tool_use calls (for Read tool)
+		if raw.Type == "assistant" && raw.Message != nil {
+			var msgContent struct {
+				Content []struct {
+					Type  string `json:"type"`
+					ID    string `json:"id,omitempty"`
+					Name  string `json:"name,omitempty"`
+					Input struct {
+						FilePath string `json:"file_path,omitempty"`
+					} `json:"input,omitempty"`
+				} `json:"content"`
+			}
+			if err := json.Unmarshal(raw.Message, &msgContent); err == nil {
+				for _, block := range msgContent.Content {
+					if block.Type == "tool_use" && block.Name == "Read" && block.Input.FilePath != "" {
+						toolUseFilePaths[block.ID] = block.Input.FilePath
+					}
+				}
+			}
 		}
 
 		// Detect context compaction
@@ -379,6 +452,47 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			messageJSON = string(raw.Message)
 		}
 
+		// Extract image metadata from toolUseResult
+		var imageMetadataJSON sql.NullString
+		if raw.ToolUseResult != nil && raw.ToolUseResult.Type == "image" && raw.ToolUseResult.File != nil {
+			file := raw.ToolUseResult.File
+			// Find the tool_use_id from the message content to get file_path
+			var filePath string
+			var msgContent struct {
+				Content []struct {
+					Type      string `json:"type"`
+					ToolUseID string `json:"tool_use_id,omitempty"`
+				} `json:"content"`
+			}
+			if err := json.Unmarshal(raw.Message, &msgContent); err == nil {
+				for _, block := range msgContent.Content {
+					if block.Type == "tool_result" && block.ToolUseID != "" {
+						if fp, ok := toolUseFilePaths[block.ToolUseID]; ok {
+							filePath = fp
+							break
+						}
+					}
+				}
+			}
+
+			metadata := ImageMetadata{
+				FilePath:     filePath,
+				Type:         file.Type,
+				OriginalSize: file.OriginalSize,
+			}
+			if file.Dimensions != nil {
+				metadata.Dimensions = &ImageDimensions{
+					OriginalWidth:  file.Dimensions.OriginalWidth,
+					OriginalHeight: file.Dimensions.OriginalHeight,
+					DisplayWidth:   file.Dimensions.DisplayWidth,
+					DisplayHeight:  file.Dimensions.DisplayHeight,
+				}
+			}
+			if metadataBytes, err := json.Marshal(metadata); err == nil {
+				imageMetadataJSON = sql.NullString{String: string(metadataBytes), Valid: true}
+			}
+		}
+
 		_, err = stmt.Exec(
 			sessionID,
 			lineNum,
@@ -389,6 +503,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			messageJSON,
 			isContextCompaction,
 			raw.IsMeta,
+			imageMetadataJSON,
 		)
 		if err != nil {
 			log.Debug().Err(err).Int("line", lineNum).Msg("failed to insert message")

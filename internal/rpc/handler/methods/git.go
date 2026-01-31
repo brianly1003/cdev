@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 )
@@ -69,12 +70,16 @@ type BranchInfo struct {
 
 // GitService provides git-related RPC methods.
 type GitService struct {
-	provider GitProvider
+	provider      GitProvider
+	maxDiffSizeKB int
 }
 
 // NewGitService creates a new git service.
-func NewGitService(provider GitProvider) *GitService {
-	return &GitService{provider: provider}
+func NewGitService(provider GitProvider, maxDiffSizeKB int) *GitService {
+	return &GitService{
+		provider:      provider,
+		maxDiffSizeKB: maxDiffSizeKB,
+	}
 }
 
 // RegisterMethods registers all git methods with the registry.
@@ -197,10 +202,11 @@ type DiffParams struct {
 
 // DiffResult for git/diff method.
 type DiffResult struct {
-	Path     string `json:"path,omitempty"`
-	Diff     string `json:"diff"`
-	IsStaged bool   `json:"is_staged"`
-	IsNew    bool   `json:"is_new"`
+	Path        string `json:"path,omitempty"`
+	Diff        string `json:"diff"`
+	IsStaged    bool   `json:"is_staged"`
+	IsNew       bool   `json:"is_new"`
+	IsTruncated bool   `json:"is_truncated"`
 }
 
 // Diff returns the diff for a file or all files.
@@ -221,11 +227,13 @@ func (s *GitService) Diff(ctx context.Context, params json.RawMessage) (interfac
 		return nil, message.ErrGitOperationFailed("diff", err.Error())
 	}
 
+	diff, truncated := git.TruncateDiff(diff, s.maxDiffSizeKB)
 	return DiffResult{
-		Path:     p.Path,
-		Diff:     diff,
-		IsStaged: isStaged,
-		IsNew:    isNew,
+		Path:        p.Path,
+		Diff:        diff,
+		IsStaged:    isStaged,
+		IsNew:       isNew,
+		IsTruncated: truncated,
 	}, nil
 }
 

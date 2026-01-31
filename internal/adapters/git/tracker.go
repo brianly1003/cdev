@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -307,7 +308,7 @@ func (t *Tracker) GetRepoName() string {
 }
 
 // GetDiffForEvent generates a git diff event for a file change.
-func (t *Tracker) GetDiffForEvent(ctx context.Context, path string) *events.BaseEvent {
+func (t *Tracker) GetDiffForEvent(ctx context.Context, path string, maxDiffSizeKB int) *events.BaseEvent {
 	if !t.isRepo {
 		return nil
 	}
@@ -328,13 +329,15 @@ func (t *Tracker) GetDiffForEvent(ctx context.Context, path string) *events.Base
 		return nil
 	}
 
+	diff, truncated := TruncateDiff(diff, maxDiffSizeKB)
+
 	// Count additions and deletions
 	additions, deletions := countDiffLines(diff)
 
 	// Check if it's a new file
 	isNewFile := strings.Contains(diff, "new file mode")
 
-	return events.NewGitDiffEvent(path, diff, additions, deletions, isStaged, isNewFile)
+	return events.NewGitDiffEvent(path, diff, additions, deletions, isStaged, isNewFile, truncated)
 }
 
 // countDiffLines counts additions and deletions in a diff.
@@ -387,8 +390,27 @@ func (t *Tracker) GetFileContent(ctx context.Context, path string, maxSizeKB int
 		return "", false, domain.ErrPathOutsideRepo
 	}
 
+	// Resolve symlinks to prevent escape via symlinked paths
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, fmt.Errorf("file not found: %s", path)
+		}
+		return "", false, fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	realRoot := absRoot
+	if resolvedRoot, err := filepath.EvalSymlinks(absRoot); err == nil {
+		realRoot = resolvedRoot
+	}
+
+	rel, err := filepath.Rel(realRoot, realPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", false, domain.ErrPathOutsideRepo
+	}
+
 	// Check file exists and is not a directory
-	info, err := os.Stat(absPath)
+	info, err := os.Stat(realPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", false, fmt.Errorf("file not found: %s", path)
@@ -399,15 +421,26 @@ func (t *Tracker) GetFileContent(ctx context.Context, path string, maxSizeKB int
 		return "", false, fmt.Errorf("path is a directory: %s", path)
 	}
 
-	// Read file using os.ReadFile (safe, no shell execution)
-	content, err := os.ReadFile(absPath)
+	// Read file with size cap to avoid large memory spikes
+	maxSize := int64(maxSizeKB) * 1024
+	if maxSize <= 0 {
+		return "", false, fmt.Errorf("invalid max file size: %dKB", maxSizeKB)
+	}
+
+	file, err := os.Open(realPath)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+
+	limited := io.LimitReader(file, maxSize+1) // +1 to detect truncation
+	content, err := io.ReadAll(limited)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	// Check if truncation needed
-	maxSize := maxSizeKB * 1024
-	truncated := len(content) > maxSize
+	truncated := int64(len(content)) > maxSize
 	if truncated {
 		content = content[:maxSize]
 	}

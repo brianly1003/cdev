@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -17,6 +18,21 @@ import (
 // Test image data (valid JPEG magic bytes)
 var testJPEGData = []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}
 
+// testWorkspaceID is the workspace ID used in tests
+const testWorkspaceID = "test-workspace-123"
+
+// mockWorkspaceResolver implements imagestorage.WorkspacePathResolver for tests
+type mockWorkspaceResolver struct {
+	path string
+}
+
+func (m *mockWorkspaceResolver) GetWorkspacePath(workspaceID string) (string, error) {
+	if workspaceID == testWorkspaceID {
+		return m.path, nil
+	}
+	return "", fmt.Errorf("workspace not found: %s", workspaceID)
+}
+
 func setupTestImageHandler(t *testing.T) (*ImageHandler, string) {
 	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "image-handler-test-*")
@@ -24,13 +40,10 @@ func setupTestImageHandler(t *testing.T) (*ImageHandler, string) {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 
-	storage, err := imagestorage.New(tmpDir)
-	if err != nil {
-		_ = os.RemoveAll(tmpDir)
-		t.Fatalf("failed to create storage: %v", err)
-	}
+	resolver := &mockWorkspaceResolver{path: tmpDir}
+	manager := imagestorage.NewManager(resolver)
 
-	handler := NewImageHandler(storage)
+	handler := NewImageHandler(manager)
 	return handler, tmpDir
 }
 
@@ -64,7 +77,8 @@ func createMultipartRequest(t *testing.T, fieldName, filename, mimeType string, 
 		return nil, err
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/images", body)
+	// Include workspace_id in the URL
+	req := httptest.NewRequest(http.MethodPost, "/api/images?workspace_id="+testWorkspaceID, body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	return req, nil
 }
@@ -73,8 +87,8 @@ func TestNewImageHandler(t *testing.T) {
 	handler, tmpDir := setupTestImageHandler(t)
 	defer cleanupTestImageHandler(handler, tmpDir)
 
-	if handler.storage == nil {
-		t.Error("expected storage to be set")
+	if handler.manager == nil {
+		t.Error("expected manager to be set")
 	}
 	if handler.rateLimiter == nil {
 		t.Error("expected rateLimiter to be set")
@@ -192,7 +206,7 @@ func TestHandleImages_List(t *testing.T) {
 	handler.HandleImages(rec, req)
 
 	// Now list images
-	req = httptest.NewRequest(http.MethodGet, "/api/images", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID, nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -229,7 +243,7 @@ func TestHandleImages_GetSingle(t *testing.T) {
 	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Get single image by ID
-	req = httptest.NewRequest(http.MethodGet, "/api/images?id="+uploadResp.ID, nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID+"&id="+uploadResp.ID, nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -252,7 +266,7 @@ func TestHandleImages_GetSingle_NotFound(t *testing.T) {
 	defer cleanupTestImageHandler(handler, tmpDir)
 
 	// Use valid ID format (hex chars only) that doesn't exist
-	req := httptest.NewRequest(http.MethodGet, "/api/images?id=abcd1234ef56", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID+"&id=abcd1234ef56", nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -277,7 +291,7 @@ func TestHandleImages_Delete(t *testing.T) {
 	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Delete the image
-	req = httptest.NewRequest(http.MethodDelete, "/api/images?id="+uploadResp.ID, nil)
+	req = httptest.NewRequest(http.MethodDelete, "/api/images?workspace_id="+testWorkspaceID+"&id="+uploadResp.ID, nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -286,7 +300,7 @@ func TestHandleImages_Delete(t *testing.T) {
 	}
 
 	// Verify it's deleted
-	req = httptest.NewRequest(http.MethodGet, "/api/images?id="+uploadResp.ID, nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID+"&id="+uploadResp.ID, nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -299,7 +313,7 @@ func TestHandleImages_Delete_MissingID(t *testing.T) {
 	handler, tmpDir := setupTestImageHandler(t)
 	defer cleanupTestImageHandler(handler, tmpDir)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/images", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/images?workspace_id="+testWorkspaceID, nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -313,7 +327,7 @@ func TestHandleImages_Delete_NotFound(t *testing.T) {
 	defer cleanupTestImageHandler(handler, tmpDir)
 
 	// Use valid ID format (hex chars only) that doesn't exist
-	req := httptest.NewRequest(http.MethodDelete, "/api/images?id=abcd1234ef56", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/images?workspace_id="+testWorkspaceID+"&id=abcd1234ef56", nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -326,7 +340,7 @@ func TestHandleImages_MethodNotAllowed(t *testing.T) {
 	handler, tmpDir := setupTestImageHandler(t)
 	defer cleanupTestImageHandler(handler, tmpDir)
 
-	req := httptest.NewRequest(http.MethodPatch, "/api/images", nil)
+	req := httptest.NewRequest(http.MethodPatch, "/api/images?workspace_id="+testWorkspaceID, nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -351,7 +365,7 @@ func TestValidateImagePath(t *testing.T) {
 	_ = json.NewDecoder(rec.Body).Decode(&uploadResp)
 
 	// Validate valid path
-	req = httptest.NewRequest(http.MethodGet, "/api/images/validate?path="+uploadResp.LocalPath, nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/images/validate?workspace_id="+testWorkspaceID+"&path="+uploadResp.LocalPath, nil)
 	rec = httptest.NewRecorder()
 	handler.ValidateImagePath(rec, req)
 
@@ -372,7 +386,7 @@ func TestValidateImagePath_Invalid(t *testing.T) {
 	defer cleanupTestImageHandler(handler, tmpDir)
 
 	// Path traversal attempt
-	req := httptest.NewRequest(http.MethodGet, "/api/images/validate?path=.cdev/images/../../../etc/passwd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/images/validate?workspace_id="+testWorkspaceID+"&path=.cdev/images/../../../etc/passwd", nil)
 	rec := httptest.NewRecorder()
 	handler.ValidateImagePath(rec, req)
 
@@ -392,7 +406,7 @@ func TestValidateImagePath_MissingPath(t *testing.T) {
 	handler, tmpDir := setupTestImageHandler(t)
 	defer cleanupTestImageHandler(handler, tmpDir)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/images/validate", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/images/validate?workspace_id="+testWorkspaceID, nil)
 	rec := httptest.NewRecorder()
 	handler.ValidateImagePath(rec, req)
 
@@ -415,7 +429,7 @@ func TestHandleImageStats(t *testing.T) {
 	}
 
 	// Get stats
-	req := httptest.NewRequest(http.MethodGet, "/api/images/stats", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/images/stats?workspace_id="+testWorkspaceID, nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImageStats(rec, req)
 
@@ -453,7 +467,7 @@ func TestHandleClearImages(t *testing.T) {
 	}
 
 	// Clear all images
-	req := httptest.NewRequest(http.MethodDelete, "/api/images/all", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/images/all?workspace_id="+testWorkspaceID, nil)
 	rec := httptest.NewRecorder()
 	handler.HandleClearImages(rec, req)
 
@@ -462,7 +476,7 @@ func TestHandleClearImages(t *testing.T) {
 	}
 
 	// Verify all images are cleared
-	req = httptest.NewRequest(http.MethodGet, "/api/images", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID, nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
@@ -543,28 +557,40 @@ func TestContains(t *testing.T) {
 	}
 }
 
-func TestHandleImages_NilStorage(t *testing.T) {
-	handler := &ImageHandler{
-		storage:     nil,
-		rateLimiter: nil,
-	}
+func TestHandleImages_MissingWorkspaceID(t *testing.T) {
+	handler, tmpDir := setupTestImageHandler(t)
+	defer cleanupTestImageHandler(handler, tmpDir)
 
-	// Test POST
+	// Test POST without workspace_id
 	req := httptest.NewRequest(http.MethodPost, "/api/images", nil)
 	rec := httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected status 503 for nil storage, got %d", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for missing workspace_id, got %d", rec.Code)
 	}
 
-	// Test GET
+	// Test GET without workspace_id
 	req = httptest.NewRequest(http.MethodGet, "/api/images", nil)
 	rec = httptest.NewRecorder()
 	handler.HandleImages(rec, req)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Errorf("expected status 503 for nil storage, got %d", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for missing workspace_id, got %d", rec.Code)
+	}
+}
+
+func TestHandleImages_InvalidWorkspaceID(t *testing.T) {
+	handler, tmpDir := setupTestImageHandler(t)
+	defer cleanupTestImageHandler(handler, tmpDir)
+
+	// Test with invalid workspace_id
+	req := httptest.NewRequest(http.MethodGet, "/api/images?workspace_id=invalid-workspace", nil)
+	rec := httptest.NewRecorder()
+	handler.HandleImages(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400 for invalid workspace_id, got %d", rec.Code)
 	}
 }
 
@@ -600,8 +626,9 @@ func BenchmarkHandleImages_Upload(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "image-handler-bench-*")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	storage, _ := imagestorage.New(tmpDir)
-	handler := NewImageHandler(storage)
+	resolver := &mockWorkspaceResolver{path: tmpDir}
+	manager := imagestorage.NewManager(resolver)
+	handler := NewImageHandler(manager)
 	defer handler.Close()
 
 	// Create test data
@@ -616,7 +643,7 @@ func BenchmarkHandleImages_Upload(b *testing.B) {
 		_, _ = part.Write(data)
 		_ = writer.Close()
 
-		req := httptest.NewRequest(http.MethodPost, "/api/images", body)
+		req := httptest.NewRequest(http.MethodPost, "/api/images?workspace_id="+testWorkspaceID, body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		rec := httptest.NewRecorder()
 
@@ -631,8 +658,9 @@ func BenchmarkHandleImages_List(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "image-handler-bench-*")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	storage, _ := imagestorage.New(tmpDir)
-	handler := NewImageHandler(storage)
+	resolver := &mockWorkspaceResolver{path: tmpDir}
+	manager := imagestorage.NewManager(resolver)
+	handler := NewImageHandler(manager)
 	defer handler.Close()
 
 	// Upload some images first
@@ -646,7 +674,7 @@ func BenchmarkHandleImages_List(b *testing.B) {
 		_, _ = part.Write(data)
 		_ = writer.Close()
 
-		req := httptest.NewRequest(http.MethodPost, "/api/images", body)
+		req := httptest.NewRequest(http.MethodPost, "/api/images?workspace_id="+testWorkspaceID, body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		rec := httptest.NewRecorder()
 		handler.HandleImages(rec, req)
@@ -654,7 +682,7 @@ func BenchmarkHandleImages_List(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/api/images", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/images?workspace_id="+testWorkspaceID, nil)
 		rec := httptest.NewRecorder()
 		handler.HandleImages(rec, req)
 		_, _ = io.Copy(io.Discard, rec.Body)

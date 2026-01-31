@@ -12,6 +12,7 @@ This directory contains all project documentation organized by category.
 | Understand the protocol | [api/PROTOCOL.md](./api/PROTOCOL.md) |
 | Understand the architecture | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) |
 | Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
+| Safely access remotely | [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) |
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
 | **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
 | **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
@@ -46,7 +47,8 @@ docs/
 │   └── MULTI-AGENT-ARCHITECTURE.md        # Multi-agent (Claude/Gemini/Codex)
 ├── security/                  # Security docs
 │   ├── SECURITY.md            # Security guidelines & threat model
-│   ├── TECHNICAL-REVIEW.md    # Security analysis
+│   ├── TOKEN-ARCHITECTURE.md  # Token model and lifecycle
+│   ├── TUNNEL-PROXY-HARDENING.md # Tunnel/proxy deployment hardening
 │   └── IMAGE-UPLOAD-SECURITY-ANALYSIS.md
 ├── mobile/                    # Mobile Integration docs
 │   ├── IOS-INTEGRATION-GUIDE.md       # iOS integration reference
@@ -54,12 +56,14 @@ docs/
 │   └── LIVE-SESSION-INTEGRATION.md    # LIVE session support for terminal sessions
 ├── guides/                    # Guides & Testing docs
 │   ├── WORKSPACE-MANAGER-SETUP.md  # Workspace manager setup with VS Code tunnels
+│   ├── SAFE-REMOTE-ACCESS.md  # Safe remote access (tunnels + auth)
 │   ├── POC-TESTING-GUIDE.md   # POC testing guide
 │   ├── CLAUDE-CLI.md          # Claude CLI reference
 │   └── TROUBLESHOOTING.md     # Common issues and solutions
 └── planning/                  # Project Management docs
     ├── BACKLOG.md             # Product backlog
-    └── STRATEGIC-ROADMAP.md   # Strategic roadmap
+    ├── READINESS-ROADMAP-SOURCE-OF-TRUTH.md # Authoritative readiness/roadmap
+    └── POSITIONING-GTM-SOLO-DEV.md # Positioning + go-to-market plan
 ```
 
 ---
@@ -131,8 +135,9 @@ docs/
 | Document | Description |
 |----------|-------------|
 | [security/SECURITY.md](./security/SECURITY.md) | Security guidelines, threat model, and best practices |
-| [security/TECHNICAL-REVIEW.md](./security/TECHNICAL-REVIEW.md) | Security analysis with specific vulnerabilities |
+| [security/TOKEN-ARCHITECTURE.md](./security/TOKEN-ARCHITECTURE.md) | Token lifecycle and auth model |
 | [security/IMAGE-UPLOAD-SECURITY-ANALYSIS.md](./security/IMAGE-UPLOAD-SECURITY-ANALYSIS.md) | Image upload security analysis and fixes |
+| [security/TUNNEL-PROXY-HARDENING.md](./security/TUNNEL-PROXY-HARDENING.md) | Tunnel/proxy deployment hardening checklist |
 
 **Key Topics:**
 - Current security posture
@@ -166,6 +171,7 @@ docs/
 | Document | Description |
 |----------|-------------|
 | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) | **Step-by-step workspace manager setup with VS Code tunnels** |
+| [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) | Safe remote access with tunnels + auth |
 | [guides/POC-TESTING-GUIDE.md](./guides/POC-TESTING-GUIDE.md) | POC testing guide with examples |
 | [guides/CLAUDE-CLI.md](./guides/CLAUDE-CLI.md) | Claude CLI reference and flags |
 | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) | Common issues and solutions |
@@ -177,12 +183,13 @@ docs/
 
 | Document | Description |
 |----------|-------------|
-| [planning/STRATEGIC-ROADMAP.md](./planning/STRATEGIC-ROADMAP.md) | Strategic technology roadmap and scaling plan |
 | [planning/BACKLOG.md](./planning/BACKLOG.md) | Product backlog with prioritized work items |
+| [planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md](./planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md) | **Authoritative** readiness + roadmap status |
+| [planning/POSITIONING-GTM-SOLO-DEV.md](./planning/POSITIONING-GTM-SOLO-DEV.md) | Positioning + go-to-market plan (solo devs) |
 
 **Key Topics:**
-- Strategic roadmap (Production -> Protocol -> Cloud -> Enterprise)
-- Core technology assets and ownership
+- Authoritative readiness + roadmap status
+- Positioning + go-to-market
 - Prioritized backlog items
 
 ---
@@ -215,15 +222,17 @@ docs/
 | VSCODE-INTEGRATION-STRATEGY.md | architecture | 1.0 | Active |
 | TRANSPORT-ARCHITECTURE-ANALYSIS.md | architecture | 1.0 | Active |
 | MULTI-AGENT-ARCHITECTURE.md | architecture | 1.0 | Active |
-| SECURITY.md | security | 1.0 | Draft |
-| TECHNICAL-REVIEW.md | security | 1.0 | Current |
+| SECURITY.md | security | 1.1 | Active |
+| TOKEN-ARCHITECTURE.md | security | 1.0 | Current |
 | IMAGE-UPLOAD-SECURITY-ANALYSIS.md | security | 1.0 | Current |
+| TUNNEL-PROXY-HARDENING.md | security | 1.0 | Current |
 | WORKSPACE-MANAGER-SETUP.md | guides | 1.0 | Current |
 | POC-TESTING-GUIDE.md | guides | 1.0 | Current |
 | CLAUDE-CLI.md | guides | 1.0 | Current |
 | TROUBLESHOOTING.md | guides | 1.0 | Current |
-| STRATEGIC-ROADMAP.md | planning | 1.0 | Active |
 | BACKLOG.md | planning | 1.0 | Active |
+| READINESS-ROADMAP-SOURCE-OF-TRUTH.md | planning | 1.0 | Active |
+| POSITIONING-GTM-SOLO-DEV.md | planning | 1.0 | Draft |
 
 ---
 

@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain"
@@ -82,9 +83,10 @@ type Manager struct {
 	onPTYComplete func(sessionID string)
 
 	// Spinner tracking for deduplication and debouncing
-	lastSpinnerText string    // Last spinner text to avoid duplicates
-	lastSpinnerTime time.Time // Time of last spinner event for debouncing
-	lastLogLine     string    // Last log line to filter duplicates
+	lastSpinnerText   string    // Last emitted spinner message to avoid duplicates
+	lastSpinnerSymbol string    // Last emitted spinner symbol for animation
+	lastSpinnerTime   time.Time // Time of last spinner event for debouncing
+	lastLogLine       string    // Last log line to filter duplicates
 }
 
 // NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
@@ -795,35 +797,60 @@ func (m *Manager) processPTYLine(line string, parser *PTYParser, lastState *PTYS
 	}
 
 	// Detect spinner patterns and emit debounced pty_spinner events
-	if symbol, message, ok := detectSpinner(cleanText); ok {
+	if symbol, message, hasSymbol, hasMessage := detectSpinnerParts(cleanText); hasSymbol || hasMessage {
 		m.mu.Lock()
 		now := time.Now()
-		// Debounce: only emit if message changed or 150ms passed
-		shouldEmit := message != m.lastSpinnerText || now.Sub(m.lastSpinnerTime) > 150*time.Millisecond
-		if shouldEmit {
-			m.lastSpinnerText = message
-			m.lastSpinnerTime = now
-			sessionID := m.sessionID
+
+		// Prefer newly detected parts, fall back to last emitted ones
+		if !hasMessage {
+			message = m.lastSpinnerText
+		}
+		if message == "" {
+			// Ignore symbol-only updates until we have a full message
 			m.mu.Unlock()
-
-			log.Debug().
-				Str("symbol", symbol).
-				Str("message", message).
-				Str("session_id", sessionID).
-				Msg("emitting pty_spinner event")
-
-			m.publishEvent(events.NewPTYSpinnerEventWithSession(
-				cleanText, // Full text like "✶ Vibing…"
-				symbol,    // Just "✶"
-				message,   // Just "Vibing…"
-				sessionID,
-			))
 		} else {
-			log.Debug().
-				Str("symbol", symbol).
-				Str("message", message).
-				Msg("pty_spinner debounced (same message within 150ms)")
-			m.mu.Unlock()
+			if !hasSymbol {
+				symbol = m.lastSpinnerSymbol
+			}
+
+			// Debounce: emit if message changed, symbol changed, or 150ms passed
+			shouldEmit := message != m.lastSpinnerText ||
+				(symbol != "" && symbol != m.lastSpinnerSymbol) ||
+				now.Sub(m.lastSpinnerTime) > 150*time.Millisecond
+			if shouldEmit {
+				m.lastSpinnerText = message
+				if symbol != "" {
+					m.lastSpinnerSymbol = symbol
+				}
+				m.lastSpinnerTime = now
+				sessionID := m.sessionID
+				m.mu.Unlock()
+
+				text := message
+				if symbol != "" {
+					text = symbol + " " + message
+				}
+
+				log.Debug().
+					Str("text", text).
+					Str("symbol", symbol).
+					Str("message", message).
+					Str("session_id", sessionID).
+					Msg("emitting pty_spinner event")
+
+				m.publishEvent(events.NewPTYSpinnerEventWithSession(
+					text,    // Full text like "✶ Vibing…"
+					symbol,  // Just "✶"
+					message, // Just "Vibing…"
+					sessionID,
+				))
+			} else {
+				log.Debug().
+					Str("symbol", symbol).
+					Str("message", message).
+					Msg("pty_spinner debounced (same message within 150ms)")
+				m.mu.Unlock()
+			}
 		}
 	}
 
@@ -1050,9 +1077,9 @@ func (m *Manager) streamOutput(pipe io.ReadCloser, stream events.StreamType) {
 	log.Debug().Str("stream", string(stream)).Msg("streamOutput goroutine started")
 
 	scanner := bufio.NewScanner(pipe)
-	// Increase buffer size for long lines
+	// Increase buffer size for long lines (10MB to handle base64 images)
 	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 
 	lineCount := 0
 	for scanner.Scan() {
@@ -1222,47 +1249,86 @@ func truncatePrompt(s string, maxLen int) string {
 // spinnerSymbols are the characters used in Claude's thinking animation
 var spinnerSymbols = []string{"✳", "✶", "✻", "✽", "✢", "·"}
 
-// detectSpinner checks if a line contains a spinner pattern and extracts the symbol and message.
-// Returns (symbol, message, true) if spinner detected, or ("", "", false) otherwise.
-// Example: "✶ Vibing…" -> ("✶", "Vibing…", true)
-func detectSpinner(line string) (symbol, message string, ok bool) {
-	line = strings.TrimSpace(line)
-	if len(line) == 0 {
-		return "", "", false
-	}
-
-	// Check for spinner patterns: symbol followed by space and text ending with "…"
-	// This covers patterns like "✳ Thinking…", "· Unravelling…", etc.
-	for _, sym := range spinnerSymbols {
-		if strings.HasPrefix(line, sym) {
-			// Extract the message after the symbol
-			msg := strings.TrimSpace(strings.TrimPrefix(line, sym))
-			return sym, msg, true
+// detectSpinnerParts extracts spinner symbol/message parts from a line.
+// It handles carriage-return updates where symbol and message arrive separately.
+// Returns symbol/message along with flags indicating what was found.
+func detectSpinnerParts(line string) (symbol, message string, hasSymbol, hasMessage bool) {
+	segments := strings.Split(line, "\r")
+	for _, segment := range segments {
+		seg := strings.TrimSpace(segment)
+		if seg == "" {
+			continue
 		}
-	}
+		// Skip non-spinner UI markers (not part of spinner animation)
+		if strings.HasPrefix(seg, "⎿") || strings.HasPrefix(seg, "⏺") {
+			continue
+		}
 
-	// Also check for spinner patterns by looking for common spinner messages
-	// Claude uses patterns like "Thinking…", "Unravelling…", "Vibing…"
-	spinnerMessages := []string{"Thinking", "Unravelling", "Vibing", "Processing"}
-	for _, msg := range spinnerMessages {
-		if strings.Contains(line, msg+"…") || strings.Contains(line, msg+"...") {
-			// Extract the first rune as the symbol
-			runes := []rune(line)
-			if len(runes) > 0 {
-				sym := string(runes[0])
-				rest := strings.TrimSpace(string(runes[1:]))
-				log.Debug().
-					Str("line", line).
-					Str("detected_symbol", sym).
-					Str("first_char_hex", fmt.Sprintf("%X", runes[0])).
-					Msg("spinner detected via message pattern")
-				return sym, rest, true
+		// Check for spinner symbol at the start
+		for _, sym := range spinnerSymbols {
+			if strings.HasPrefix(seg, sym) {
+				hasSymbol = true
+				symbol = sym
+				msg := strings.TrimSpace(strings.TrimPrefix(seg, sym))
+				if looksLikeSpinnerMessage(msg) {
+					hasMessage = true
+					message = msg
+				}
+				goto nextSegment
 			}
 		}
+
+		// Message-only line (newer Claude output formats)
+		if looksLikeSpinnerMessage(seg) {
+			hasMessage = true
+			message = seg
+		}
+
+	nextSegment:
 	}
 
-	return "", "", false
+	return symbol, message, hasSymbol, hasMessage
 }
+
+func looksLikeSpinnerMessage(text string) bool {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return false
+	}
+	if !hasLikelySpinnerPrefix(text) {
+		return false
+	}
+	if !(strings.Contains(text, "…") || strings.Contains(text, "...")) {
+		return false
+	}
+	if strings.HasSuffix(text, "…") || strings.HasSuffix(text, "...") {
+		return true
+	}
+	if strings.Contains(text, "(esc to interrupt") || strings.Contains(text, "(ctrl+c to interrupt") {
+		return true
+	}
+	// Avoid prompt fragments and overly long lines
+	if strings.Contains(text, "❯") {
+		return false
+	}
+	if len([]rune(text)) > 80 {
+		return false
+	}
+	return true
+}
+
+func hasLikelySpinnerPrefix(text string) bool {
+	runes := []rune(text)
+	if len(runes) < 4 {
+		return false
+	}
+	first := runes[0]
+	if unicode.IsLetter(first) && !unicode.IsUpper(first) {
+		return false
+	}
+	return true
+}
+
 
 // claudeMessage represents a parsed Claude output message.
 type claudeMessage struct {

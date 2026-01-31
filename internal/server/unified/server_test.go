@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/brianly1003/cdev/internal/testutil"
 	"github.com/gorilla/websocket"
 )
@@ -127,6 +129,91 @@ func TestServer_WebSocketConnection(t *testing.T) {
 	}
 }
 
+func TestServer_WebSocketAuth_RejectsMissingToken(t *testing.T) {
+	hub := testutil.NewMockEventHub()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
+
+	dispatcher := handler.NewDispatcher(handler.NewRegistry())
+	server := NewServer("127.0.0.1", 0, dispatcher, hub)
+	server.SetSecurity(newTestTokenManager(t), nil, true)
+
+	testServer := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
+	defer testServer.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
+
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err == nil {
+		_ = ws.Close()
+		t.Fatal("expected handshake failure without token")
+	}
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 response, got %v", resp)
+	}
+}
+
+func TestServer_WebSocketAuth_AllowsAccessToken(t *testing.T) {
+	hub := testutil.NewMockEventHub()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
+
+	dispatcher := handler.NewDispatcher(handler.NewRegistry())
+	server := NewServer("127.0.0.1", 0, dispatcher, hub)
+	tokenManager := newTestTokenManager(t)
+	server.SetSecurity(tokenManager, nil, true)
+
+	accessToken, _, err := tokenManager.GenerateAccessToken()
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
+	defer testServer.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
+
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+accessToken)
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, headers)
+	if err != nil {
+		t.Fatalf("expected successful connection, got %v", err)
+	}
+	_ = ws.Close()
+}
+
+func TestServer_WebSocketAuth_RejectsPairingToken(t *testing.T) {
+	hub := testutil.NewMockEventHub()
+	_ = hub.Start()
+	defer func() { _ = hub.Stop() }()
+
+	dispatcher := handler.NewDispatcher(handler.NewRegistry())
+	server := NewServer("127.0.0.1", 0, dispatcher, hub)
+	tokenManager := newTestTokenManager(t)
+	server.SetSecurity(tokenManager, nil, true)
+
+	pairingToken, _, err := tokenManager.GeneratePairingToken()
+	if err != nil {
+		t.Fatalf("failed to generate pairing token: %v", err)
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(server.HandleWebSocket))
+	defer testServer.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
+
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+pairingToken)
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
+	if err == nil {
+		_ = ws.Close()
+		t.Fatal("expected handshake failure with pairing token")
+	}
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 response, got %v", resp)
+	}
+}
+
 func TestServer_JSONRPCCommand(t *testing.T) {
 	hub := testutil.NewMockEventHub()
 	_ = hub.Start()
@@ -229,6 +316,16 @@ func TestServer_InvalidMessage_Logged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Connection should still be alive: %v", err)
 	}
+}
+
+func newTestTokenManager(t *testing.T) *security.TokenManager {
+	t.Helper()
+	secretPath := filepath.Join(t.TempDir(), "token_secret.json")
+	manager, err := security.NewTokenManagerWithPath(300, secretPath)
+	if err != nil {
+		t.Fatalf("failed to create token manager: %v", err)
+	}
+	return manager
 }
 
 // --- UnifiedClient Tests ---

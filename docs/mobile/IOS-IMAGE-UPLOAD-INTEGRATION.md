@@ -4,18 +4,23 @@ This guide explains how to integrate image upload functionality from the cdev-io
 
 ## Overview
 
-The cdev agent provides HTTP endpoints for uploading images that can be used with Claude. Images are stored temporarily in `.cdev/images/` with automatic cleanup after 1 hour.
+The cdev agent provides HTTP endpoints for uploading images that can be used with Claude. Images are stored per-workspace in `{workspace}/.cdev/images/` with automatic cleanup after 1 hour.
+
+> **Important:** All image operations require a `workspace_id` query parameter to specify which workspace the images belong to.
 
 ## API Endpoints
 
 ### Upload Image
 
 ```
-POST /api/images
+POST /api/images?workspace_id=<workspace_id>
 Content-Type: multipart/form-data
 ```
 
-**Request:**
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID where the image will be stored
+
+**Request Body:**
 - Field name: `file`
 - Supported formats: JPEG, PNG, GIF, WebP
 - Max file size: 10 MB
@@ -32,6 +37,8 @@ Content-Type: multipart/form-data
   "expires_at": 1705320600
 }
 ```
+
+> **Note:** `local_path` is a relative path within the workspace (e.g., `.cdev/images/...`). Claude running in that workspace can directly access it.
 
 **Response (Rate Limited - 429):**
 ```json
@@ -61,8 +68,11 @@ Header: `Retry-After: 60`
 ### List Images
 
 ```
-GET /api/images
+GET /api/images?workspace_id=<workspace_id>
 ```
+
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID to list images for
 
 **Response:**
 ```json
@@ -87,8 +97,12 @@ GET /api/images
 ### Get Single Image
 
 ```
-GET /api/images?id=abc123def456
+GET /api/images?workspace_id=<workspace_id>&id=abc123def456
 ```
+
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID
+- `id` (required): The image ID
 
 **Response:**
 ```json
@@ -105,8 +119,12 @@ GET /api/images?id=abc123def456
 ### Delete Image
 
 ```
-DELETE /api/images?id=abc123def456
+DELETE /api/images?workspace_id=<workspace_id>&id=abc123def456
 ```
+
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID
+- `id` (required): The image ID to delete
 
 **Response:**
 ```json
@@ -120,8 +138,11 @@ DELETE /api/images?id=abc123def456
 ### Get Storage Stats
 
 ```
-GET /api/images/stats
+GET /api/images/stats?workspace_id=<workspace_id>
 ```
+
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID to get stats for
 
 **Response:**
 ```json
@@ -139,8 +160,11 @@ GET /api/images/stats
 ### Clear All Images
 
 ```
-DELETE /api/images/all
+DELETE /api/images/all?workspace_id=<workspace_id>
 ```
+
+**Query Parameters:**
+- `workspace_id` (required): The workspace ID to clear images for
 
 **Response:**
 ```json
@@ -162,13 +186,17 @@ import Foundation
 
 class ImageUploader {
     private let baseURL: URL
+    private let workspaceID: String
 
-    init(host: String, port: Int) {
+    init(host: String, port: Int, workspaceID: String) {
         self.baseURL = URL(string: "http://\(host):\(port)")!
+        self.workspaceID = workspaceID
     }
 
     func uploadImage(_ imageData: Data, mimeType: String) async throws -> ImageUploadResponse {
-        let url = baseURL.appendingPathComponent("api/images")
+        var components = URLComponents(url: baseURL.appendingPathComponent("api/images"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "workspace_id", value: workspaceID)]
+        let url = components.url!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
@@ -316,7 +344,7 @@ The cdev agent will pass the image path to Claude CLI, which can then analyze th
 
 ## Image Lifecycle
 
-1. **Upload**: Image stored in `.cdev/images/` with unique ID
+1. **Upload**: Image stored in `{workspace}/.cdev/images/` with unique ID
 2. **Deduplication**: Identical images (by SHA256 hash) return existing entry
 3. **TTL**: Images expire after 1 hour (auto-cleaned every 5 minutes)
 4. **LRU Eviction**: When storage is full, oldest images are evicted
@@ -356,14 +384,14 @@ This section outlines what the cdev-ios team needs to implement for image upload
 // Base URL from connection settings
 let baseURL = "http://\(host):\(port)"
 
-// Endpoints to implement:
-POST   /api/images           // Upload (multipart/form-data)
-GET    /api/images           // List all images
-GET    /api/images?id=xxx    // Get single image info
-DELETE /api/images?id=xxx    // Delete single image
-GET    /api/images/stats     // Get storage statistics
-DELETE /api/images/all       // Clear all images
-GET    /api/images/validate  // Validate image path (optional)
+// Endpoints to implement (all require workspace_id parameter):
+POST   /api/images?workspace_id=xxx           // Upload (multipart/form-data)
+GET    /api/images?workspace_id=xxx           // List all images
+GET    /api/images?workspace_id=xxx&id=yyy    // Get single image info
+DELETE /api/images?workspace_id=xxx&id=yyy    // Delete single image
+GET    /api/images/stats?workspace_id=xxx     // Get storage statistics
+DELETE /api/images/all?workspace_id=xxx       // Clear all images
+GET    /api/images/validate?workspace_id=xxx  // Validate image path (optional)
 ```
 
 ### Response Models
@@ -452,6 +480,8 @@ struct ImageErrorResponse: Codable {
 
 | HTTP Code | Error Key | User Message | Action |
 |-----------|-----------|--------------|--------|
+| 400 | `missing_workspace_id` | "Workspace ID required" | Ensure workspace_id param is included |
+| 400 | `invalid_workspace` | "Workspace not found" | Verify workspace is registered |
 | 429 | `rate_limit_exceeded` | "Too many uploads. Please wait." | Show countdown timer using `Retry-After` header |
 | 413 | `image_too_large` | "Image exceeds 10MB limit" | Suggest compressing or choosing smaller image |
 | 415 | `unsupported_type` | "Unsupported format" | Show supported formats: JPEG, PNG, GIF, WebP |
@@ -473,11 +503,11 @@ struct ImageErrorResponse: Codable {
 │                        ↓                                    │
 │  3. User selects image(s)                                   │
 │                        ↓                                    │
-│  4. Call GET /api/images/stats                              │
+│  4. Call GET /api/images/stats?workspace_id=xxx             │
 │     - Check canAcceptUpload == true                         │
 │     - If false, show reason to user                         │
 │                        ↓                                    │
-│  5. Upload via POST /api/images                             │
+│  5. Upload via POST /api/images?workspace_id=xxx            │
 │     - Show progress indicator                               │
 │     - Handle errors gracefully                              │
 │                        ↓                                    │
@@ -548,7 +578,8 @@ let prompt = constructPrompt(
 
 ### What cdev Server Handles (No iOS Implementation Needed)
 
-- ✅ Image storage and cleanup (auto-expires after 1 hour)
+- ✅ Per-workspace image storage in `{workspace}/.cdev/images/`
+- ✅ Automatic cleanup (auto-expires after 1 hour)
 - ✅ Deduplication (same image returns existing entry)
 - ✅ Path traversal protection
 - ✅ Magic bytes validation (content matches MIME type)
@@ -556,14 +587,17 @@ let prompt = constructPrompt(
 
 ### Testing Checklist
 
-- [ ] Upload JPEG, PNG, GIF, WebP successfully
+- [ ] Upload JPEG, PNG, GIF, WebP successfully with workspace_id
 - [ ] Reject PDF, SVG, BMP with proper error
 - [ ] Handle 10MB+ file with 413 error
 - [ ] Handle rapid uploads with 429 rate limit
+- [ ] Handle missing workspace_id with 400 error
+- [ ] Handle invalid workspace_id with 400 error
 - [ ] Verify image path works in Claude prompt
 - [ ] Test multiple images in single prompt
-- [ ] Delete single image
-- [ ] Clear all images
-- [ ] Check storage stats accuracy
+- [ ] Delete single image with workspace_id
+- [ ] Clear all images with workspace_id
+- [ ] Check storage stats accuracy for specific workspace
 - [ ] Test with poor network (timeout handling)
 - [ ] Test upload progress updates
+- [ ] Verify images are isolated per workspace

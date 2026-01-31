@@ -16,7 +16,26 @@ The WebSocket endpoint supports two protocols:
 
 ## Authentication
 
-Currently, cdev runs on localhost only. No authentication is required. Future versions may support secure remote connections.
+When `security.require_auth = true` (default), **all HTTP and WebSocket endpoints require bearer auth**.
+
+```
+Authorization: Bearer <access-token>
+```
+
+**Unauthenticated allowlist** (for pairing + token exchange):
+- `/health`
+- `/pair`
+- `/api/pair/*`
+- `/api/auth/exchange`
+- `/api/auth/refresh`
+
+**Token flow (summary):**
+1. Pairing token is displayed in `/pair` or `/api/pair/info` (QR includes token).
+2. Exchange pairing token via `POST /api/auth/exchange`.
+3. Use returned access token for HTTP + WebSocket requests.
+4. Refresh via `POST /api/auth/refresh`.
+
+**Note:** Query‑string tokens are not supported.
 
 ---
 

@@ -21,12 +21,12 @@ import (
 
 // Storage limits and configuration constants.
 const (
-	MaxImagesCount   = 50                // Max images in folder
-	MaxTotalSizeMB   = 100               // Max total size in MB
-	MaxSingleImageMB = 10                // Max single image in MB
-	ImageTTL         = 1 * time.Hour     // Auto-cleanup after 1 hour
-	CleanupInterval  = 5 * time.Minute   // Check every 5 minutes
-	CdevImagesDir    = ".cdev/images"    // Relative path from repo root
+	MaxImagesCount   = 50              // Max images in folder
+	MaxTotalSizeMB   = 100             // Max total size in MB
+	MaxSingleImageMB = 10              // Max single image in MB
+	ImageTTL         = 1 * time.Hour   // Auto-cleanup after 1 hour
+	CleanupInterval  = 5 * time.Minute // Check every 5 minutes
+	CdevImagesDir    = ".cdev/images"  // Relative path within workspace
 )
 
 // Supported image MIME types.
@@ -48,7 +48,7 @@ var magicBytes = map[string][]byte{
 // StoredImage represents a stored image with metadata.
 type StoredImage struct {
 	ID          string    `json:"id"`
-	LocalPath   string    `json:"local_path"`   // Relative path: .cdev/images/xxx.jpg
+	LocalPath   string    `json:"local_path"`   // Relative path: .cdev/images/xxx.jpg (for Claude in workspace)
 	FullPath    string    `json:"-"`            // Absolute path (internal use)
 	MimeType    string    `json:"mime_type"`
 	Size        int64     `json:"size"`
@@ -67,19 +67,27 @@ type StorageStats struct {
 
 // Storage manages image storage with limits and cleanup.
 type Storage struct {
-	baseDir       string
-	repoPath      string
+	baseDir       string                  // Absolute path to images directory
+	workspacePath string                  // Workspace root path (for relative path calculation)
 	mu            sync.RWMutex
 	cleanupDone   chan struct{}
-	closeOnce     sync.Once           // Prevents double-close panic
+	closeOnce     sync.Once               // Prevents double-close panic
 	images        map[string]*StoredImage // id -> image
 	hashIndex     map[string]string       // content_hash -> id (for dedup)
 	totalSize     int64                   // Cached total size for performance
 }
 
-// New creates a new ImageStorage instance.
-func New(repoPath string) (*Storage, error) {
-	baseDir := filepath.Join(repoPath, CdevImagesDir)
+// New creates a new ImageStorage instance for a workspace.
+// The workspacePath is the root path of the workspace - images will be stored in {workspacePath}/.cdev/images/
+func New(workspacePath string) (*Storage, error) {
+	// Ensure absolute workspace path
+	absWorkspace, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve workspace path: %w", err)
+	}
+
+	// Build images directory path
+	baseDir := filepath.Join(absWorkspace, CdevImagesDir)
 
 	// Create directory if not exists
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
@@ -87,11 +95,11 @@ func New(repoPath string) (*Storage, error) {
 	}
 
 	s := &Storage{
-		baseDir:     baseDir,
-		repoPath:    repoPath,
-		cleanupDone: make(chan struct{}),
-		images:      make(map[string]*StoredImage),
-		hashIndex:   make(map[string]string),
+		baseDir:       baseDir,
+		workspacePath: absWorkspace,
+		cleanupDone:   make(chan struct{}),
+		images:        make(map[string]*StoredImage),
+		hashIndex:     make(map[string]string),
 	}
 
 	// Load existing images into memory
@@ -134,10 +142,11 @@ func (s *Storage) loadExistingImages() error {
 		// Determine MIME type from extension
 		mimeType := extensionToMimeType(filepath.Ext(f.Name()))
 
+		fullPath := filepath.Join(s.baseDir, f.Name())
 		img := &StoredImage{
 			ID:        id,
-			LocalPath: filepath.Join(CdevImagesDir, f.Name()),
-			FullPath:  filepath.Join(s.baseDir, f.Name()),
+			LocalPath: filepath.Join(CdevImagesDir, f.Name()), // Relative path for Claude in workspace
+			FullPath:  fullPath,
 			MimeType:  mimeType,
 			Size:      info.Size(),
 			CreatedAt: info.ModTime(),
@@ -243,7 +252,7 @@ func (s *Storage) Store(reader io.Reader, mimeType string) (*StoredImage, error)
 	now := time.Now()
 	img := &StoredImage{
 		ID:          id,
-		LocalPath:   filepath.Join(CdevImagesDir, filename),
+		LocalPath:   filepath.Join(CdevImagesDir, filename), // Relative path for Claude in workspace
 		FullPath:    fullPath,
 		MimeType:    mimeType,
 		Size:        int64(len(data)),
@@ -457,7 +466,7 @@ func (s *Storage) ValidatePath(path string) error {
 	}
 
 	// Build full path and verify it's still under the base directory
-	fullPath := filepath.Join(s.repoPath, cleanPath)
+	fullPath := filepath.Join(s.workspacePath, cleanPath)
 	absPath, err := filepath.Abs(fullPath)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)

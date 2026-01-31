@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/brianly1003/cdev/internal/rpc/handler"
@@ -92,7 +93,7 @@ func (m *mockGitProvider) Checkout(ctx context.Context, branch string) (*Checkou
 
 func TestNewGitService(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	if svc == nil {
 		t.Fatal("NewGitService returned nil")
@@ -100,11 +101,14 @@ func TestNewGitService(t *testing.T) {
 	if svc.provider != provider {
 		t.Error("provider not set correctly")
 	}
+	if svc.maxDiffSizeKB != 100 {
+		t.Errorf("maxDiffSizeKB = %d, want 100", svc.maxDiffSizeKB)
+	}
 }
 
 func TestGitService_RegisterMethods(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 	registry := handler.NewRegistry()
 
 	svc.RegisterMethods(registry)
@@ -140,7 +144,7 @@ func TestGitService_Status_Success(t *testing.T) {
 			Unstaged: []GitFileStatus{},
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	result, err := svc.Status(context.Background(), nil)
 
@@ -162,7 +166,7 @@ func TestGitService_Status_Success(t *testing.T) {
 }
 
 func TestGitService_Status_NoProvider(t *testing.T) {
-	svc := NewGitService(nil)
+	svc := NewGitService(nil, 100)
 
 	_, err := svc.Status(context.Background(), nil)
 
@@ -178,7 +182,7 @@ func TestGitService_Status_Error(t *testing.T) {
 	provider := &mockGitProvider{
 		statusErr: fmt.Errorf("git status failed"),
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	_, err := svc.Status(context.Background(), nil)
 
@@ -196,7 +200,7 @@ func TestGitService_Diff_Success(t *testing.T) {
 		diffIsStaged: true,
 		diffIsNew:    false,
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(DiffParams{Path: "file.go"})
 	result, err := svc.Diff(context.Background(), params)
@@ -216,11 +220,39 @@ func TestGitService_Diff_Success(t *testing.T) {
 	if !diff.IsStaged {
 		t.Error("IsStaged = false, want true")
 	}
+	if diff.IsTruncated {
+		t.Error("IsTruncated = true, want false")
+	}
+}
+
+func TestGitService_Diff_Truncates(t *testing.T) {
+	longDiff := strings.Repeat("a", 2048)
+	provider := &mockGitProvider{
+		diffResult: longDiff,
+	}
+	svc := NewGitService(provider, 1)
+
+	result, err := svc.Diff(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Diff() error = %v", err)
+	}
+
+	diff, ok := result.(DiffResult)
+	if !ok {
+		t.Fatal("result is not DiffResult")
+	}
+
+	if !diff.IsTruncated {
+		t.Error("IsTruncated = false, want true")
+	}
+	if len(diff.Diff) != 1024 {
+		t.Errorf("Diff length = %d, want 1024", len(diff.Diff))
+	}
 }
 
 func TestGitService_Diff_InvalidParams(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	// Invalid JSON
 	_, err := svc.Diff(context.Background(), []byte(`{invalid`))
@@ -235,7 +267,7 @@ func TestGitService_Diff_InvalidParams(t *testing.T) {
 
 func TestGitService_Stage_Success(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(PathsParams{Paths: []string{"file1.go", "file2.go"}})
 	result, err := svc.Stage(context.Background(), params)
@@ -262,7 +294,7 @@ func TestGitService_Stage_Success(t *testing.T) {
 
 func TestGitService_Stage_EmptyPaths(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(PathsParams{Paths: []string{}})
 	_, err := svc.Stage(context.Background(), params)
@@ -277,7 +309,7 @@ func TestGitService_Stage_EmptyPaths(t *testing.T) {
 
 func TestGitService_Unstage_Success(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(PathsParams{Paths: []string{"file.go"}})
 	result, err := svc.Unstage(context.Background(), params)
@@ -298,7 +330,7 @@ func TestGitService_Unstage_Success(t *testing.T) {
 
 func TestGitService_Discard_Success(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(PathsParams{Paths: []string{"file.go"}})
 	result, err := svc.Discard(context.Background(), params)
@@ -326,7 +358,7 @@ func TestGitService_Commit_Success(t *testing.T) {
 			FilesCommitted: 2,
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(CommitParams{Message: "test commit", Push: false})
 	result, err := svc.Commit(context.Background(), params)
@@ -353,7 +385,7 @@ func TestGitService_Commit_Success(t *testing.T) {
 
 func TestGitService_Commit_EmptyMessage(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(CommitParams{Message: ""})
 	_, err := svc.Commit(context.Background(), params)
@@ -371,7 +403,7 @@ func TestGitService_Push_Success(t *testing.T) {
 			CommitsPushed: 3,
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	result, err := svc.Push(context.Background(), nil)
 
@@ -396,7 +428,7 @@ func TestGitService_Pull_Success(t *testing.T) {
 			Message: "pulled successfully",
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	result, err := svc.Pull(context.Background(), nil)
 
@@ -425,7 +457,7 @@ func TestGitService_Branches_Success(t *testing.T) {
 			},
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	result, err := svc.Branches(context.Background(), nil)
 
@@ -454,7 +486,7 @@ func TestGitService_Checkout_Success(t *testing.T) {
 			Message: "Switched to branch 'feature-branch'",
 		},
 	}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(CheckoutParams{Branch: "feature-branch"})
 	result, err := svc.Checkout(context.Background(), params)
@@ -481,7 +513,7 @@ func TestGitService_Checkout_Success(t *testing.T) {
 
 func TestGitService_Checkout_EmptyBranch(t *testing.T) {
 	provider := &mockGitProvider{}
-	svc := NewGitService(provider)
+	svc := NewGitService(provider, 100)
 
 	params, _ := json.Marshal(CheckoutParams{Branch: ""})
 	_, err := svc.Checkout(context.Background(), params)

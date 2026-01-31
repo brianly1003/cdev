@@ -230,7 +230,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("indexer.skip_directories", DefaultSkipDirectories)
 
 	// Security defaults
-	v.SetDefault("security.require_auth", false)     // No auth required by default (local development)
+	v.SetDefault("security.require_auth", true)      // Auth required by default
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
@@ -244,7 +244,7 @@ func setDefaults(v *viper.Viper) {
 
 	// Debug defaults - disabled by default for security
 	v.SetDefault("debug.enabled", false)
-	v.SetDefault("debug.pprof_enabled", true) // When debug is enabled, pprof is on by default
+	v.SetDefault("debug.pprof_enabled", false) // Must be explicitly enabled
 }
 
 // postProcess applies post-processing to configuration.

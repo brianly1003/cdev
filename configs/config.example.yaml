@@ -53,9 +53,9 @@ git:
   diff_on_change: true  # Auto-generate diff on file change
 
 # Security settings
-# IMPORTANT: For production/remote access, set require_auth: true
+# IMPORTANT: For production/remote access, keep require_auth: true
 security:
-  require_auth: false           # Set true to require token authentication for WebSocket connections
+  require_auth: true            # Require token authentication for WebSocket and HTTP
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
@@ -140,4 +140,4 @@ permissions:
 # WARNING: Only enable in development or trusted environments
 debug:
   enabled: false              # Enable /debug/* endpoints
-  pprof_enabled: true         # Enable /debug/pprof/* profiling (when debug is enabled)
+  pprof_enabled: false        # Enable /debug/pprof/* profiling (when debug is enabled)

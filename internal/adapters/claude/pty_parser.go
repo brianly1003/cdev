@@ -133,11 +133,11 @@ func NewPTYParser() *PTYParser {
 		promptEndPattern: regexp.MustCompile(`(?i)^\s*(?:Esc(?:ape)?\s+to\s+cancel|press\s+\d+|enter\s+to\s+confirm)`),
 
 		// Thinking patterns - matches Claude's various "processing" indicators
-		// All thinking indicators end with "(esc to interrupt ...)" - use that as the primary pattern
+		// All thinking indicators end with "(esc to interrupt ...)" or "(ctrl+c to interrupt ...)" - use that as the primary pattern
 		thinkingPatterns: []*regexp.Regexp{
-			// Primary pattern: "(esc to interrupt" followed by optional content and closing paren
-			// Handles both "(esc to interrupt)" and "(esc to interrupt · thinking)"
-			regexp.MustCompile(`\(esc to interrupt[^)]*\)`),
+			// Primary pattern: "(esc to interrupt" or "(ctrl+c to interrupt" followed by optional content and closing paren
+			// Handles: "(esc to interrupt)", "(esc to interrupt · thinking)", "(ctrl+c to interrupt)", "(ctrl+c to interrupt · thinking)"
+			regexp.MustCompile(`\((?:esc|ctrl\+c) to interrupt[^)]*\)`),
 			// Fallback patterns for older formats without the suffix:
 			// regexp.MustCompile(`(?i)(?:Thinking|Scheming|Cooking|Analyzing|Processing|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)…?\.{0,3}`),
 			// regexp.MustCompile(`(?i)(?:✢|✽|✻|✶|✳|·)\s*(?:Thinking|Scheming|Cooking|Considering|Baking|Imagining|Sussing|Finagling|Vibing|Pondering|Musing|Brewing|Crafting|Conjuring|Dreaming|Mulling|Deciphering)`),

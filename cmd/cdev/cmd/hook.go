@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/hooks"
 	"github.com/brianly1003/cdev/internal/permission"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
@@ -48,6 +49,58 @@ Configure in ~/.claude/settings.json:
 For more details, see: https://code.claude.com/docs/en/hooks`,
 }
 
+// hookInstallCmd installs Claude Code hooks for external session capture.
+var hookInstallCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install Claude Code hooks for external session capture",
+	Long: `Install hooks into Claude Code's settings to capture events from external sessions.
+
+This command:
+1. Creates a forwarder script in ~/.cdev/hooks/forward.sh
+2. Adds hooks to ~/.claude/settings.json for SessionStart, Notification, PreToolUse, PostToolUse
+3. Creates an installed marker at ~/.cdev/hooks/.installed
+
+Once installed, cdev will receive real-time events from Claude running in VS Code, Cursor,
+or any terminal - not just sessions started by cdev.
+
+The hooks are designed to fail silently when cdev is not running, so they won't interfere
+with normal Claude Code operation.
+
+Examples:
+  # Install hooks:
+  cdev hook install
+
+  # Check installation status:
+  cdev hook status`,
+	RunE: runHookInstall,
+}
+
+// hookUninstallCmd removes Claude Code hooks.
+var hookUninstallCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: "Remove Claude Code hooks",
+	Long: `Remove cdev hooks from Claude Code's settings.
+
+This command:
+1. Removes cdev hooks from ~/.claude/settings.json
+2. Deletes ~/.cdev/hooks/ directory
+
+Examples:
+  cdev hook uninstall`,
+	RunE: runHookUninstall,
+}
+
+// hookStatusCmd shows Claude Code hooks installation status.
+var hookStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show Claude Code hooks installation status",
+	Long: `Check whether Claude Code hooks are installed and working.
+
+Examples:
+  cdev hook status`,
+	RunE: runHookStatus,
+}
+
 // hookPermissionRequestCmd handles permission request hooks.
 var hookPermissionRequestCmd = &cobra.Command{
 	Use:   "permission-request",
@@ -73,12 +126,20 @@ Examples:
 	RunE: runHookPermissionRequest,
 }
 
+var hookPort int
+
 func init() {
 	// Add hook command to root
 	rootCmd.AddCommand(hookCmd)
 
 	// Add subcommands to hook
+	hookCmd.AddCommand(hookInstallCmd)
+	hookCmd.AddCommand(hookUninstallCmd)
+	hookCmd.AddCommand(hookStatusCmd)
 	hookCmd.AddCommand(hookPermissionRequestCmd)
+
+	// Flags for install
+	hookInstallCmd.Flags().IntVar(&hookPort, "port", 8766, "cdev server port for hook forwarding")
 
 	// Flags for permission-request
 	hookPermissionRequestCmd.Flags().StringVar(&hookServerURL, "server", "ws://127.0.0.1:8766", "cdev server URL (WebSocket)")
@@ -274,5 +335,82 @@ func outputDenyError(message string) error {
 	if err := encoder.Encode(hookOutput); err != nil {
 		return fmt.Errorf("failed to output error: %w", err)
 	}
+	return nil
+}
+
+// runHookInstall installs Claude Code hooks for external session capture.
+func runHookInstall(cmd *cobra.Command, args []string) error {
+	manager := hooks.NewManager(hookPort)
+
+	if manager.IsInstalled() {
+		fmt.Println("Claude Code hooks are already installed.")
+		fmt.Printf("Status: %s\n", manager.Status())
+		return nil
+	}
+
+	fmt.Println("Installing Claude Code hooks...")
+	if err := manager.Install(); err != nil {
+		return fmt.Errorf("failed to install hooks: %w", err)
+	}
+
+	fmt.Println("✓ Claude Code hooks installed successfully!")
+	fmt.Println()
+	fmt.Println("What this enables:")
+	fmt.Println("  • Real-time event capture from Claude running in VS Code, Cursor, or terminal")
+	fmt.Println("  • Session discovery when Claude starts (even outside cdev)")
+	fmt.Println("  • Permission prompt notifications")
+	fmt.Println("  • Tool execution tracking")
+	fmt.Println()
+	fmt.Println("The hooks will only forward events when cdev is running.")
+	fmt.Println("To remove hooks: cdev hook uninstall")
+
+	return nil
+}
+
+// runHookUninstall removes Claude Code hooks.
+func runHookUninstall(cmd *cobra.Command, args []string) error {
+	manager := hooks.NewManager(hookPort)
+
+	if !manager.IsInstalled() {
+		fmt.Println("Claude Code hooks are not installed.")
+		return nil
+	}
+
+	fmt.Println("Removing Claude Code hooks...")
+	if err := manager.Uninstall(); err != nil {
+		return fmt.Errorf("failed to uninstall hooks: %w", err)
+	}
+
+	fmt.Println("✓ Claude Code hooks removed successfully!")
+	fmt.Println()
+	fmt.Println("External Claude sessions will no longer be captured.")
+	fmt.Println("To reinstall: cdev hook install")
+
+	return nil
+}
+
+// runHookStatus shows the Claude Code hooks installation status.
+func runHookStatus(cmd *cobra.Command, args []string) error {
+	manager := hooks.NewManager(hookPort)
+
+	status := manager.Status()
+	installed := manager.IsInstalled()
+
+	fmt.Println("Claude Code Hooks Status")
+	fmt.Println("========================")
+	fmt.Printf("Installed: %v\n", installed)
+	fmt.Printf("Status:    %s\n", status)
+
+	if installed {
+		fmt.Println()
+		fmt.Println("Hooks are forwarding events to: http://127.0.0.1:" + fmt.Sprint(hookPort) + "/api/hooks/")
+		fmt.Println()
+		fmt.Println("Active hooks:")
+		fmt.Println("  • SessionStart  → /api/hooks/session")
+		fmt.Println("  • Notification  → /api/hooks/permission (permission_prompt)")
+		fmt.Println("  • PreToolUse    → /api/hooks/tool-start")
+		fmt.Println("  • PostToolUse   → /api/hooks/tool-end")
+	}
+
 	return nil
 }

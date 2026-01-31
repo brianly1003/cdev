@@ -369,10 +369,11 @@ func TestGitStatusInfoJSON(t *testing.T) {
 // TestDiffResultJSON tests snake_case serialization for DiffResult.
 func TestDiffResultJSON(t *testing.T) {
 	result := DiffResult{
-		Path:     "main.go",
-		Diff:     "--- a/main.go\n+++ b/main.go",
-		IsStaged: true,
-		IsNew:    false,
+		Path:        "main.go",
+		Diff:        "--- a/main.go\n+++ b/main.go",
+		IsStaged:    true,
+		IsNew:       false,
+		IsTruncated: true,
 	}
 
 	data, err := json.Marshal(result)
@@ -383,8 +384,8 @@ func TestDiffResultJSON(t *testing.T) {
 	jsonStr := string(data)
 
 	// Verify snake_case field names
-	expectedFields := []string{"is_staged", "is_new"}
-	unexpectedFields := []string{"isStaged", "isNew"}
+	expectedFields := []string{"is_staged", "is_new", "is_truncated"}
+	unexpectedFields := []string{"isStaged", "isNew", "isTruncated"}
 
 	for _, field := range expectedFields {
 		if !containsField(jsonStr, field) {

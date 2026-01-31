@@ -202,8 +202,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate token if authentication is required
-	// Allow localhost connections without authentication (for hook commands)
-	if s.requireAuth && !isLocalhostAddr(r.RemoteAddr) {
+	if s.requireAuth {
 		if err := s.validateTokenFromRequest(r); err != nil {
 			log.Warn().
 				Err(err).
@@ -545,7 +544,7 @@ func isLocalhostOrigin(origin string) bool {
 }
 
 // validateTokenFromRequest extracts and validates a token from the request.
-// Token can be in Authorization header (Bearer token) or query param (?token=xxx).
+// Token must be provided in Authorization header (Bearer token).
 func (s *Server) validateTokenFromRequest(r *http.Request) error {
 	if s.tokenManager == nil {
 		return fmt.Errorf("token manager not configured")
@@ -562,17 +561,18 @@ func (s *Server) validateTokenFromRequest(r *http.Request) error {
 		}
 	}
 
-	// Fall back to query parameter
-	if token == "" {
-		token = r.URL.Query().Get("token")
-	}
-
 	if token == "" {
 		return fmt.Errorf("no token provided")
 	}
 
-	_, err := s.tokenManager.ValidateToken(token)
-	return err
+	payload, err := s.tokenManager.ValidateToken(token)
+	if err != nil {
+		return err
+	}
+	if payload.Type != security.TokenTypeSession && payload.Type != security.TokenTypeAccess {
+		return fmt.Errorf("invalid token type")
+	}
+	return nil
 }
 
 // UnifiedClient represents a JSON-RPC 2.0 WebSocket client.

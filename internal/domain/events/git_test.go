@@ -13,7 +13,7 @@ func TestNewGitDiffEvent(t *testing.T) {
 +import "fmt"
  func main() {}`
 
-	event := NewGitDiffEvent("file.go", diff, 1, 0, false, false)
+	event := NewGitDiffEvent("file.go", diff, 1, 0, false, false, false)
 
 	if event.Type() != EventTypeGitDiff {
 		t.Errorf("Type() = %v, want %v", event.Type(), EventTypeGitDiff)
@@ -45,7 +45,7 @@ func TestNewGitDiffEvent(t *testing.T) {
 }
 
 func TestNewGitDiffEvent_StagedNewFile(t *testing.T) {
-	event := NewGitDiffEvent("new.go", "new file content", 10, 0, true, true)
+	event := NewGitDiffEvent("new.go", "new file content", 10, 0, true, true, false)
 
 	payload := event.Payload.(GitDiffPayload)
 
@@ -58,7 +58,7 @@ func TestNewGitDiffEvent_StagedNewFile(t *testing.T) {
 }
 
 func TestGitDiffPayload_JSON(t *testing.T) {
-	event := NewGitDiffEvent("src/main.go", "diff content here", 5, 3, true, false)
+	event := NewGitDiffEvent("src/main.go", "diff content here", 5, 3, true, false, false)
 
 	jsonBytes, err := event.ToJSON()
 	if err != nil {
@@ -102,7 +102,7 @@ func TestGitDiffPayload_JSON(t *testing.T) {
 }
 
 func TestGitDiffPayload_EmptyDiff(t *testing.T) {
-	event := NewGitDiffEvent("unchanged.go", "", 0, 0, false, false)
+	event := NewGitDiffEvent("unchanged.go", "", 0, 0, false, false, false)
 
 	payload := event.Payload.(GitDiffPayload)
 
@@ -124,7 +124,7 @@ func TestGitDiffPayload_LargeDiff(t *testing.T) {
 		largeDiff += "+line " + string(rune('0'+i%10)) + "\n"
 	}
 
-	event := NewGitDiffEvent("large.go", largeDiff, 1000, 0, false, true)
+	event := NewGitDiffEvent("large.go", largeDiff, 1000, 0, false, true, false)
 
 	payload := event.Payload.(GitDiffPayload)
 
@@ -148,7 +148,7 @@ func TestGitDiffPayload_SpecialCharacters(t *testing.T) {
 +// 日本語コメント
 +// "quotes" and 'apostrophes' and \backslashes\`
 
-	event := NewGitDiffEvent("unicode.go", diff, 2, 0, false, false)
+	event := NewGitDiffEvent("unicode.go", diff, 2, 0, false, false, false)
 
 	jsonBytes, err := event.ToJSON()
 	if err != nil {
@@ -163,7 +163,7 @@ func TestGitDiffPayload_SpecialCharacters(t *testing.T) {
 }
 
 func TestGitDiffPayload_PathWithSpaces(t *testing.T) {
-	event := NewGitDiffEvent("path with spaces/file name.go", "diff", 1, 1, false, false)
+	event := NewGitDiffEvent("path with spaces/file name.go", "diff", 1, 1, false, false, false)
 
 	payload := event.Payload.(GitDiffPayload)
 

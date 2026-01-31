@@ -18,8 +18,8 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
 	"github.com/brianly1003/cdev/internal/config"
-	"github.com/brianly1003/cdev/internal/services/imagestorage"
 	"github.com/brianly1003/cdev/internal/domain/events"
+	"github.com/brianly1003/cdev/internal/hooks"
 	"github.com/brianly1003/cdev/internal/hub"
 	"github.com/brianly1003/cdev/internal/pairing"
 	"github.com/brianly1003/cdev/internal/permission"
@@ -29,6 +29,7 @@ import (
 	httpserver "github.com/brianly1003/cdev/internal/server/http"
 	httpMiddleware "github.com/brianly1003/cdev/internal/server/http/middleware"
 	"github.com/brianly1003/cdev/internal/server/unified"
+	"github.com/brianly1003/cdev/internal/services/imagestorage"
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/terminal"
 	"github.com/brianly1003/cdev/internal/workspace"
@@ -43,20 +44,20 @@ type App struct {
 	version string
 
 	// Core components
-	hub             *hub.Hub
-	claudeManager   *claude.Manager
-	fileWatcher     *watcher.Watcher
-	gitTracker      *git.Tracker
-	sessionCache    *sessioncache.Cache
-	messageCache    *sessioncache.MessageCache
-	sessionStreamer *sessioncache.SessionStreamer
-	repoIndexer     *repository.SQLiteIndexer
-	imageStorage    *imagestorage.Storage
-	httpServer      *httpserver.Server
-	unifiedServer   *unified.Server
-	rpcDispatcher   *handler.Dispatcher
-	qrGenerator     *pairing.QRGenerator
-	tokenManager    *security.TokenManager
+	hub                 *hub.Hub
+	claudeManager       *claude.Manager
+	fileWatcher         *watcher.Watcher
+	gitTracker          *git.Tracker
+	sessionCache        *sessioncache.Cache
+	messageCache        *sessioncache.MessageCache
+	sessionStreamer     *sessioncache.SessionStreamer
+	repoIndexer         *repository.SQLiteIndexer
+	imageStorageManager *imagestorage.Manager
+	httpServer          *httpserver.Server
+	unifiedServer       *unified.Server
+	rpcDispatcher       *handler.Dispatcher
+	qrGenerator         *pairing.QRGenerator
+	tokenManager        *security.TokenManager
 
 	// Multi-workspace support
 	sessionManager         *session.Manager
@@ -65,6 +66,9 @@ type App struct {
 
 	// Permission hook bridge
 	permissionManager *permission.MemoryManager
+
+	// Claude Code hooks for external session capture
+	hooksManager *hooks.Manager
 
 	// Security
 	rateLimiter *httpMiddleware.RateLimiter
@@ -146,24 +150,10 @@ func (a *App) Start(ctx context.Context) error {
 		// Set Claude working directory to repository path
 		a.claudeManager.SetWorkDir(a.cfg.Repository.Path)
 
-		// Create .cdev directory structure
-		cdevDir := filepath.Join(a.cfg.Repository.Path, ".cdev")
-		cdevLogsDir := filepath.Join(cdevDir, "logs")
-		cdevImagesDir := filepath.Join(cdevDir, "images")
+		// Create .cdev/logs directory for Claude session logs
+		cdevLogsDir := filepath.Join(a.cfg.Repository.Path, ".cdev", "logs")
 		if err := os.MkdirAll(cdevLogsDir, 0755); err != nil {
 			log.Warn().Err(err).Msg("failed to create .cdev/logs directory")
-		}
-		if err := os.MkdirAll(cdevImagesDir, 0755); err != nil {
-			log.Warn().Err(err).Msg("failed to create .cdev/images directory")
-		}
-
-		// Initialize Image Storage for iOS image uploads
-		imageStorage, err := imagestorage.New(a.cfg.Repository.Path)
-		if err != nil {
-			log.Warn().Err(err).Msg("failed to create image storage, image uploads will not be available")
-		} else {
-			a.imageStorage = imageStorage
-			log.Info().Str("dir", cdevImagesDir).Msg("image storage initialized")
 		}
 
 		// Enable Claude output logging to .cdev/logs directory
@@ -243,6 +233,25 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	a.workspaceConfigManager = workspace.NewConfigManager(emptyWorkspacesCfg, workspacesPath)
 	log.Info().Msg("workspace manager initialized (workspaces added via API)")
+
+	// Initialize Image Storage Manager for per-workspace image uploads
+	pathResolver := workspace.NewImageStoragePathResolver(a.workspaceConfigManager)
+	a.imageStorageManager = imagestorage.NewManager(pathResolver)
+	log.Info().Msg("image storage manager initialized (per-workspace)")
+
+	// Initialize Claude Code Hooks Manager for external session capture
+	// This allows cdev to receive real-time events from Claude running in VS Code, Cursor, or terminal
+	a.hooksManager = hooks.NewManager(a.cfg.Server.Port)
+	if !a.hooksManager.IsInstalled() {
+		log.Info().Msg("Claude Code hooks not installed - installing for external session capture...")
+		if err := a.hooksManager.Install(); err != nil {
+			log.Warn().Err(err).Msg("failed to install Claude Code hooks - external session capture will not work")
+		} else {
+			log.Info().Msg("Claude Code hooks installed - external Claude sessions will now be captured")
+		}
+	} else {
+		log.Debug().Str("status", a.hooksManager.Status()).Msg("Claude Code hooks already installed")
+	}
 
 	// Initialize GitTrackerManager for cached git operations
 	// This provides lazy-init, cached git trackers for all workspaces
@@ -375,7 +384,7 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Git service
 	if a.gitTracker != nil {
-		gitService := methods.NewGitService(NewGitProviderAdapter(a.gitTracker))
+		gitService := methods.NewGitService(NewGitProviderAdapter(a.gitTracker), a.cfg.Limits.MaxDiffSizeKB)
 		gitService.RegisterMethods(rpcRegistry)
 	}
 
@@ -500,15 +509,16 @@ func (a *App) Start(ctx context.Context) error {
 		a.messageCache,
 		a.hub,
 		a.cfg.Limits.MaxFileSizeKB,
+		a.cfg.Limits.MaxDiffSizeKB,
 		a.cfg.Repository.Path,
 	)
 	// Set repository indexer for file search APIs
 	if a.repoIndexer != nil {
 		a.httpServer.SetRepositoryIndexer(a.repoIndexer)
 	}
-	// Set image storage for iOS image uploads
-	if a.imageStorage != nil {
-		a.httpServer.SetImageStorage(a.imageStorage)
+	// Set image storage manager for iOS image uploads (multi-workspace)
+	if a.imageStorageManager != nil {
+		a.httpServer.SetImageStorageManager(a.imageStorageManager)
 	}
 
 	// Set up pairing handler for mobile app connection
@@ -528,6 +538,8 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Configure security on HTTP server (CORS origin checking)
 	a.httpServer.SetOriginChecker(originChecker)
+	// Configure HTTP auth (bearer tokens)
+	a.httpServer.SetAuth(a.tokenManager, a.cfg.Security.RequireAuth)
 
 	// Configure rate limiting if enabled
 	if a.cfg.Security.RateLimit.Enabled {
@@ -565,6 +577,15 @@ func (a *App) Start(ctx context.Context) error {
 		a.httpServer.SetDebugHandler(debugHandler)
 		log.Info().Bool("pprof", a.cfg.Debug.PprofEnabled).Msg("debug endpoints enabled")
 	}
+
+	// Set up hooks handler for receiving Claude Code hook events
+	// This enables real-time event capture from external Claude sessions (VS Code, Cursor, terminal)
+	// The permission manager enables mobile permission approval for PreToolUse hooks
+	hooksHandler := httpserver.NewHooksHandler(a.hub)
+	if a.permissionManager != nil {
+		hooksHandler.SetPermissionManager(a.permissionManager)
+	}
+	a.httpServer.SetHooksHandler(hooksHandler)
 
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
@@ -611,6 +632,16 @@ func (a *App) shutdown() error {
 	a.running = false
 
 	log.Info().Msg("shutting down...")
+
+	// Remove Claude Code hooks on shutdown (clean exit)
+	if a.hooksManager != nil && a.hooksManager.IsInstalled() {
+		log.Info().Msg("removing Claude Code hooks...")
+		if err := a.hooksManager.Uninstall(); err != nil {
+			log.Warn().Err(err).Msg("failed to remove Claude Code hooks")
+		} else {
+			log.Info().Msg("Claude Code hooks removed")
+		}
+	}
 
 	// Publish session end event
 	a.hub.Publish(events.NewSessionEndEvent(a.sessionID, "shutdown"))
@@ -732,7 +763,7 @@ func (a *App) handleFileChangeForGitDiff(ctx context.Context, event events.Event
 	time.Sleep(50 * time.Millisecond)
 
 	// Generate git diff
-	diffEvent := a.gitTracker.GetDiffForEvent(ctx, wrapper.Payload.Path)
+	diffEvent := a.gitTracker.GetDiffForEvent(ctx, wrapper.Payload.Path, a.cfg.Limits.MaxDiffSizeKB)
 	if diffEvent != nil {
 		a.hub.Publish(diffEvent)
 	}
@@ -992,6 +1023,7 @@ func (w *wsOutputWriter) Write(p []byte) (n int, err error) {
 // - Branch switches: .git/HEAD changes (git checkout, git switch)
 // - Pull/Fetch: .git/FETCH_HEAD, .git/refs/remotes/* changes
 // - Merges/Rebases: .git/ORIG_HEAD, .git/MERGE_HEAD changes
+//
 //nolint:unused
 func (a *App) watchGitState(ctx context.Context) {
 	repoPath := a.cfg.Repository.Path
@@ -1153,6 +1185,7 @@ startWatching:
 }
 
 // emitGitStatusChanged emits a git_status_changed event.
+//
 //nolint:unused
 func (a *App) emitGitStatusChanged(ctx context.Context) {
 	if a.gitTracker == nil {

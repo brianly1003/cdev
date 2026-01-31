@@ -429,8 +429,8 @@ cdev/
 ## Security Notice
 
 **Important:** This is currently a POC with known security limitations:
-- No authentication (any client can connect)
-- CORS allows all origins
+- HTTP API auth pending (WebSocket auth exists; do not expose HTTP port)
+- CORS restrictions incomplete on some endpoints
 - Binds to localhost only (intentional security measure)
 
 See [docs/security/SECURITY.md](./docs/security/SECURITY.md) for details and [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) for planned fixes.

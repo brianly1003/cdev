@@ -1168,15 +1168,9 @@ func TestGetFileContent_SymlinkAttack(t *testing.T) {
 		isRepo:   true,
 	}
 
-	// Note: The current implementation follows symlinks. This test documents the behavior.
-	// If symlink following should be blocked, this test would need to expect an error.
-	content, _, err := tracker.GetFileContent(context.Background(), "evil_link", 100)
-	if err != nil {
-		// If implementation blocks symlinks, this is expected
-		t.Logf("Symlink blocked (good for security): %v", err)
-	} else {
-		// If implementation follows symlinks, log a warning
-		t.Logf("WARNING: Symlink was followed, content: %q", content)
+	_, _, err := tracker.GetFileContent(context.Background(), "evil_link", 100)
+	if err == nil {
+		t.Fatal("expected symlink escape to be blocked")
 	}
 }
 

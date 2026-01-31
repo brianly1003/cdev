@@ -74,6 +74,32 @@ type ParsedContentBlock struct {
 	ToolID string `json:"tool_id,omitempty"`
 	// ToolInput is the raw JSON input for the tool (for "tool_use" type)
 	ToolInput string `json:"tool_input,omitempty"`
+	// FilePath is the file path for Read tool results (for image tool_result)
+	FilePath string `json:"file_path,omitempty"`
+	// ImageInfo contains metadata for image tool results
+	ImageInfo *ImageInfo `json:"image_info,omitempty"`
+}
+
+// ImageInfo contains metadata about an image from a Read tool result.
+type ImageInfo struct {
+	// Type is the MIME type (e.g., "image/jpeg")
+	Type string `json:"type"`
+	// OriginalSize is the file size in bytes
+	OriginalSize int64 `json:"original_size"`
+	// Dimensions contains the image dimensions
+	Dimensions *ImageDimensions `json:"dimensions,omitempty"`
+}
+
+// ImageDimensions contains width/height info for images.
+type ImageDimensions struct {
+	// OriginalWidth is the original image width in pixels
+	OriginalWidth int `json:"original_width"`
+	// OriginalHeight is the original image height in pixels
+	OriginalHeight int `json:"original_height"`
+	// DisplayWidth is the scaled width for display (after resize for Claude)
+	DisplayWidth int `json:"display_width"`
+	// DisplayHeight is the scaled height for display (after resize for Claude)
+	DisplayHeight int `json:"display_height"`
 }
 
 // ClaudeStatusPayload is the payload for claude_status events.
@@ -233,6 +259,10 @@ type ClaudeMessageContent struct {
 	Content string `json:"content,omitempty"`
 	// IsError indicates if the tool result is an error
 	IsError bool `json:"is_error,omitempty"`
+	// FilePath is the file path for Read tool results (for image tool_result)
+	FilePath string `json:"file_path,omitempty"`
+	// ImageInfo contains metadata for image tool results
+	ImageInfo *ImageInfo `json:"image_info,omitempty"`
 }
 
 // NewClaudeMessageEvent creates a new claude_message event.

@@ -27,6 +27,7 @@ func setupTestStorage(t *testing.T) (*Storage, string) {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 
+	// New() takes a workspace path - images will be stored in {workspace}/.cdev/images/
 	storage, err := New(tmpDir)
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
@@ -45,7 +46,7 @@ func TestNew(t *testing.T) {
 	storage, tmpDir := setupTestStorage(t)
 	defer cleanupTestStorage(storage, tmpDir)
 
-	// Check that the images directory was created
+	// Check that the images directory was created under workspace/.cdev/images
 	imagesDir := filepath.Join(tmpDir, CdevImagesDir)
 	if _, err := os.Stat(imagesDir); os.IsNotExist(err) {
 		t.Errorf("images directory was not created: %s", imagesDir)
@@ -383,7 +384,7 @@ func TestValidatePath(t *testing.T) {
 		t.Fatalf("Store failed: %v", err)
 	}
 
-	// Valid path
+	// Valid path (relative: .cdev/images/img_xxx.jpg)
 	err = storage.ValidatePath(stored.LocalPath)
 	if err != nil {
 		t.Errorf("ValidatePath failed for valid path: %v", err)
@@ -395,7 +396,7 @@ func TestValidatePath(t *testing.T) {
 		t.Error("should reject path traversal")
 	}
 
-	// Wrong prefix
+	// Wrong prefix (path not in .cdev/images directory)
 	err = storage.ValidatePath("some/other/path.jpg")
 	if err == nil {
 		t.Error("should reject path not in images directory")
@@ -517,7 +518,7 @@ func TestLoadExistingImages(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// Create images directory and place a test file
+	// Create images directory and place a test file (simulating workspace/.cdev/images/)
 	imagesDir := filepath.Join(tmpDir, CdevImagesDir)
 	if err := os.MkdirAll(imagesDir, 0755); err != nil {
 		t.Fatalf("failed to create images dir: %v", err)
@@ -531,7 +532,7 @@ func TestLoadExistingImages(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Create storage - it should load existing images
+	// Create storage - New() takes workspace path
 	storage, err := New(tmpDir)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
