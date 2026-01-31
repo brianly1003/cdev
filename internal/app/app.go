@@ -58,6 +58,7 @@ type App struct {
 	rpcDispatcher       *handler.Dispatcher
 	qrGenerator         *pairing.QRGenerator
 	tokenManager        *security.TokenManager
+	authRegistry        *security.AuthRegistry
 
 	// Multi-workspace support
 	sessionManager         *session.Manager
@@ -240,6 +241,15 @@ func (a *App) Start(ctx context.Context) error {
 		Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).
 		Msg("workspace manager initialized")
 
+	authRegistryPath := config.DefaultAuthRegistryPath()
+	authRegistry, err := security.LoadAuthRegistry(authRegistryPath)
+	if err != nil {
+		log.Warn().Err(err).Str("auth_registry_path", authRegistryPath).Msg("failed to load auth registry")
+	} else {
+		a.authRegistry = authRegistry
+		log.Info().Str("auth_registry_path", authRegistryPath).Msg("auth registry initialized")
+	}
+
 	// Initialize Image Storage Manager for per-workspace image uploads
 	pathResolver := workspace.NewImageStoragePathResolver(a.workspaceConfigManager)
 	a.imageStorageManager = imagestorage.NewManager(pathResolver)
@@ -294,6 +304,11 @@ func (a *App) Start(ctx context.Context) error {
 
 	if err := a.sessionManager.Start(); err != nil {
 		log.Warn().Err(err).Msg("failed to start session manager")
+	}
+
+	if a.authRegistry != nil {
+		a.pruneAuthRegistry("startup")
+		a.startAuthRegistryCleanup(ctx)
 	}
 
 	// Workspaces are loaded from config and updated via workspace/add API
@@ -413,7 +428,7 @@ func (a *App) Start(ctx context.Context) error {
 	sessionService.RegisterMethods(rpcRegistry)
 
 	// Workspace config service (workspace/list, workspace/add, etc.)
-	workspaceConfigService := methods.NewWorkspaceConfigService(a.sessionManager, a.workspaceConfigManager, a.hub)
+	workspaceConfigService := methods.NewWorkspaceConfigService(a.sessionManager, a.workspaceConfigManager, a.hub, a.authRegistry)
 	workspaceConfigService.RegisterMethods(rpcRegistry)
 
 	// Session manager service (session/start, session/stop, session/send, etc.)
@@ -575,12 +590,13 @@ func (a *App) Start(ctx context.Context) error {
 			}
 			return nil
 		},
+		a.cfg.Server.ExternalURL == "",
 	)
 	a.httpServer.SetPairingHandler(pairingHandler)
 
 	// Create auth handler for token exchange and refresh
 	if a.tokenManager != nil {
-		authHandler := httpserver.NewAuthHandler(a.tokenManager)
+		authHandler := httpserver.NewAuthHandler(a.tokenManager, a.authRegistry, a.cleanupOrphanedWorkspaces)
 		a.httpServer.SetAuthHandler(authHandler)
 	}
 

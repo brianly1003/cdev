@@ -29,17 +29,17 @@ const (
 
 // Default token expiry durations
 const (
-	DefaultAccessTokenExpiry  = 15 * 60      // 15 minutes
+	DefaultAccessTokenExpiry  = 15 * 60       // 15 minutes
 	DefaultRefreshTokenExpiry = 7 * 24 * 3600 // 7 days
 )
 
 // Common errors
 var (
-	ErrInvalidToken   = errors.New("invalid token")
-	ErrExpiredToken   = errors.New("token has expired")
-	ErrInvalidFormat  = errors.New("invalid token format")
-	ErrTokenNotFound  = errors.New("token not found")
-	ErrTokenRevoked   = errors.New("token has been revoked")
+	ErrInvalidToken  = errors.New("invalid token")
+	ErrExpiredToken  = errors.New("token has expired")
+	ErrInvalidFormat = errors.New("invalid token format")
+	ErrTokenNotFound = errors.New("token not found")
+	ErrTokenRevoked  = errors.New("token has been revoked")
 )
 
 // TokenType represents the type of token.
@@ -68,7 +68,7 @@ type TokenPayload struct {
 
 	// Core fields
 	Type      TokenType `json:"type"`
-	ServerID  string    `json:"server_id"`  // Local agent ID (legacy name for compatibility)
+	ServerID  string    `json:"server_id"` // Local agent ID (legacy name for compatibility)
 	IssuedAt  int64     `json:"issued_at"`
 	ExpiresAt int64     `json:"expires_at"`
 	Nonce     string    `json:"nonce"`
@@ -85,7 +85,7 @@ type TokenManager struct {
 	serverID     string
 	serverSecret []byte
 
-	mu           sync.RWMutex
+	mu            sync.RWMutex
 	revokedNonces map[string]time.Time // nonce -> revoked at (for cleanup)
 
 	defaultExpirySecs int
@@ -156,6 +156,11 @@ func getSecretPath() string {
 	return filepath.Join(home, ".cdev", "token_secret.json")
 }
 
+// DefaultTokenSecretPath returns the path used for the token secret file.
+func DefaultTokenSecretPath() string {
+	return getSecretPath()
+}
+
 // saveSecret saves the server ID and secret to a file.
 func saveSecret(path, serverID string, secret []byte) error {
 	// Ensure directory exists
@@ -185,28 +190,28 @@ func (tm *TokenManager) ServerID() string {
 
 // GeneratePairingToken generates a new pairing token.
 func (tm *TokenManager) GeneratePairingToken() (string, time.Time, error) {
-	return tm.generateToken(TokenTypePairing, tm.defaultExpirySecs)
+	return tm.generateToken(TokenTypePairing, tm.defaultExpirySecs, "")
 }
 
 // GeneratePairingTokenWithExpiry generates a pairing token with custom expiry.
 func (tm *TokenManager) GeneratePairingTokenWithExpiry(expirySecs int) (string, time.Time, error) {
-	return tm.generateToken(TokenTypePairing, expirySecs)
+	return tm.generateToken(TokenTypePairing, expirySecs, "")
 }
 
 // GenerateSessionToken generates a new session token (shorter expiry).
 func (tm *TokenManager) GenerateSessionToken() (string, time.Time, error) {
 	// Session tokens have shorter expiry (5 minutes default)
-	return tm.generateToken(TokenTypeSession, 300)
+	return tm.generateToken(TokenTypeSession, 300, "")
 }
 
 // GenerateAccessToken generates a new access token.
 func (tm *TokenManager) GenerateAccessToken() (string, time.Time, error) {
-	return tm.generateToken(TokenTypeAccess, DefaultAccessTokenExpiry)
+	return tm.generateToken(TokenTypeAccess, DefaultAccessTokenExpiry, "")
 }
 
 // GenerateRefreshToken generates a new refresh token.
 func (tm *TokenManager) GenerateRefreshToken() (string, time.Time, error) {
-	return tm.generateToken(TokenTypeRefresh, DefaultRefreshTokenExpiry)
+	return tm.generateToken(TokenTypeRefresh, DefaultRefreshTokenExpiry, "")
 }
 
 // TokenPair represents an access token and refresh token pair.
@@ -215,19 +220,45 @@ type TokenPair struct {
 	AccessTokenExpiry  time.Time `json:"access_token_expires_at"`
 	RefreshToken       string    `json:"refresh_token"`
 	RefreshTokenExpiry time.Time `json:"refresh_token_expires_at"`
+	DeviceID           string    `json:"-"`
+	AccessNonce        string    `json:"-"`
+	RefreshNonce       string    `json:"-"`
 }
 
 // GenerateTokenPair generates a new access/refresh token pair.
 // This is typically called after initial pairing.
 func (tm *TokenManager) GenerateTokenPair() (*TokenPair, error) {
-	accessToken, accessExpiry, err := tm.GenerateAccessToken()
+	deviceID, err := generateRandomString(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate device ID: %w", err)
+	}
+	return tm.GenerateTokenPairWithDeviceID(deviceID)
+}
+
+// GenerateTokenPairWithDeviceID generates a token pair tied to a device ID.
+func (tm *TokenManager) GenerateTokenPairWithDeviceID(deviceID string) (*TokenPair, error) {
+	if deviceID == "" {
+		return nil, fmt.Errorf("device_id is required")
+	}
+
+	accessToken, accessExpiry, err := tm.generateToken(TokenTypeAccess, DefaultAccessTokenExpiry, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshToken, refreshExpiry, err := tm.GenerateRefreshToken()
+	refreshToken, refreshExpiry, err := tm.generateToken(TokenTypeRefresh, DefaultRefreshTokenExpiry, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	accessPayload, err := tm.ValidateToken(accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate access token: %w", err)
+	}
+
+	refreshPayload, err := tm.ValidateToken(refreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate refresh token: %w", err)
 	}
 
 	return &TokenPair{
@@ -235,6 +266,9 @@ func (tm *TokenManager) GenerateTokenPair() (*TokenPair, error) {
 		AccessTokenExpiry:  accessExpiry,
 		RefreshToken:       refreshToken,
 		RefreshTokenExpiry: refreshExpiry,
+		DeviceID:           deviceID,
+		AccessNonce:        accessPayload.Nonce,
+		RefreshNonce:       refreshPayload.Nonce,
 	}, nil
 }
 
@@ -253,7 +287,11 @@ func (tm *TokenManager) RefreshTokenPair(refreshToken string) (*TokenPair, error
 	}
 
 	// Generate new token pair
-	pair, err := tm.GenerateTokenPair()
+	deviceID := payload.DeviceID
+	if deviceID == "" {
+		return nil, fmt.Errorf("refresh token missing device_id")
+	}
+	pair, err := tm.GenerateTokenPairWithDeviceID(deviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +319,11 @@ func (tm *TokenManager) ExchangePairingToken(pairingToken string) (*TokenPair, e
 	}
 
 	// Generate new token pair
-	pair, err := tm.GenerateTokenPair()
+	deviceID, err := generateRandomString(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate device ID: %w", err)
+	}
+	pair, err := tm.GenerateTokenPairWithDeviceID(deviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +337,7 @@ func (tm *TokenManager) ExchangePairingToken(pairingToken string) (*TokenPair, e
 }
 
 // generateToken creates a token of the specified type.
-func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (string, time.Time, error) {
+func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int, deviceID string) (string, time.Time, error) {
 	nonce, err := generateRandomString(16)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to generate nonce: %w", err)
@@ -309,6 +351,7 @@ func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (stri
 		Type:      tokenType,
 		ServerID:  tm.serverID,
 		AgentID:   tm.serverID, // Same as ServerID for local mode
+		DeviceID:  deviceID,
 		IssuedAt:  now.Unix(),
 		ExpiresAt: expiresAt.Unix(),
 		Nonce:     nonce,
@@ -355,8 +398,8 @@ func (tm *TokenManager) generateToken(tokenType TokenType, expirySecs int) (stri
 	return token, expiresAt, nil
 }
 
-// ValidateToken validates a token and returns the payload if valid.
-func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
+// parseTokenPayload decodes and validates the token signature and type without checking revocation or expiry.
+func (tm *TokenManager) parseTokenPayload(token string) (TokenPayload, error) {
 	// Determine token type from prefix
 	var expectedType TokenType
 	var tokenData string
@@ -372,13 +415,13 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 		expectedType = TokenTypeRefresh
 		tokenData = token[len(RefreshTokenPrefix):]
 	default:
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Decode base64
 	combinedJSON, err := base64.RawURLEncoding.DecodeString(tokenData)
 	if err != nil {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Parse combined structure
@@ -387,36 +430,36 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 		Signature string `json:"s"`
 	}
 	if err := json.Unmarshal(combinedJSON, &combined); err != nil {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Decode payload
 	payloadJSON, err := base64.RawURLEncoding.DecodeString(combined.Payload)
 	if err != nil {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Decode signature
 	signature, err := base64.RawURLEncoding.DecodeString(combined.Signature)
 	if err != nil {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Verify signature
 	expectedSig := tm.calculateHMAC(payloadJSON)
 	if !hmac.Equal(signature, expectedSig) {
-		return nil, ErrInvalidToken
+		return TokenPayload{}, ErrInvalidToken
 	}
 
 	// Parse payload
 	var payload TokenPayload
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
 	}
 
 	// Verify server ID
 	if payload.ServerID != tm.serverID {
-		return nil, ErrInvalidToken
+		return TokenPayload{}, ErrInvalidToken
 	}
 
 	// Verify token type (access and session both use session prefix)
@@ -425,7 +468,17 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 		validType = true
 	}
 	if !validType {
-		return nil, ErrInvalidFormat
+		return TokenPayload{}, ErrInvalidFormat
+	}
+
+	return payload, nil
+}
+
+// ValidateToken validates a token and returns the payload if valid.
+func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
+	payload, err := tm.parseTokenPayload(token)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check if revoked
@@ -446,8 +499,8 @@ func (tm *TokenManager) ValidateToken(token string) (*TokenPayload, error) {
 
 // RevokeToken revokes a token by its nonce.
 func (tm *TokenManager) RevokeToken(token string) error {
-	payload, err := tm.ValidateToken(token)
-	if err != nil && err != ErrExpiredToken {
+	payload, err := tm.parseTokenPayload(token)
+	if err != nil {
 		return err
 	}
 
@@ -458,12 +511,27 @@ func (tm *TokenManager) RevokeToken(token string) error {
 	return nil
 }
 
+// RevokeTokenByNonce revokes a token by nonce without validating the token.
+func (tm *TokenManager) RevokeTokenByNonce(nonce string) {
+	if nonce == "" {
+		return
+	}
+	tm.mu.Lock()
+	tm.revokedNonces[nonce] = time.Now()
+	tm.mu.Unlock()
+}
+
 // RevokeAllTokens revokes all issued tokens.
 // This is done by regenerating the server secret.
 func (tm *TokenManager) RevokeAllTokens() error {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return fmt.Errorf("failed to regenerate server secret: %w", err)
+	}
+
+	// Persist new secret so tokens remain consistent across restarts.
+	if err := saveSecret(getSecretPath(), tm.serverID, secret); err != nil {
+		return fmt.Errorf("failed to persist token secret: %w", err)
 	}
 
 	tm.mu.Lock()

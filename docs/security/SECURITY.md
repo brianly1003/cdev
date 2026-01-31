@@ -185,6 +185,7 @@ These endpoints remain unauthenticated to support pairing and token exchange:
 - `/api/pair/*`
 - `/api/auth/exchange`
 - `/api/auth/refresh`
+- `/api/auth/revoke`
 
 ### Token Generation (Implemented)
 
@@ -235,7 +236,7 @@ func generateToken() (string, error) {
 
 ### Regular Maintenance
 
-- [ ] Rotate authentication tokens
+- [ ] Rotate authentication tokens (`cdev auth reset` or POST `/api/pair/refresh`)
 - [ ] Review and clean old logs
 - [ ] Update dependencies
 - [ ] Review logs for anomalies

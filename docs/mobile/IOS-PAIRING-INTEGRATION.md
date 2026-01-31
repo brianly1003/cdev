@@ -24,18 +24,18 @@ When scanning the QR code, the iOS app will receive a JSON payload:
 | `http` | string | Yes | HTTP API base URL |
 | `session` | string | Yes | Server session UUID |
 | `repo` | string | Yes | Repository name |
-| `token` | string | **Conditional** | Authentication token (only present when `require_auth: true`) |
+| `token` | string | **Conditional** | **Pairing token** (only present when `require_auth: true`) |
 
 ### Token Presence
 
-- **Token present**: Server has authentication enabled. Use token for all requests.
+- **Token present**: Server has authentication enabled. The token is a **one-time pairing token** that must be exchanged for access/refresh tokens.
 - **Token absent**: Server allows unauthenticated connections.
 
 ---
 
 ## Authentication Flow
 
-### 1. Check Token Presence
+### 1. Check Token Presence (Pairing Token)
 
 ```swift
 struct PairingInfo: Codable {
@@ -50,27 +50,24 @@ func handleQRScan(_ jsonString: String) {
     let info = try JSONDecoder().decode(PairingInfo.self, from: data)
 
     if let token = info.token {
-        // Auth required - store token securely
-        KeychainService.store(token: token, for: info.session)
+        // Auth required - token is a one-time pairing token
+        // Exchange it for access/refresh tokens (do NOT use it directly for WS/HTTP)
     }
 }
 ```
 
-### 2. WebSocket Connection with Token
+### 2. WebSocket Connection with Access Token
 
-When connecting to WebSocket, include the token as a query parameter:
+When connecting to WebSocket, include the **access token** in the `Authorization` header.
 
 ```swift
-func connect(to info: PairingInfo) {
-    var urlString = info.ws
+func connect(to info: PairingInfo, accessToken: String?) {
+    let url = URL(string: info.ws)!
+    var request = URLRequest(url: url)
 
-    // Append token if available
-    if let token = info.token {
-        urlString += "?token=\(token)"
+    if let accessToken = accessToken {
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     }
-
-    let url = URL(string: urlString)!
-    let request = URLRequest(url: url)
 
     webSocket = URLSession.shared.webSocketTask(with: request)
     webSocket.resume()
@@ -79,19 +76,19 @@ func connect(to info: PairingInfo) {
 
 **WebSocket URL formats:**
 - Without auth: `ws://127.0.0.1:8766/ws`
-- With auth: `ws://127.0.0.1:8766/ws?token=cdev_p_xxx`
+- With auth: `ws://127.0.0.1:8766/ws` (Authorization header required)
 
 ### 3. HTTP API Requests with Token
 
-For HTTP requests, include the token in the `Authorization` header:
+For HTTP requests, include the **access token** in the `Authorization` header:
 
 ```swift
 func makeAPIRequest(to endpoint: String, info: PairingInfo) -> URLRequest {
     let url = URL(string: "\(info.http)\(endpoint)")!
     var request = URLRequest(url: url)
 
-    if let token = info.token {
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    if let accessToken = accessToken {
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
     }
 
     return request
@@ -111,7 +108,15 @@ These endpoints are always accessible without authentication:
 | `/pair` | GET | HTML pairing page with QR code |
 | `/api/pair/info` | GET | JSON pairing info |
 | `/api/pair/qr` | GET | PNG QR code image |
-| `/api/pair/refresh` | POST | Generate new token (revokes old) |
+| `/api/pair/refresh` | POST | Generate new pairing token (**revokes existing tokens; requires re-pair**) |
+
+### Auth Endpoints (No Auth Required)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/exchange` | POST | Exchange pairing token for access + refresh tokens |
+| `/api/auth/refresh` | POST | Refresh access token using refresh token |
+| `/api/auth/revoke` | POST | Revoke refresh token (explicit disconnect) |
 
 ### Response: `/api/pair/info`
 
@@ -125,6 +130,8 @@ These endpoints are always accessible without authentication:
   "token_expires_at": "2025-12-30T01:00:00Z"
 }
 ```
+
+**Note:** `token` is a **pairing token** only. It must be exchanged via `/api/auth/exchange` before any authenticated WebSocket or HTTP calls.
 
 ### Protected Endpoints (Auth Required When Enabled)
 
@@ -144,7 +151,7 @@ These endpoints are always accessible without authentication:
 
 | Prefix | Type | Expiry | Purpose |
 |--------|------|--------|---------|
-| `cdev_p_` | Pairing token | 1 hour | Initial connection from QR scan |
+| `cdev_p_` | Pairing token | 1 hour | One-time exchange via `/api/auth/exchange` |
 | `cdev_s_` | Access token | 15 min | API/WebSocket authentication |
 | `cdev_r_` | Refresh token | 7 days | Obtain new access tokens |
 
@@ -164,7 +171,7 @@ These endpoints are always accessible without authentication:
                                         │
                     ┌───────────────────┴───────────────────┐
                     │                                       │
-                    ▼ (Every 15 min)                       ▼ (Every 7 days)
+                    ▼ (Every 15 min)                       ▼ (On refresh expiry)
              POST /api/auth/refresh                   Re-scan QR
              with refresh_token                       (or auto-refresh)
 ```
@@ -203,7 +210,7 @@ func exchangePairingToken(baseURL: String, pairingToken: String) async throws ->
 }
 ```
 
-### Step 2: Use Access Token for API Calls
+### Step 2: Use Access Token for API/WS Calls
 
 ```swift
 class APIClient {
@@ -264,11 +271,29 @@ func refreshAccessToken() async throws {
         let pair = try JSONDecoder().decode(TokenPairResponse.self, from: data)
         setTokens(pair)
     case 401:
-        // Refresh token expired - need to re-pair
+        // Refresh token expired/invalid - need to re-pair
         throw AuthError.refreshTokenExpired
     default:
         throw AuthError.refreshFailed
     }
+}
+```
+
+### Step 4: Explicit Disconnect (Revoke Refresh Token)
+
+When the user taps Disconnect, revoke the refresh token so the device session is immediately invalidated:
+
+```swift
+func revokeRefreshToken() async throws {
+    let url = URL(string: "\(baseURL)/api/auth/revoke")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body = ["refresh_token": refreshToken]
+    request.httpBody = try JSONEncoder().encode(body)
+
+    _ = try await URLSession.shared.data(for: request)
 }
 ```
 
@@ -330,12 +355,11 @@ class TokenRefreshManager {
 }
 ```
 
-### Legacy Token Flow
+### Reconnect After cdev Restart
 
-For backwards compatibility, the old pairing token flow still works:
-- QR code pairing token can be used directly for WebSocket/API
-- `/api/pair/refresh` regenerates the QR code pairing token
-- This is simpler but requires re-scanning QR when token expires
+- As long as the **refresh token is valid** (7 days) and the server secret is persisted, iOS can reconnect after multiple cdev restarts **without re-scanning QR**.
+- If refresh fails because the server is temporarily offline, keep using the **existing access token** until it expires, and retry refresh later.
+- If `/api/pair/refresh` is called, `cdev auth reset` is run, or `~/.cdev/token_secret.json` is deleted, **all existing tokens are invalidated** and iOS must re-pair.
 
 ---
 
@@ -345,8 +369,8 @@ For backwards compatibility, the old pairing token flow still works:
 
 | Error | Cause | Resolution |
 |-------|-------|------------|
-| 401 Unauthorized | Missing or invalid token | Re-scan QR code |
-| 403 Forbidden | Token expired | Call `/api/pair/refresh` or re-scan |
+| 401 Unauthorized | Access token missing/invalid | Refresh token; re-pair if refresh fails |
+| 403 Forbidden | Token invalid | Re-pair (token revoked or expired) |
 | Connection refused | Server not running | Show "Server offline" message |
 
 ### HTTP API Errors
@@ -405,24 +429,24 @@ Display parsed pairing info:
 
 ## Testing
 
-### Test with Auth Disabled (Default)
+### Test with Auth Enabled (Default)
 
 ```bash
 ./bin/cdev start
-# QR code will NOT contain token
+# QR code WILL contain pairing token
 ```
 
-### Test with Auth Enabled
+### Test with Auth Disabled
 
 ```bash
-# Create config with auth
+# Create config with auth disabled
 cat > ~/.cdev/config.yaml << EOF
 security:
-  require_auth: true
+  require_auth: false
 EOF
 
 ./bin/cdev start
-# QR code WILL contain token
+# QR code will NOT contain token
 ```
 
 ### Verify Token in QR
@@ -437,10 +461,11 @@ EOF
 ## Migration Checklist
 
 - [ ] Update `PairingInfo` model to include optional `token` field
-- [ ] Update WebSocket connection to append `?token=` query param
-- [ ] Update HTTP requests to include `Authorization: Bearer` header
+- [ ] Exchange pairing token for access/refresh pair (`/api/auth/exchange`)
+- [ ] Update WebSocket connection to include `Authorization: Bearer <access-token>` header
+- [ ] Update HTTP requests to include `Authorization: Bearer <access-token>` header
 - [ ] Add token storage in Keychain
-- [ ] Handle 401/403 errors with re-scan prompt
+- [ ] Handle 401/403 errors by refreshing token; re-pair only on refresh failure
 - [ ] Update connection status UI with auth indicator
 - [ ] Test both auth-enabled and auth-disabled modes
 
@@ -507,4 +532,4 @@ For detailed token architecture, see [TOKEN-ARCHITECTURE.md](../security/TOKEN-A
 
 ---
 
-*cdev iOS Pairing Integration Guide v1.1*
+*cdev iOS Pairing Integration Guide v1.3*

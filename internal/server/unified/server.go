@@ -202,8 +202,10 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate token if authentication is required
+	var authPayload *security.TokenPayload
 	if s.requireAuth {
-		if err := s.validateTokenFromRequest(r); err != nil {
+		payload, err := s.validateTokenFromRequest(r)
+		if err != nil {
 			log.Warn().
 				Err(err).
 				Str("remote_addr", r.RemoteAddr).
@@ -211,6 +213,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		authPayload = payload
 	}
 
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
@@ -230,6 +233,9 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 		s.removeClient(id)
 	})
+	if authPayload != nil {
+		client.SetAuthPayload(authPayload)
+	}
 
 	// Wrap in FilteredSubscriber for workspace filtering support
 	filtered := hub.NewFilteredSubscriber(client)
@@ -545,9 +551,9 @@ func isLocalhostOrigin(origin string) bool {
 
 // validateTokenFromRequest extracts and validates a token from the request.
 // Token must be provided in Authorization header (Bearer token).
-func (s *Server) validateTokenFromRequest(r *http.Request) error {
+func (s *Server) validateTokenFromRequest(r *http.Request) (*security.TokenPayload, error) {
 	if s.tokenManager == nil {
-		return fmt.Errorf("token manager not configured")
+		return nil, fmt.Errorf("token manager not configured")
 	}
 
 	token := ""
@@ -562,27 +568,28 @@ func (s *Server) validateTokenFromRequest(r *http.Request) error {
 	}
 
 	if token == "" {
-		return fmt.Errorf("no token provided")
+		return nil, fmt.Errorf("no token provided")
 	}
 
 	payload, err := s.tokenManager.ValidateToken(token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if payload.Type != security.TokenTypeSession && payload.Type != security.TokenTypeAccess {
-		return fmt.Errorf("invalid token type")
+		return nil, fmt.Errorf("invalid token type")
 	}
-	return nil
+	return payload, nil
 }
 
 // UnifiedClient represents a JSON-RPC 2.0 WebSocket client.
 type UnifiedClient struct {
-	id         string
-	conn       *websocket.Conn
-	send       chan []byte
-	done       chan struct{}
-	dispatcher *handler.Dispatcher
-	onClose    func(id string)
+	id          string
+	conn        *websocket.Conn
+	send        chan []byte
+	done        chan struct{}
+	dispatcher  *handler.Dispatcher
+	onClose     func(id string)
+	authPayload *security.TokenPayload
 
 	mu     sync.Mutex
 	closed bool
@@ -607,6 +614,11 @@ func NewUnifiedClient(
 // ID returns the client ID.
 func (c *UnifiedClient) ID() string {
 	return c.id
+}
+
+// SetAuthPayload stores the auth payload for this client connection.
+func (c *UnifiedClient) SetAuthPayload(payload *security.TokenPayload) {
+	c.authPayload = payload
 }
 
 // Start starts the client's read and write loops.
@@ -756,8 +768,11 @@ func (c *UnifiedClient) handleJSONRPC(data []byte) {
 		return
 	}
 
-	// Add client ID to context for methods that need it
+	// Add client ID and auth info to context for methods that need it
 	ctx := context.WithValue(context.Background(), handler.ClientIDKey, c.id)
+	if c.authPayload != nil {
+		ctx = context.WithValue(ctx, handler.AuthPayloadKey, c.authPayload)
+	}
 	response, err := c.dispatcher.HandleMessage(ctx, data)
 	if err != nil {
 		log.Warn().Err(err).Str("client_id", c.id).Msg("JSON-RPC dispatch error")

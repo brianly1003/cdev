@@ -166,8 +166,9 @@ func (s *Server) SetAuthHandler(handler *AuthHandler) {
 	// Register auth routes (no authentication required - they handle their own validation)
 	s.mux.HandleFunc("/api/auth/exchange", handler.HandleExchange)
 	s.mux.HandleFunc("/api/auth/refresh", handler.HandleRefresh)
+	s.mux.HandleFunc("/api/auth/revoke", handler.HandleRevoke)
 
-	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh")
+	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh, /api/auth/revoke")
 }
 
 // SetDebugHandler sets up debug and profiling endpoints.

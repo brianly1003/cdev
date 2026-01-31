@@ -12,6 +12,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain/ports"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/workspace"
 )
@@ -29,14 +30,16 @@ type WorkspaceConfigService struct {
 	configManager  *workspace.ConfigManager
 	viewerProvider SessionViewerProvider
 	hub            ports.EventHub
+	authRegistry   *security.AuthRegistry
 }
 
 // NewWorkspaceConfigService creates a new workspace config service.
-func NewWorkspaceConfigService(sessionManager *session.Manager, configManager *workspace.ConfigManager, hub ports.EventHub) *WorkspaceConfigService {
+func NewWorkspaceConfigService(sessionManager *session.Manager, configManager *workspace.ConfigManager, hub ports.EventHub, authRegistry *security.AuthRegistry) *WorkspaceConfigService {
 	return &WorkspaceConfigService{
 		sessionManager: sessionManager,
 		configManager:  configManager,
 		hub:            hub,
+		authRegistry:   authRegistry,
 	}
 }
 
@@ -510,6 +513,12 @@ func (s *WorkspaceConfigService) Add(ctx context.Context, params json.RawMessage
 	// Register with session manager
 	s.sessionManager.RegisterWorkspace(ws)
 
+	if err := s.bindWorkspaceToDevice(ctx, ws.Definition.ID); err != nil {
+		_ = s.sessionManager.UnregisterWorkspace(ws.Definition.ID)
+		_ = s.configManager.RemoveWorkspace(ws.Definition.ID)
+		return nil, message.NewError(message.InternalError, err.Error())
+	}
+
 	// Build response with git state info
 	response := map[string]interface{}{
 		"id":         ws.Definition.ID,
@@ -587,6 +596,12 @@ func (s *WorkspaceConfigService) Remove(ctx context.Context, params json.RawMess
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
+	if s.authRegistry != nil {
+		if err := s.authRegistry.UnbindWorkspace(p.WorkspaceID); err != nil {
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+	}
+
 	// Broadcast workspace_removed event to all clients
 	if s.hub != nil {
 		event := events.NewWorkspaceRemovedEvent(ws.Definition.ID, ws.Definition.Name, ws.Definition.Path)
@@ -597,6 +612,22 @@ func (s *WorkspaceConfigService) Remove(ctx context.Context, params json.RawMess
 		"success": true,
 		"message": "Workspace removed",
 	}, nil
+}
+
+func (s *WorkspaceConfigService) bindWorkspaceToDevice(ctx context.Context, workspaceID string) error {
+	if s.authRegistry == nil {
+		return nil
+	}
+
+	payload, _ := ctx.Value(handler.AuthPayloadKey).(*security.TokenPayload)
+	if payload == nil {
+		return nil
+	}
+	if payload.DeviceID == "" {
+		return fmt.Errorf("token missing device_id; re-pair required")
+	}
+
+	return s.authRegistry.BindWorkspace(payload.DeviceID, workspaceID)
 }
 
 // Update updates workspace settings.

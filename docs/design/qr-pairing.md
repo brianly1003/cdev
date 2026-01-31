@@ -30,11 +30,10 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 
 ### Current Limitations
 
-- No `/api/pair` or `/pair` HTTP endpoint
-- No `cdev pair` command to regenerate QR on demand
-- No token expiry/rotation mechanism
-- No device management
-- QR only visible in terminal (not accessible via web for tunnels)
+- Device management CLI not implemented (`cdev devices ...`)
+- QR SVG endpoint not implemented (`/api/pair/qr?format=svg`)
+- Pairing page shows a refresh timer but does not display token expiry details
+- CLI output needs explicit `server.external_url` or `--external-url` to show public tunnel URLs
 
 ## Industry Patterns Comparison
 
@@ -46,7 +45,7 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 | **Home Assistant** | Web page | On-demand `/pair` page | One-time token | Medium |
 | **Tailscale** | Account-based | No QR | OAuth | High |
 | **ngrok** | URL display | Terminal output | URL-based | Low |
-| **cdev (current)** | Auto on start | Terminal output | None | Low |
+| **cdev (current)** | Auto + on-demand | Terminal + `/pair` | One-time pairing token + refresh tokens | Medium |
 
 ### Analysis
 
@@ -69,10 +68,13 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 │  $ cdev start --no-qr      → Silent start                           │
 │  $ cdev pair               → Show QR on demand                      │
 │  $ cdev pair --refresh     → New token + QR                         │
+│  $ cdev pair --page        → Print pairing page URL                 │
+│  $ cdev pair --external-url https://<tunnel>  → Public URLs         │
 │                                                                     │
 │  Option 2: Web Page (new)                                           │
 │  ────────────────────────────                                       │
-│  http://localhost:8766/pair                                         │
+│  http://localhost:8766/pair (local)                                 │
+│  https://<tunnel>/pair (remote)                                     │
 │  ├── Shows QR code in browser                                       │
 │  ├── Works with VS Code port forwarding                             │
 │  ├── Auto-refresh option                                            │
@@ -83,6 +85,7 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 │  GET /api/pair/info        → JSON with connection details           │
 │  GET /api/pair/qr          → QR code as PNG image                   │
 │  POST /api/pair/refresh    → Generate new token                     │
+│  POST /api/auth/revoke     → Revoke refresh token (disconnect)      │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -93,6 +96,12 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 
 ```bash
 cdev start                    # Shows QR by default (if configured)
+cdev pair                     # Show QR code in terminal
+cdev pair --refresh           # Generate new token + show QR
+cdev pair --json              # Output connection info as JSON
+cdev pair --url               # Output connection URL only
+cdev pair --page              # Output pairing page URL (/pair)
+cdev pair --external-url https://<tunnel>  # Override public URL
 ```
 
 ### Recommended Commands
@@ -108,6 +117,8 @@ cdev pair                     # Show QR code in terminal
 cdev pair --refresh           # Generate new token + show QR
 cdev pair --json              # Output connection info as JSON
 cdev pair --url               # Output connection URL only
+cdev pair --page              # Output pairing page URL (/pair)
+cdev pair --external-url https://<tunnel>  # Override public URL
 
 # Future: Device management
 cdev devices list             # List paired devices
@@ -118,17 +129,21 @@ cdev devices revoke <id>      # Revoke device access
 
 ### Current Endpoints
 
-None for pairing.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/pair` | GET | HTML page with QR code |
+| `/api/pair/info` | GET | JSON connection info |
+| `/api/pair/qr` | GET | PNG QR code |
+| `/api/pair/refresh` | POST | Generate new pairing token (revokes existing tokens) |
+| `/api/auth/exchange` | POST | Exchange pairing token for access + refresh tokens |
+| `/api/auth/refresh` | POST | Refresh access token using refresh token |
+| `/api/auth/revoke` | POST | Revoke refresh token (explicit disconnect) |
 
 ### Recommended Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/pair` | GET | HTML page with QR code |
-| `/api/pair/info` | GET | JSON connection info |
-| `/api/pair/qr` | GET | PNG QR code image |
 | `/api/pair/qr?format=svg` | GET | SVG QR code |
-| `/api/pair/refresh` | POST | Generate new token |
 
 ### `/api/pair/info` Response
 
@@ -251,17 +266,17 @@ pairing:
 
 | Feature | Status | Effort |
 |---------|--------|--------|
-| Add `cdev pair` command | Pending | Low |
+| Add `cdev pair` command | Done | Low |
 | Add `--no-qr` flag to start | Pending | Low |
-| Add `/api/pair/info` endpoint | Pending | Low |
-| Add `/api/pair/qr` endpoint | Pending | Low |
+| Add `/api/pair/info` endpoint | Done | Low |
+| Add `/api/pair/qr` endpoint | Done | Low |
 
 ### Phase 2: Web Pairing
 
 | Feature | Status | Effort |
 |---------|--------|--------|
-| Add `/pair` HTML page | Pending | Medium |
-| QR code refresh button | Pending | Low |
+| Add `/pair` HTML page | Done | Medium |
+| QR code refresh button | Done | Low |
 | Copy URL functionality | Pending | Low |
 | Token expiry display | Pending | Low |
 
@@ -269,9 +284,9 @@ pairing:
 
 | Feature | Status | Effort |
 |---------|--------|--------|
-| Token validation on connect | Pending | Medium |
-| Token refresh mechanism | Pending | Medium |
-| Connection authentication | Pending | Medium |
+| Token validation on connect | Done | Medium |
+| Token refresh mechanism | Done | Medium |
+| Connection authentication | Done | Medium |
 
 ### Phase 4: Device Management (Future)
 
@@ -301,7 +316,7 @@ Scan QR code with cdev mobile app:
 
 ```bash
 # Developer uses VS Code tunnel, needs web-based QR
-$ cdev start --external-http-url https://my-tunnel.devtunnels.ms
+$ cdev start --external-url https://my-tunnel.devtunnels.ms
 
 # On mobile browser, open:
 # https://my-tunnel.devtunnels.ms/pair
@@ -343,19 +358,18 @@ Scan QR code with cdev mobile app:
 | Aspect | Current | Recommended |
 |--------|---------|-------------|
 | Auto-show QR on start | ✅ Implemented | Keep as default |
-| On-demand regeneration | ❌ Missing | Add `cdev pair` command |
-| Web-based pairing | ❌ Missing | Add `/pair` page |
-| Token mechanism | ❌ Missing | Add for security |
-| API endpoints | ❌ Missing | Add `/api/pair/*` |
+| On-demand regeneration | ✅ Implemented | Keep as default |
+| Web-based pairing | ✅ Implemented | Keep as default |
+| Token mechanism | ✅ Implemented | Keep as default |
+| API endpoints | ✅ Implemented | Keep as default |
 
 ### Verdict
 
-**Current approach (auto-QR on start) is acceptable** for a development tool, similar to Expo Go. However, it should be enhanced with:
+**Current approach (auto-QR on start) is acceptable** for a development tool, similar to Expo Go. However, it can still be enhanced with:
 
-1. **`cdev pair` command** - On-demand QR display
-2. **`/pair` web page** - For tunnel/remote scenarios
-3. **`--no-qr` flag** - For scripting/headless use
-4. **Token support** - Optional security enhancement
+1. **`--no-qr` flag** - For scripting/headless use
+2. **Token expiry display** - Optional UI improvement
+3. **Device management** - Future device list/revoke
 
 ## References
 

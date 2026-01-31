@@ -13,12 +13,16 @@ import (
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
 	tokenManager *security.TokenManager
+	registry     *security.AuthRegistry
+	onOrphaned   func([]string, string)
 }
 
 // NewAuthHandler creates a new auth handler.
-func NewAuthHandler(tm *security.TokenManager) *AuthHandler {
+func NewAuthHandler(tm *security.TokenManager, registry *security.AuthRegistry, onOrphaned func([]string, string)) *AuthHandler {
 	return &AuthHandler{
 		tokenManager: tm,
+		registry:     registry,
+		onOrphaned:   onOrphaned,
 	}
 }
 
@@ -29,6 +33,11 @@ type TokenExchangeRequest struct {
 
 // TokenRefreshRequest is the request body for token refresh.
 type TokenRefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// TokenRevokeRequest is the request body for token revocation.
+type TokenRevokeRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
@@ -75,6 +84,12 @@ func (h *AuthHandler) HandleExchange(w http.ResponseWriter, r *http.Request) {
 		log.Warn().Err(err).Msg("Token exchange failed")
 		writeJSONError(w, "Invalid or expired pairing token", http.StatusUnauthorized)
 		return
+	}
+
+	if h.registry != nil {
+		if err := h.registry.RegisterDevice(pair.DeviceID, pair.RefreshNonce, pair.RefreshTokenExpiry, pair.AccessNonce, pair.AccessTokenExpiry); err != nil {
+			log.Warn().Err(err).Msg("failed to register device tokens")
+		}
 	}
 
 	resp := TokenPairResponse{
@@ -125,6 +140,12 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.registry != nil {
+		if err := h.registry.RegisterDevice(pair.DeviceID, pair.RefreshNonce, pair.RefreshTokenExpiry, pair.AccessNonce, pair.AccessTokenExpiry); err != nil {
+			log.Warn().Err(err).Msg("failed to update device tokens")
+		}
+	}
+
 	resp := TokenPairResponse{
 		AccessToken:        pair.AccessToken,
 		AccessTokenExpiry:  pair.AccessTokenExpiry.Format(time.RFC3339),
@@ -136,6 +157,71 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// HandleRevoke revokes a refresh token and clears any workspace bindings for the device.
+// @Summary Revoke refresh token
+// @Description Revokes the refresh token for a device and releases any workspace bindings.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body TokenRevokeRequest true "Refresh token"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/auth/revoke [post]
+func (h *AuthHandler) HandleRevoke(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req TokenRevokeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		writeJSONError(w, "refresh_token is required", http.StatusBadRequest)
+		return
+	}
+
+	payload, err := h.tokenManager.ValidateToken(req.RefreshToken)
+	if err != nil {
+		log.Warn().Err(err).Msg("Token revoke failed")
+		writeJSONError(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+		return
+	}
+	if payload.Type != security.TokenTypeRefresh {
+		writeJSONError(w, "refresh_token is required", http.StatusBadRequest)
+		return
+	}
+
+	h.tokenManager.RevokeTokenByNonce(payload.Nonce)
+
+	var orphaned []string
+	if h.registry != nil && payload.DeviceID != "" {
+		if session, ok := h.registry.GetDevice(payload.DeviceID); ok && session != nil {
+			if session.AccessNonce != "" {
+				h.tokenManager.RevokeTokenByNonce(session.AccessNonce)
+			}
+		}
+
+		orphaned, err = h.registry.RemoveDevice(payload.DeviceID)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to remove device from registry")
+		}
+		if len(orphaned) > 0 && h.onOrphaned != nil {
+			h.onOrphaned(orphaned, "device revoked")
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":             true,
+		"orphaned_workspaces": orphaned,
+	})
 }
 
 // writeJSONError writes a JSON error response.

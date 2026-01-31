@@ -8,6 +8,20 @@ The cdev agent provides HTTP endpoints for uploading images that can be used wit
 
 > **Important:** All image operations require a `workspace_id` query parameter to specify which workspace the images belong to.
 
+## Authentication
+
+When `security.require_auth = true` (default), **all `/api/images` requests require a bearer access token**.
+Pairing tokens are **not** valid for image upload; they must be exchanged first via `/api/auth/exchange`.
+See `docs/mobile/IOS-PAIRING-INTEGRATION.md` for the full pairing + token exchange flow.
+
+Include this header on every request:
+
+```
+Authorization: Bearer <access-token>
+```
+
+If auth is disabled (`security.require_auth = false`), the `Authorization` header is not required.
+
 ## API Endpoints
 
 ### Upload Image
@@ -15,6 +29,7 @@ The cdev agent provides HTTP endpoints for uploading images that can be used wit
 ```
 POST /api/images?workspace_id=<workspace_id>
 Content-Type: multipart/form-data
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -65,10 +80,19 @@ Header: `Retry-After: 60`
 }
 ```
 
+**Response (Unauthorized - 401):**
+```json
+{
+  "error": "unauthorized",
+  "message": "Unauthorized"
+}
+```
+
 ### List Images
 
 ```
 GET /api/images?workspace_id=<workspace_id>
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -98,6 +122,7 @@ GET /api/images?workspace_id=<workspace_id>
 
 ```
 GET /api/images?workspace_id=<workspace_id>&id=abc123def456
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -120,6 +145,7 @@ GET /api/images?workspace_id=<workspace_id>&id=abc123def456
 
 ```
 DELETE /api/images?workspace_id=<workspace_id>&id=abc123def456
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -139,6 +165,7 @@ DELETE /api/images?workspace_id=<workspace_id>&id=abc123def456
 
 ```
 GET /api/images/stats?workspace_id=<workspace_id>
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -161,6 +188,7 @@ GET /api/images/stats?workspace_id=<workspace_id>
 
 ```
 DELETE /api/images/all?workspace_id=<workspace_id>
+Authorization: Bearer <access-token>
 ```
 
 **Query Parameters:**
@@ -181,16 +209,21 @@ DELETE /api/images/all?workspace_id=<workspace_id>
 
 ### Swift Upload Example
 
+Assumes you already exchanged the pairing token for an access token and keep it refreshed
+(see `docs/mobile/IOS-PAIRING-INTEGRATION.md`).
+
 ```swift
 import Foundation
 
 class ImageUploader {
     private let baseURL: URL
     private let workspaceID: String
+    private let accessToken: String?
 
-    init(host: String, port: Int, workspaceID: String) {
+    init(host: String, port: Int, workspaceID: String, accessToken: String?) {
         self.baseURL = URL(string: "http://\(host):\(port)")!
         self.workspaceID = workspaceID
+        self.accessToken = accessToken
     }
 
     func uploadImage(_ imageData: Data, mimeType: String) async throws -> ImageUploadResponse {
@@ -202,6 +235,9 @@ class ImageUploader {
 
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let accessToken {
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
 
         var body = Data()
 
@@ -379,12 +415,14 @@ This section outlines what the cdev-ios team needs to implement for image upload
 ### API Integration Notes
 
 **Important:** All image operations use **HTTP REST API**, not JSON-RPC WebSocket.
+When auth is enabled, include `Authorization: Bearer <access-token>` on every request.
 
 ```swift
 // Base URL from connection settings
 let baseURL = "http://\(host):\(port)"
 
 // Endpoints to implement (all require workspace_id parameter):
+// Headers: Authorization: Bearer <access-token>
 POST   /api/images?workspace_id=xxx           // Upload (multipart/form-data)
 GET    /api/images?workspace_id=xxx           // List all images
 GET    /api/images?workspace_id=xxx&id=yyy    // Get single image info
@@ -482,6 +520,8 @@ struct ImageErrorResponse: Codable {
 |-----------|-----------|--------------|--------|
 | 400 | `missing_workspace_id` | "Workspace ID required" | Ensure workspace_id param is included |
 | 400 | `invalid_workspace` | "Workspace not found" | Verify workspace is registered |
+| 401 | `unauthorized` | "Unauthorized" | Add/refresh access token; re-pair if refresh fails |
+| 403 | `forbidden` | "Forbidden" | Re-pair (token revoked or expired) |
 | 429 | `rate_limit_exceeded` | "Too many uploads. Please wait." | Show countdown timer using `Retry-After` header |
 | 413 | `image_too_large` | "Image exceeds 10MB limit" | Suggest compressing or choosing smaller image |
 | 415 | `unsupported_type` | "Unsupported format" | Show supported formats: JPEG, PNG, GIF, WebP |
@@ -593,6 +633,7 @@ let prompt = constructPrompt(
 - [ ] Handle rapid uploads with 429 rate limit
 - [ ] Handle missing workspace_id with 400 error
 - [ ] Handle invalid workspace_id with 400 error
+- [ ] Handle missing/expired access token with 401/403 errors
 - [ ] Verify image path works in Claude prompt
 - [ ] Test multiple images in single prompt
 - [ ] Delete single image with workspace_id

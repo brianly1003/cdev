@@ -15,6 +15,8 @@ type ContextKey string
 const (
 	// ClientIDKey is the context key for the client ID.
 	ClientIDKey ContextKey = "client_id"
+	// AuthPayloadKey is the context key for the auth token payload.
+	AuthPayloadKey ContextKey = "auth_payload"
 )
 
 // HandlerFunc is the signature for RPC method handlers.

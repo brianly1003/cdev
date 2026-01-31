@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/config"
@@ -18,9 +19,11 @@ import (
 )
 
 var (
-	pairJSON    bool
-	pairURL     bool
-	pairRefresh bool
+	pairJSON        bool
+	pairURL         bool
+	pairPage        bool
+	pairRefresh     bool
+	pairExternalURL string
 )
 
 // pairCmd displays QR code for mobile pairing.
@@ -45,7 +48,9 @@ func init() {
 
 	pairCmd.Flags().BoolVar(&pairJSON, "json", false, "output pairing info as JSON")
 	pairCmd.Flags().BoolVar(&pairURL, "url", false, "output connection URL only")
+	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (/pair)")
 	pairCmd.Flags().BoolVar(&pairRefresh, "refresh", false, "generate new session ID (ignore running server)")
+	pairCmd.Flags().StringVar(&pairExternalURL, "external-url", "", "override external URL for pairing output")
 }
 
 // serverPairingInfo represents the response from /api/pair/info
@@ -82,7 +87,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 
 	// If no server or --refresh, generate new pairing info
 	if info == nil {
-		info = generatePairingInfo(cfg)
+		info = generatePairingInfo(cfg, pairExternalURL)
 		if pairRefresh {
 			fmt.Fprintln(os.Stderr, "Generated new session ID (not connected to running server)")
 		} else {
@@ -92,9 +97,17 @@ func runPair(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr, "Connected to running cdev server")
 	}
 
+	if pairExternalURL != "" {
+		applyExternalURL(info, pairExternalURL)
+	}
+
 	// Output based on flags
 	if pairJSON {
 		return outputJSON(info)
+	}
+
+	if pairPage {
+		return outputPairPage(info)
 	}
 
 	if pairURL {
@@ -134,7 +147,7 @@ func getPairingFromServer(cfg *config.Config) (*serverPairingInfo, error) {
 	return &info, nil
 }
 
-func generatePairingInfo(cfg *config.Config) *pairing.PairingInfo {
+func generatePairingInfo(cfg *config.Config, externalURL string) *pairing.PairingInfo {
 	// Generate new session ID
 	sessionID := uuid.New().String()
 
@@ -153,7 +166,9 @@ func generatePairingInfo(cfg *config.Config) *pairing.PairingInfo {
 	)
 
 	// Set external URL if configured
-	if cfg.Server.ExternalURL != "" {
+	if externalURL != "" {
+		gen.SetExternalURL(externalURL)
+	} else if cfg.Server.ExternalURL != "" {
 		gen.SetExternalURL(cfg.Server.ExternalURL)
 	}
 
@@ -172,6 +187,12 @@ func outputJSON(info *pairing.PairingInfo) error {
 func outputURL(info *pairing.PairingInfo) error {
 	fmt.Printf("WebSocket: %s\n", info.WebSocket)
 	fmt.Printf("HTTP:      %s\n", info.HTTP)
+	return nil
+}
+
+func outputPairPage(info *pairing.PairingInfo) error {
+	base := strings.TrimRight(info.HTTP, "/")
+	fmt.Printf("%s/pair\n", base)
 	return nil
 }
 
@@ -210,6 +231,22 @@ func outputQR(info *pairing.PairingInfo) error {
 	fmt.Println()
 
 	return nil
+}
+
+func applyExternalURL(info *pairing.PairingInfo, externalURL string) {
+	if info == nil || externalURL == "" {
+		return
+	}
+	base := strings.TrimRight(externalURL, "/")
+	info.HTTP = base
+
+	wsURL := base
+	if strings.HasPrefix(wsURL, "https://") {
+		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+	} else if strings.HasPrefix(wsURL, "http://") {
+		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	}
+	info.WebSocket = wsURL + "/ws"
 }
 
 func truncate(s string, maxLen int) string {

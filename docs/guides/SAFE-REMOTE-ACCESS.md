@@ -44,6 +44,7 @@ ssh -L 8766:localhost:8766 user@devmachine
 ### VS Code port forwarding
 - Forward port `8766`
 - Set `security.allowed_origins` to the VS Code tunnel domain
+- Open the pairing page via the tunnel URL (e.g. `https://<tunnel>/pair`) so the QR embeds the public URL
 
 ### Cloudflare / ngrok / other
 - Terminate TLS at the tunnel
@@ -66,12 +67,14 @@ Authorization: Bearer <access-token>
 - `/api/pair/*`
 - `/api/auth/exchange`
 - `/api/auth/refresh`
+- `/api/auth/revoke`
 
 **Token flow:**
 1. Pairing token is displayed at `/pair` (QR code) or `/api/pair/info`.
 2. Exchange via `POST /api/auth/exchange` with `{ "pairing_token": "..." }`.
 3. Use returned access token for all HTTP + WebSocket requests.
 4. Refresh via `POST /api/auth/refresh`.
+5. On explicit disconnect, revoke via `POST /api/auth/revoke`.
 
 **Note:** Query‑string tokens are not supported.
 

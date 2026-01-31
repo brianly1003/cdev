@@ -3,7 +3,10 @@ package http
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/pairing"
@@ -17,14 +20,18 @@ type PairingHandler struct {
 	tokenManager *security.TokenManager
 	requireAuth  bool
 	pairingInfo  func() *pairing.PairingInfo
+	// allowRequestExternal enables deriving HTTP/WS URLs from request headers
+	// when no explicit external URL is configured.
+	allowRequestExternal bool
 }
 
 // NewPairingHandler creates a new pairing handler.
-func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pairingInfoFn func() *pairing.PairingInfo) *PairingHandler {
+func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pairingInfoFn func() *pairing.PairingInfo, allowRequestExternal bool) *PairingHandler {
 	return &PairingHandler{
-		tokenManager: tokenManager,
-		requireAuth:  requireAuth,
-		pairingInfo:  pairingInfoFn,
+		tokenManager:         tokenManager,
+		requireAuth:          requireAuth,
+		pairingInfo:          pairingInfoFn,
+		allowRequestExternal: allowRequestExternal,
 	}
 }
 
@@ -43,7 +50,7 @@ func (h *PairingHandler) HandlePairInfo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	info := h.pairingInfo()
+	info := h.pairingInfoForRequest(r)
 	if info == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 			"error": "Pairing info not available",
@@ -87,7 +94,7 @@ func (h *PairingHandler) HandlePairQR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	info := h.pairingInfo()
+	info := h.pairingInfoForRequest(r)
 	if info == nil {
 		http.Error(w, "Pairing info not available", http.StatusServiceUnavailable)
 		return
@@ -158,7 +165,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	info := h.pairingInfo()
+	info := h.pairingInfoForRequest(r)
 	if info == nil {
 		http.Error(w, "Pairing info not available", http.StatusServiceUnavailable)
 		return
@@ -579,4 +586,111 @@ func parseInt(s string) (int, error) {
 		n = n*10 + int(c-'0')
 	}
 	return n, nil
+}
+
+func (h *PairingHandler) pairingInfoForRequest(r *http.Request) *pairing.PairingInfo {
+	info := h.pairingInfo()
+	if info == nil || r == nil || !h.allowRequestExternal {
+		return info
+	}
+
+	if !shouldOverridePairingInfo(info) {
+		return info
+	}
+
+	baseURL, ok := requestBaseURL(r)
+	if !ok {
+		return info
+	}
+
+	adjusted := *info
+	adjusted.HTTP = baseURL
+	adjusted.WebSocket = deriveWebSocketURL(baseURL)
+	return &adjusted
+}
+
+func shouldOverridePairingInfo(info *pairing.PairingInfo) bool {
+	if info == nil {
+		return false
+	}
+	host := hostFromURL(info.HTTP)
+	if host == "" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return ip.IsLoopback() || ip.IsUnspecified()
+	}
+	switch strings.ToLower(host) {
+	case "localhost", "0.0.0.0":
+		return true
+	default:
+		return false
+	}
+}
+
+func hostFromURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
+}
+
+func requestBaseURL(r *http.Request) (string, bool) {
+	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = r.Host
+	}
+	if host == "" {
+		return "", false
+	}
+
+	proto := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "" {
+		proto = firstForwardedValue(r.Header.Get("X-Forwarded-Scheme"))
+	}
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+
+	proto = strings.ToLower(strings.TrimSpace(proto))
+	if proto != "http" && proto != "https" {
+		return "", false
+	}
+
+	forwardedPort := firstForwardedValue(r.Header.Get("X-Forwarded-Port"))
+	if forwardedPort != "" && !strings.Contains(host, ":") {
+		if (proto == "http" && forwardedPort != "80") || (proto == "https" && forwardedPort != "443") {
+			host = host + ":" + forwardedPort
+		}
+	}
+
+	return proto + "://" + host, true
+}
+
+func deriveWebSocketURL(httpURL string) string {
+	base := strings.TrimRight(httpURL, "/")
+	wsURL := base
+	if strings.HasPrefix(wsURL, "https://") {
+		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
+	} else if strings.HasPrefix(wsURL, "http://") {
+		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	}
+	return wsURL + "/ws"
+}
+
+func firstForwardedValue(value string) string {
+	if value == "" {
+		return ""
+	}
+	parts := strings.Split(value, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(parts[0])
 }
