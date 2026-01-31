@@ -2,11 +2,11 @@
 package claude
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/adapters/jsonl"
 	"github.com/rs/zerolog/log"
 )
 
@@ -240,22 +241,32 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 		info.LastUpdated = stat.ModTime()
 	}
 
-	scanner := bufio.NewScanner(file)
-	// Increase buffer for large lines
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 10*1024*1024)
-
 	messageCount := 0
 	foundSummary := false
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
+	reader := jsonl.NewReader(file, 0)
+
+	for {
+		line, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return SessionInfo{}, err
+		}
+		if line.TooLong {
+			log.Warn().
+				Str("session_id", sessionID).
+				Int("bytes_read", line.BytesRead).
+				Msg("session JSONL line exceeded max size; skipping")
+			continue
+		}
+		if len(line.Data) == 0 {
 			continue
 		}
 
 		var msg sessionMessage
-		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+		if err := json.Unmarshal(line.Data, &msg); err != nil {
 			continue
 		}
 
@@ -278,7 +289,7 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 
 	info.MessageCount = messageCount
 
-	return info, scanner.Err()
+	return info, nil
 }
 
 // truncateSummary truncates a string for display.
@@ -338,20 +349,30 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 
 	var messages []SessionMessage
 
-	scanner := bufio.NewScanner(file)
-	// Increase buffer for large lines
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 10*1024*1024)
+	reader := jsonl.NewReader(file, 0)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
+	for {
+		line, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if line.TooLong {
+			log.Warn().
+				Str("session_id", sessionID).
+				Int("bytes_read", line.BytesRead).
+				Msg("session JSONL line exceeded max size; skipping")
+			continue
+		}
+		if len(line.Data) == 0 {
 			continue
 		}
 
 		// Parse into a map first to check type and extract fields
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := json.Unmarshal(line.Data, &raw); err != nil {
 			log.Debug().Err(err).Msg("failed to parse session message")
 			continue
 		}
@@ -366,7 +387,7 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 		if msgType == "user" || msgType == "assistant" {
 			// Read with camelCase struct, convert to snake_case for API response
 			var rawMsg sessionMessageRaw
-			if err := json.Unmarshal([]byte(line), &rawMsg); err != nil {
+			if err := json.Unmarshal(line.Data, &rawMsg); err != nil {
 				log.Debug().Err(err).Msg("failed to parse session message into struct")
 				continue
 			}
@@ -374,10 +395,6 @@ func GetSessionMessages(repoPath, sessionID string) ([]SessionMessage, error) {
 			msg := SessionMessage(rawMsg)
 			messages = append(messages, msg)
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 
 	return messages, nil

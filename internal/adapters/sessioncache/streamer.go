@@ -2,7 +2,6 @@
 package sessioncache
 
 import (
-	"bufio"
 	"encoding/json"
 	"io"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/brianly1003/cdev/internal/adapters/jsonl"
 
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
@@ -321,29 +322,37 @@ func (s *SessionStreamer) checkForNewContent(completeChan chan<- *completeInfo) 
 		return
 	}
 
-	scanner := bufio.NewScanner(file)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 10*1024*1024) // 10MB max to handle extended thinking
-
 	newOffset := lastOffset
 	messagesEmitted := 0
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		newOffset += int64(len(line)) + 1 // +1 for newline
+	reader := jsonl.NewReader(file, 0)
 
-		if line == "" {
+	for {
+		line, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Warn().Err(err).Msg("error scanning session file")
+			break
+		}
+		newOffset += int64(line.BytesRead)
+
+		if line.TooLong {
+			log.Warn().
+				Str("session_id", sessionID).
+				Int("bytes_read", line.BytesRead).
+				Msg("session JSONL line exceeded max size; skipping")
+			continue
+		}
+		if len(line.Data) == 0 {
 			continue
 		}
 
 		// Parse and emit message
-		if msg := s.parseAndEmitMessage(line, sessionID); msg != nil {
+		if msg := s.parseAndEmitMessage(string(line.Data), sessionID); msg != nil {
 			messagesEmitted++
 		}
-	}
-
-	if scanner.Err() != nil {
-		log.Warn().Err(scanner.Err()).Msg("error scanning session file")
 	}
 
 	// Log state after reading
@@ -396,7 +405,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 		Message    struct {
 			Role       string          `json:"role"`
 			Content    json.RawMessage `json:"content"`
-			Model      string          `json:"model,omitempty"`      // Model used (e.g., "claude-opus-4-5-20251101")
+			Model      string          `json:"model,omitempty"`       // Model used (e.g., "claude-opus-4-5-20251101")
 			StopReason string          `json:"stop_reason,omitempty"` // Also check inside message
 		} `json:"message"`
 	}

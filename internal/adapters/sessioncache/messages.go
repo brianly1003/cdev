@@ -2,15 +2,17 @@
 package sessioncache
 
 import (
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/brianly1003/cdev/internal/adapters/jsonl"
 
 	"github.com/rs/zerolog/log"
 )
@@ -64,13 +66,13 @@ type ImageDimensions struct {
 
 // MessagesPage represents a paginated response.
 type MessagesPage struct {
-	Messages   []CachedMessage `json:"messages"`
-	Total      int             `json:"total"`
-	Limit      int             `json:"limit"`
-	Offset     int             `json:"offset"`
-	HasMore    bool            `json:"has_more"`
-	CacheHit   bool            `json:"cache_hit"`
-	QueryTimeMS float64        `json:"query_time_ms"`
+	Messages    []CachedMessage `json:"messages"`
+	Total       int             `json:"total"`
+	Limit       int             `json:"limit"`
+	Offset      int             `json:"offset"`
+	HasMore     bool            `json:"has_more"`
+	CacheHit    bool            `json:"cache_hit"`
+	QueryTimeMS float64         `json:"query_time_ms"`
 }
 
 // messageSchemaVersion tracks message cache schema changes.
@@ -350,34 +352,46 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 	}
 	defer func() { _ = stmt.Close() }()
 
-	scanner := bufio.NewScanner(file)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 10*1024*1024) // 10MB max to handle extended thinking
-
 	lineNum := 0
 	messageCount := 0
 
 	// Track tool_use calls to link file_path to tool_result
 	toolUseFilePaths := make(map[string]string) // tool_use_id -> file_path
 
-	for scanner.Scan() {
+	reader := jsonl.NewReader(file, 0)
+
+	for {
+		line, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		lineNum++
-		line := scanner.Text()
-		if line == "" {
+		if line.TooLong {
+			log.Warn().
+				Str("session_id", sessionID).
+				Int("line_num", lineNum).
+				Int("bytes_read", line.BytesRead).
+				Msg("session JSONL line exceeded max size; skipping")
+			continue
+		}
+		if len(line.Data) == 0 {
 			continue
 		}
 
 		// Parse just enough to get type and metadata
 		var raw struct {
 			Type      string          `json:"type"`
-			Subtype   string          `json:"subtype,omitempty"`   // "compact_boundary" for context compaction marker
-			UserType  string          `json:"userType,omitempty"`  // "external" for auto-generated messages
+			Subtype   string          `json:"subtype,omitempty"`  // "compact_boundary" for context compaction marker
+			UserType  string          `json:"userType,omitempty"` // "external" for auto-generated messages
 			UUID      string          `json:"uuid,omitempty"`
 			SessionID string          `json:"sessionId,omitempty"`
 			Timestamp string          `json:"timestamp,omitempty"`
 			GitBranch string          `json:"gitBranch,omitempty"`
-			Content   string          `json:"content,omitempty"`   // For system messages
-			IsMeta    bool            `json:"isMeta,omitempty"`    // True for system-generated metadata messages
+			Content   string          `json:"content,omitempty"` // For system messages
+			IsMeta    bool            `json:"isMeta,omitempty"`  // True for system-generated metadata messages
 			Message   json.RawMessage `json:"message"`
 			// toolUseResult contains image metadata for Read tool results
 			ToolUseResult *struct {
@@ -395,7 +409,7 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			} `json:"toolUseResult,omitempty"`
 		}
 
-		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+		if err := json.Unmarshal(line.Data, &raw); err != nil {
 			continue
 		}
 
@@ -510,10 +524,6 @@ func (mc *MessageCache) indexSession(sessionID, filePath string, mtime int64) er
 			continue
 		}
 		messageCount++
-	}
-
-	if err := scanner.Err(); err != nil {
-		return err
 	}
 
 	// Update session metadata
