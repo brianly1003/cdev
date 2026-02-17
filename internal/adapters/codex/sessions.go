@@ -29,6 +29,7 @@ type Message struct {
 	Content   string    `json:"content"`
 	Timestamp time.Time `json:"timestamp"`
 	Source    string    `json:"source"`
+	SessionID string    `json:"session_id"`
 }
 
 type logEntry struct {
@@ -149,6 +150,7 @@ func ParseSessionFile(path string) (SessionInfo, []Message, error) {
 
 	var lastMessage string
 	var lastUpdated time.Time
+	currentSessionID := ""
 
 	reader := jsonl.NewReader(file, 0)
 
@@ -189,6 +191,7 @@ func ParseSessionFile(path string) (SessionInfo, []Message, error) {
 			if err := json.Unmarshal(entry.Payload, &payload); err == nil {
 				if payload.ID != "" {
 					info.SessionID = payload.ID
+					currentSessionID = payload.ID
 				}
 				if payload.Cwd != "" && info.WorkspacePath == "" {
 					info.WorkspacePath = payload.Cwd
@@ -217,6 +220,7 @@ func ParseSessionFile(path string) (SessionInfo, []Message, error) {
 					Content:   content,
 					Timestamp: lastUpdated,
 					Source:    "response_item",
+					SessionID: currentSessionID,
 				}
 				messages = append(messages, msg)
 				info.MessageCount++
@@ -239,6 +243,202 @@ func ParseSessionFile(path string) (SessionInfo, []Message, error) {
 	info.LastUpdated = lastUpdated
 
 	return info, messages, nil
+}
+
+// FindSessionByID locates a session by ID within a workspace scope.
+// Returns session info and the file path for the matching session.
+func FindSessionByID(workspacePath, sessionID string) (*SessionInfo, string, error) {
+	root := SessionsDir(DefaultCodexHome())
+	if _, err := os.Stat(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, "", nil
+		}
+		return nil, "", err
+	}
+
+	absWorkspace, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var matchInfo *SessionInfo
+	var matchPath string
+	errFound := errors.New("codex session found")
+
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(d.Name()), ".jsonl") {
+			return nil
+		}
+
+		info, _, err := ParseSessionFile(path)
+		if err != nil {
+			return nil
+		}
+		if info.SessionID != sessionID {
+			return nil
+		}
+		if info.WorkspacePath == "" {
+			return nil
+		}
+		absCwd, err := filepath.Abs(info.WorkspacePath)
+		if err != nil {
+			return nil
+		}
+		if !isWithinPath(absWorkspace, absCwd) {
+			return nil
+		}
+
+		matchInfo = &info
+		matchPath = path
+		return errFound
+	})
+
+	if err != nil && !errors.Is(err, errFound) {
+		return nil, "", err
+	}
+
+	return matchInfo, matchPath, nil
+}
+
+// GetSessionMessages returns paginated messages for a Codex session.
+func GetSessionMessages(workspacePath, sessionID string, limit, offset int, order string) ([]Message, int, error) {
+	info, path, err := FindSessionByID(workspacePath, sessionID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if info == nil || path == "" {
+		return nil, 0, errors.New("session not found")
+	}
+
+	_, messages, err := ParseSessionFile(path)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total := len(messages)
+	if total == 0 {
+		return []Message{}, 0, nil
+	}
+
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+	if order == "desc" {
+		reversed := make([]Message, len(messages))
+		for i := range messages {
+			reversed[i] = messages[len(messages)-1-i]
+		}
+		messages = reversed
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	if offset >= len(messages) {
+		return []Message{}, total, nil
+	}
+
+	end := offset + limit
+	if end > len(messages) {
+		end = len(messages)
+	}
+
+	return messages[offset:end], total, nil
+}
+
+// DeleteSession deletes a specific Codex session by ID.
+func DeleteSession(workspacePath, sessionID string) error {
+	_, path, err := FindSessionByID(workspacePath, sessionID)
+	if err != nil {
+		return err
+	}
+	if path == "" {
+		return errors.New("session not found")
+	}
+	return os.Remove(path)
+}
+
+// DeleteAllSessions deletes all Codex sessions within a workspace scope.
+func DeleteAllSessions(workspacePath string) (int, error) {
+	root := SessionsDir(DefaultCodexHome())
+	if _, err := os.Stat(root); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	absWorkspace, err := filepath.Abs(workspacePath)
+	if err != nil {
+		return 0, err
+	}
+
+	deleted := 0
+	err = filepath.WalkDir(root, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(d.Name()), ".jsonl") {
+			return nil
+		}
+
+		info, _, err := ParseSessionFile(path)
+		if err != nil {
+			return nil
+		}
+		if info.WorkspacePath == "" {
+			return nil
+		}
+		absCwd, err := filepath.Abs(info.WorkspacePath)
+		if err != nil {
+			return nil
+		}
+		if !isWithinPath(absWorkspace, absCwd) {
+			return nil
+		}
+
+		if err := os.Remove(path); err == nil {
+			deleted++
+		}
+		return nil
+	})
+
+	if err != nil {
+		return deleted, err
+	}
+
+	return deleted, nil
+}
+
+// FormatMessageJSON builds a minimal message JSON payload for clients.
+func FormatMessageJSON(role, content string) (json.RawMessage, error) {
+	payload := map[string]interface{}{
+		"role": role,
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": content,
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
 }
 
 func extractContent(raw json.RawMessage) string {

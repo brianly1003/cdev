@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
+	"github.com/brianly1003/cdev/internal/adapters/codex"
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/repository"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
@@ -51,6 +52,7 @@ type App struct {
 	sessionCache        *sessioncache.Cache
 	messageCache        *sessioncache.MessageCache
 	sessionStreamer     *sessioncache.SessionStreamer
+	codexStreamer       *codex.SessionStreamer
 	repoIndexer         *repository.SQLiteIndexer
 	imageStorageManager *imagestorage.Manager
 	httpServer          *httpserver.Server
@@ -144,6 +146,9 @@ func (a *App) Start(ctx context.Context) error {
 		a.cfg.Claude.SkipPermissions,
 		&a.cfg.Logging.Rotation,
 	)
+	// Codex streamer works with global session index, so initialize it for both
+	// legacy single-repo mode and multi-workspace mode.
+	a.codexStreamer = codex.NewSessionStreamer(a.cfg.Repository.Path, a.hub)
 
 	// Legacy single-repo mode: Initialize repo-dependent components only if repository.path is configured
 	// New multi-workspace mode uses workspace/add API and doesn't require repository.path
@@ -425,6 +430,16 @@ func (a *App) Start(ctx context.Context) error {
 	if a.sessionCache != nil && a.messageCache != nil {
 		sessionService.RegisterProvider(NewClaudeSessionAdapter(a.sessionCache, a.messageCache, a.cfg.Repository.Path))
 	}
+	// Always register Codex adapter - it can discover sessions from all projects
+	// even when no specific repository.path is configured
+	sessionService.RegisterProvider(NewCodexSessionAdapter(a.cfg.Repository.Path))
+	if a.codexStreamer != nil {
+		sessionService.RegisterStreamer("codex", a.codexStreamer)
+	}
+	// Set workspace resolver for session/list to resolve workspace_id to path
+	if a.workspaceConfigManager != nil {
+		sessionService.SetWorkspaceResolver(NewWorkspacePathResolverAdapter(a.workspaceConfigManager))
+	}
 	sessionService.RegisterMethods(rpcRegistry)
 
 	// Workspace config service (workspace/list, workspace/add, etc.)
@@ -433,6 +448,7 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Session manager service (session/start, session/stop, session/send, etc.)
 	sessionManagerService := methods.NewSessionManagerService(a.sessionManager)
+	sessionManagerService.SetSessionService(sessionService)
 	sessionManagerService.RegisterMethods(rpcRegistry)
 
 	// Repository service (repository/search, repository/files/list, etc.)
@@ -448,7 +464,7 @@ func (a *App) Start(ctx context.Context) error {
 			Stop:         a.claudeManager != nil,
 			Respond:      a.claudeManager != nil,
 			Sessions:     a.sessionCache != nil,
-			SessionWatch: a.sessionCache != nil,
+			SessionWatch: a.sessionCache != nil || a.codexStreamer != nil,
 		},
 		Git: &methods.GitCapabilities{
 			Status:   a.gitTracker != nil,
@@ -474,7 +490,7 @@ func (a *App) Start(ctx context.Context) error {
 			Rebuild: a.repoIndexer != nil,
 		},
 		Notifications:   []string{"agent_log", "agent_state", "file_changed", "git_status"},
-		SupportedAgents: []string{"claude"},
+		SupportedAgents: []string{"claude", "codex"},
 	}
 	lifecycleService := methods.NewLifecycleService(a.version, caps)
 	lifecycleService.RegisterMethods(rpcRegistry)
@@ -696,6 +712,9 @@ func (a *App) shutdown() error {
 	// Stop session streamer
 	if a.sessionStreamer != nil {
 		a.sessionStreamer.Close()
+	}
+	if a.codexStreamer != nil {
+		a.codexStreamer.Close()
 	}
 
 	// Stop repository indexer

@@ -14,6 +14,7 @@ This directory contains all project documentation organized by category.
 | Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
 | Safely access remotely | [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) |
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
+| Turn cdev into an AI Agent runtime | [planning/AI-AGENT-RUNTIME-ROADMAP.md](./planning/AI-AGENT-RUNTIME-ROADMAP.md) |
 | **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
 | **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
 | **Integrate iOS app** | [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) |
@@ -62,6 +63,7 @@ docs/
 │   └── TROUBLESHOOTING.md     # Common issues and solutions
 └── planning/                  # Project Management docs
     ├── BACKLOG.md             # Product backlog
+    ├── AI-AGENT-RUNTIME-ROADMAP.md # Transformation plan: controller -> AI Agent runtime
     ├── READINESS-ROADMAP-SOURCE-OF-TRUTH.md # Authoritative readiness/roadmap
     └── POSITIONING-GTM-SOLO-DEV.md # Positioning + go-to-market plan
 ```
@@ -184,6 +186,7 @@ docs/
 | Document | Description |
 |----------|-------------|
 | [planning/BACKLOG.md](./planning/BACKLOG.md) | Product backlog with prioritized work items |
+| [planning/AI-AGENT-RUNTIME-ROADMAP.md](./planning/AI-AGENT-RUNTIME-ROADMAP.md) | Phased plan to evolve cdev into a secure AI Agent runtime |
 | [planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md](./planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md) | **Authoritative** readiness + roadmap status |
 | [planning/POSITIONING-GTM-SOLO-DEV.md](./planning/POSITIONING-GTM-SOLO-DEV.md) | Positioning + go-to-market plan (solo devs) |
 
@@ -232,6 +235,7 @@ docs/
 | TROUBLESHOOTING.md | guides | 1.0 | Current |
 | BACKLOG.md | planning | 1.0 | Active |
 | READINESS-ROADMAP-SOURCE-OF-TRUTH.md | planning | 1.0 | Active |
+| AI-AGENT-RUNTIME-ROADMAP.md | planning | 1.0 | Active |
 | POSITIONING-GTM-SOLO-DEV.md | planning | 1.0 | Draft |
 
 ---

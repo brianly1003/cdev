@@ -4,11 +4,17 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
+	"github.com/brianly1003/cdev/internal/adapters/codex"
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
+	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/rpc/handler/methods"
+	"github.com/brianly1003/cdev/internal/workspace"
 )
 
 // StatusProvider interface implementation for App
@@ -400,7 +406,8 @@ func (a *ClaudeSessionAdapter) AgentType() string {
 }
 
 // ListSessions returns available sessions.
-func (a *ClaudeSessionAdapter) ListSessions(ctx context.Context) ([]methods.SessionInfo, error) {
+// The projectPath parameter is ignored for Claude since it already operates on a single project.
+func (a *ClaudeSessionAdapter) ListSessions(ctx context.Context, projectPath string) ([]methods.SessionInfo, error) {
 	if a.cache == nil {
 		return nil, nil
 	}
@@ -583,6 +590,853 @@ func (a *ClaudeSessionAdapter) DeleteAllSessions(ctx context.Context) (int, erro
 	return a.cache.DeleteAllSessions()
 }
 
+// CodexSessionAdapter implements methods.SessionProvider for Codex CLI sessions.
+// It uses the IndexCache for efficient project-based session discovery with rich metadata.
+type CodexSessionAdapter struct {
+	repoPath   string
+	indexCache *codex.IndexCache
+}
+
+// NewCodexSessionAdapter creates a new Codex session adapter.
+func NewCodexSessionAdapter(repoPath string) *CodexSessionAdapter {
+	return &CodexSessionAdapter{
+		repoPath:   repoPath,
+		indexCache: codex.GetGlobalIndexCache(),
+	}
+}
+
+// AgentType returns the agent type.
+func (a *CodexSessionAdapter) AgentType() string {
+	return "codex"
+}
+
+// ListSessions returns available Codex CLI sessions.
+// If projectPath is provided, filters sessions to that project path.
+// If projectPath is empty, returns ALL sessions from all projects (sorted by modification time).
+// Note: Unlike Claude sessions which are stored per-project, Codex sessions are stored globally
+// in ~/.codex/ so we can discover sessions from all projects regardless of repoPath.
+func (a *CodexSessionAdapter) ListSessions(ctx context.Context, projectPath string) ([]methods.SessionInfo, error) {
+	// If client specifies a project path, filter by that path
+	if projectPath != "" {
+		entries, err := a.indexCache.GetSessionsForProject(projectPath)
+		if err != nil {
+			// Fallback to direct parsing if index cache fails
+			sessions, err := codex.ListSessionsForWorkspace(projectPath)
+			if err != nil {
+				return nil, err
+			}
+			result := make([]methods.SessionInfo, len(sessions))
+			for i, s := range sessions {
+				result[i] = methods.SessionInfo{
+					SessionID:    s.SessionID,
+					AgentType:    "codex",
+					Summary:      s.Summary,
+					MessageCount: s.MessageCount,
+					StartTime:    s.LastUpdated,
+					LastUpdated:  s.LastUpdated,
+					ProjectPath:  s.WorkspacePath,
+				}
+			}
+			return result, nil
+		}
+
+		result := make([]methods.SessionInfo, len(entries))
+		for i, e := range entries {
+			result[i] = convertIndexEntryToSessionInfo(e)
+		}
+		return result, nil
+	}
+
+	// No project path specified - return ALL sessions from all projects
+	// This is the expected behavior for Codex since sessions are stored globally
+	entries, err := a.indexCache.GetAllSessions()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]methods.SessionInfo, len(entries))
+	for i, e := range entries {
+		result[i] = convertIndexEntryToSessionInfo(e)
+	}
+	return result, nil
+}
+
+// GetSession returns detailed session info.
+// Uses the index cache for richer metadata.
+func (a *CodexSessionAdapter) GetSession(ctx context.Context, sessionID string) (*methods.SessionInfo, error) {
+	// Try index cache first for richer metadata
+	entry, err := a.indexCache.FindSessionByID(sessionID)
+	if err == nil && entry != nil {
+		info := convertIndexEntryToSessionInfo(*entry)
+		return &info, nil
+	}
+
+	// Fallback to direct parsing only when repository.path is configured.
+	// In multi-workspace mode repository.path is empty by design.
+	if strings.TrimSpace(a.repoPath) == "" {
+		return nil, nil
+	}
+
+	// Fallback to direct parsing
+	info, _, err := codex.FindSessionByID(a.repoPath, sessionID)
+	if err != nil || info == nil {
+		return nil, err
+	}
+
+	return &methods.SessionInfo{
+		SessionID:    info.SessionID,
+		AgentType:    "codex",
+		Summary:      info.Summary,
+		MessageCount: info.MessageCount,
+		StartTime:    info.LastUpdated,
+		LastUpdated:  info.LastUpdated,
+		ProjectPath:  info.WorkspacePath,
+	}, nil
+}
+
+// convertIndexEntryToSessionInfo converts a codex.SessionIndexEntry to methods.SessionInfo.
+func convertIndexEntryToSessionInfo(e codex.SessionIndexEntry) methods.SessionInfo {
+	return methods.SessionInfo{
+		SessionID:     e.SessionID,
+		AgentType:     "codex",
+		Summary:       e.Summary,
+		FirstPrompt:   e.FirstPrompt,
+		MessageCount:  e.MessageCount,
+		StartTime:     e.Created,
+		LastUpdated:   e.Modified,
+		Branch:        e.GitBranch,
+		GitCommit:     e.GitCommit,
+		GitRepo:       e.GitRepo,
+		ProjectPath:   e.ProjectPath,
+		ModelProvider: e.ModelProvider,
+		Model:         e.Model,
+		CLIVersion:    e.CLIVersion,
+		FileSize:      e.FileSize,
+		FilePath:      e.FullPath,
+	}
+}
+
+// GetSessionMessages returns messages for a Codex session.
+func (a *CodexSessionAdapter) GetSessionMessages(ctx context.Context, sessionID string, limit, offset int, order string) ([]methods.SessionMessage, int, error) {
+	// Find the session file via the global index (Codex sessions are not repo-scoped).
+	entry, err := a.indexCache.FindSessionByID(sessionID)
+	if err != nil || entry == nil || entry.FullPath == "" {
+		return nil, 0, fmt.Errorf("session not found")
+	}
+
+	items, err := codex.ReadConversationItems(entry.FullPath)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Convert conversation items to synthetic SessionMessages that match the Claude-style
+	// message.content block format (text/thinking/tool_use/tool_result).
+	all := make([]methods.SessionMessage, 0, len(items))
+
+	type exploredState struct {
+		entries   []string
+		timestamp string
+		lastLine  int
+	}
+	var explored exploredState
+	exploredSeq := 0
+
+	appendMessage := func(role string, blocks []events.ClaudeMessageContent, timestamp string, line int, suffix string, isContextCompaction bool) {
+		raw, err := formatCodexMessageJSON(role, blocks)
+		if err != nil || raw == nil {
+			return
+		}
+
+		uuid := fmt.Sprintf("%s:%06d", sessionID, line)
+		if suffix != "" {
+			uuid = uuid + ":" + suffix
+		}
+
+		all = append(all, methods.SessionMessage{
+			UUID:                uuid,
+			SessionID:           sessionID,
+			Type:                role,
+			Timestamp:           timestamp,
+			Message:             raw,
+			IsContextCompaction: isContextCompaction,
+		})
+	}
+
+	flushExplored := func(fallbackTS string) {
+		if len(explored.entries) == 0 {
+			return
+		}
+		exploredSeq++
+		text := formatCodexExploredText(explored.entries)
+		ts := explored.timestamp
+		if ts == "" {
+			ts = fallbackTS
+		}
+		appendMessage(
+			"assistant",
+			[]events.ClaudeMessageContent{{Type: "text", Text: text}},
+			ts,
+			explored.lastLine,
+			fmt.Sprintf("explored-%03d", exploredSeq),
+			false,
+		)
+		explored = exploredState{}
+	}
+
+	for _, it := range dedupCodexThinking(items) {
+		if shouldFlushCodexExploredBeforeItem(it) {
+			flushExplored(it.Timestamp)
+		}
+
+		for _, summary := range collectCodexToolSummaries(it.Content) {
+			if strings.TrimSpace(summary) == "" {
+				continue
+			}
+			explored.entries = append(explored.entries, summary)
+			explored.timestamp = it.Timestamp
+			explored.lastLine = it.Line
+		}
+
+		appendMessage(it.Role, it.Content, it.Timestamp, it.Line, "", it.IsContextCompaction)
+	}
+	flushExplored("")
+
+	for i := range all {
+		all[i].ID = int64(i + 1)
+	}
+
+	total := len(all)
+	if total == 0 {
+		return []methods.SessionMessage{}, 0, nil
+	}
+
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+	if order == "desc" {
+		reversed := make([]methods.SessionMessage, len(all))
+		for i := range all {
+			reversed[i] = all[len(all)-1-i]
+		}
+		all = reversed
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(all) {
+		return []methods.SessionMessage{}, total, nil
+	}
+
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+
+	return all[offset:end], total, nil
+}
+
+// GetSessionElements returns pre-parsed UI elements for Codex sessions.
+func (a *CodexSessionAdapter) GetSessionElements(ctx context.Context, sessionID string, limit int, beforeID, afterID string) ([]methods.SessionElement, int, error) {
+	entry, err := a.indexCache.FindSessionByID(sessionID)
+	if err != nil || entry == nil || entry.FullPath == "" {
+		return nil, 0, fmt.Errorf("session not found")
+	}
+
+	items, err := codex.ReadConversationItems(entry.FullPath)
+	if err != nil {
+		return nil, 0, err
+	}
+	items = dedupCodexThinking(items)
+
+	// Track tool name by call_id so tool_result elements can include tool_name.
+	toolNames := make(map[string]string)
+	pendingExplored := make([]string, 0, 4)
+	pendingExploredTS := ""
+	pendingExploredLine := 0
+	exploredSeq := 0
+
+	var elements []methods.SessionElement
+	flushExplored := func(fallbackTS string) {
+		if len(pendingExplored) == 0 {
+			return
+		}
+		exploredSeq++
+		ts := pendingExploredTS
+		if ts == "" {
+			ts = fallbackTS
+		}
+		elements = append(elements, methods.SessionElement{
+			ID:        fmt.Sprintf("%s:%06d:explored:%03d", sessionID, pendingExploredLine, exploredSeq),
+			Type:      "assistant_text",
+			Timestamp: ts,
+			Content:   mustJSON(sessioncache.AssistantTextContent{Text: formatCodexExploredText(pendingExplored)}),
+		})
+		pendingExplored = pendingExplored[:0]
+		pendingExploredTS = ""
+		pendingExploredLine = 0
+	}
+
+	for _, it := range items {
+		if shouldFlushCodexExploredBeforeItem(it) {
+			flushExplored(it.Timestamp)
+		}
+
+		if it.IsContextCompaction {
+			summary := strings.TrimSpace(joinCodexText(it.Content))
+			if summary == "" {
+				summary = "Conversation compacted to continue this session."
+			}
+			elements = append(elements, methods.SessionElement{
+				ID:        fmt.Sprintf("%s:%06d:context", sessionID, it.Line),
+				Type:      string(sessioncache.ElementTypeContextCompaction),
+				Timestamp: it.Timestamp,
+				Content:   mustJSON(sessioncache.ContextCompactionContent{Summary: summary}),
+			})
+			continue
+		}
+
+		// Most items are single-type (text/thinking/tool_use/tool_result). For "message"
+		// items, we can join all text blocks into a single element.
+		if it.Role == "user" {
+			text := joinCodexText(it.Content)
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			elements = append(elements, methods.SessionElement{
+				ID:        fmt.Sprintf("%s:%06d", sessionID, it.Line),
+				Type:      "user_input",
+				Timestamp: it.Timestamp,
+				Content:   mustJSON(sessioncache.UserInputContent{Text: text}),
+			})
+			continue
+		}
+
+		// Assistant side: preserve block ordering, but coalesce adjacent text blocks.
+		var pendingText []string
+		flushText := func(idx int) {
+			if len(pendingText) == 0 {
+				return
+			}
+			text := strings.TrimSpace(strings.Join(pendingText, "\n"))
+			pendingText = nil
+			if text == "" {
+				return
+			}
+			elements = append(elements, methods.SessionElement{
+				ID:        fmt.Sprintf("%s:%06d:%d", sessionID, it.Line, idx),
+				Type:      "assistant_text",
+				Timestamp: it.Timestamp,
+				Content:   mustJSON(sessioncache.AssistantTextContent{Text: text}),
+			})
+		}
+
+		elemIdx := 0
+		for _, block := range it.Content {
+			switch block.Type {
+			case "text":
+				if strings.TrimSpace(block.Text) != "" {
+					pendingText = append(pendingText, block.Text)
+				}
+			case "thinking":
+				flushText(elemIdx)
+				elemIdx++
+				if strings.TrimSpace(block.Text) == "" {
+					continue
+				}
+				elements = append(elements, methods.SessionElement{
+					ID:        fmt.Sprintf("%s:%06d:%d", sessionID, it.Line, elemIdx),
+					Type:      "thinking",
+					Timestamp: it.Timestamp,
+					Content:   mustJSON(sessioncache.ThinkingContent{Text: block.Text, Collapsed: true}),
+				})
+			case "tool_use":
+				flushText(elemIdx)
+				elemIdx++
+				if block.ToolID != "" {
+					toolNames[block.ToolID] = block.ToolName
+				}
+				if summary := summarizeCodexToolForExplored(block.ToolName, block.ToolInput); strings.TrimSpace(summary) != "" {
+					pendingExplored = append(pendingExplored, summary)
+					pendingExploredTS = it.Timestamp
+					pendingExploredLine = it.Line
+				}
+				display := formatCodexToolDisplay(block.ToolName, block.ToolInput)
+				elements = append(elements, methods.SessionElement{
+					ID:        fmt.Sprintf("%s:%06d:%d", sessionID, it.Line, elemIdx),
+					Type:      "tool_call",
+					Timestamp: it.Timestamp,
+					Content: mustJSON(sessioncache.ToolCallContent{
+						Tool:    block.ToolName,
+						ToolID:  block.ToolID,
+						Display: display,
+						Params:  block.ToolInput,
+						Status:  sessioncache.ToolStatusCompleted,
+					}),
+				})
+			case "tool_result":
+				flushText(elemIdx)
+				elemIdx++
+				full := block.Content
+				summary := summarizeToolOutput(full)
+				toolName := toolNames[block.ToolUseID]
+				lineCount := 0
+				if strings.TrimSpace(full) != "" {
+					lineCount = strings.Count(full, "\n") + 1
+				}
+				expandable := lineCount > 12 || len(full) > 400
+
+				elements = append(elements, methods.SessionElement{
+					ID:        fmt.Sprintf("%s:%06d:%d", sessionID, it.Line, elemIdx),
+					Type:      "tool_result",
+					Timestamp: it.Timestamp,
+					Content: mustJSON(sessioncache.ToolResultContent{
+						ToolCallID:  block.ToolUseID,
+						ToolName:    toolName,
+						IsError:     block.IsError,
+						Summary:     summary,
+						FullContent: full,
+						LineCount:   lineCount,
+						Expandable:  expandable,
+					}),
+				})
+			}
+		}
+		flushText(elemIdx)
+	}
+	flushExplored("")
+
+	total := len(elements)
+	if total == 0 {
+		return []methods.SessionElement{}, 0, nil
+	}
+
+	// Apply pagination similar to Claude elements.
+	startIdx := 0
+	endIdx := len(elements)
+	if afterID != "" {
+		for i, e := range elements {
+			if e.ID == afterID {
+				startIdx = i + 1
+				break
+			}
+		}
+	}
+	if beforeID != "" {
+		for i, e := range elements {
+			if e.ID == beforeID {
+				endIdx = i
+				break
+			}
+		}
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if endIdx > startIdx+limit {
+		endIdx = startIdx + limit
+	}
+	if startIdx >= len(elements) {
+		return []methods.SessionElement{}, total, nil
+	}
+	if endIdx > len(elements) {
+		endIdx = len(elements)
+	}
+
+	return elements[startIdx:endIdx], total, nil
+}
+
+func dedupCodexThinking(items []codex.ConversationItem) []codex.ConversationItem {
+	// Best-effort de-dupe for identical thinking blocks (agent_reasoning vs reasoning.summary).
+	out := make([]codex.ConversationItem, 0, len(items))
+
+	var lastText string
+	var lastTS time.Time
+
+	for _, it := range items {
+		if it.Role == "assistant" && len(it.Content) == 1 && it.Content[0].Type == "thinking" {
+			text := strings.TrimSpace(it.Content[0].Text)
+			if text == "" {
+				continue
+			}
+			ts, ok := parseRFC3339(it.Timestamp)
+			if ok && lastText == text && !lastTS.IsZero() {
+				delta := ts.Sub(lastTS)
+				if delta < 0 {
+					delta = -delta
+				}
+				if delta <= 2*time.Second {
+					continue
+				}
+			}
+			if ok {
+				lastTS = ts
+			}
+			lastText = text
+		}
+		out = append(out, it)
+	}
+
+	return out
+}
+
+func parseRFC3339(ts string) (time.Time, bool) {
+	if ts == "" {
+		return time.Time{}, false
+	}
+	if t, err := time.Parse(time.RFC3339Nano, ts); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse(time.RFC3339, ts); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
+}
+
+func joinCodexText(blocks []events.ClaudeMessageContent) string {
+	var parts []string
+	for _, b := range blocks {
+		if b.Type != "text" {
+			continue
+		}
+		if strings.TrimSpace(b.Text) == "" {
+			continue
+		}
+		parts = append(parts, b.Text)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func shouldFlushCodexExploredBeforeItem(it codex.ConversationItem) bool {
+	if it.Role != "assistant" {
+		return true
+	}
+	for _, block := range it.Content {
+		if block.Type != "tool_use" && block.Type != "tool_result" {
+			return true
+		}
+	}
+	return false
+}
+
+func collectCodexToolSummaries(blocks []events.ClaudeMessageContent) []string {
+	var out []string
+	for _, block := range blocks {
+		if block.Type != "tool_use" {
+			continue
+		}
+		if summary := summarizeCodexToolForExplored(block.ToolName, block.ToolInput); strings.TrimSpace(summary) != "" {
+			out = append(out, summary)
+		}
+	}
+	return out
+}
+
+func formatCodexExploredText(entries []string) string {
+	if len(entries) == 0 {
+		return ""
+	}
+
+	lines := make([]string, 0, len(entries)+1)
+	lines = append(lines, "**Explored**")
+	for i, entry := range entries {
+		prefix := "├ "
+		if i == len(entries)-1 {
+			prefix = "└ "
+		}
+		lines = append(lines, prefix+entry)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func summarizeCodexToolForExplored(toolName string, params map[string]interface{}) string {
+	switch toolName {
+	case "exec_command":
+		if cmd, ok := params["command"].(string); ok && strings.TrimSpace(cmd) != "" {
+			return summarizeExecCommandForExplored(cmd)
+		}
+		if cmd, ok := params["cmd"].(string); ok && strings.TrimSpace(cmd) != "" {
+			return summarizeExecCommandForExplored(cmd)
+		}
+	case "apply_patch":
+		if in, ok := params["input"].(string); ok {
+			if summary := summarizeApplyPatch(in); summary != "" {
+				return summary
+			}
+		}
+	case "view_image":
+		// view_image already appears as its own tool row.
+		return ""
+	}
+
+	display := strings.TrimSpace(formatCodexToolDisplay(toolName, params))
+	if display == "" {
+		return "Run tool"
+	}
+	return display
+}
+
+func summarizeExecCommandForExplored(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return "Run command"
+	}
+
+	fields := strings.Fields(cmd)
+	if len(fields) == 0 {
+		return "Run command"
+	}
+
+	switch fields[0] {
+	case "find":
+		root := "."
+		if len(fields) > 1 && !strings.HasPrefix(fields[1], "-") {
+			root = trimShellToken(fields[1])
+		}
+
+		names := extractFlagValues(fields, "-name")
+		if len(names) > 0 {
+			return fmt.Sprintf("Search %s in %s", names[0], root)
+		}
+
+		paths := extractFlagValues(fields, "-path")
+		if len(paths) > 0 {
+			return fmt.Sprintf("Search %s in %s", paths[0], root)
+		}
+
+		if strings.Contains(cmd, "-type") {
+			return fmt.Sprintf("List %s", root)
+		}
+		return fmt.Sprintf("Search in %s", root)
+
+	case "ls":
+		target := "."
+		for _, tok := range fields[1:] {
+			if strings.HasPrefix(tok, "-") {
+				continue
+			}
+			target = trimShellToken(tok)
+			break
+		}
+		return fmt.Sprintf("List %s", target)
+
+	case "cat":
+		if len(fields) > 1 {
+			return fmt.Sprintf("Read %s", trimShellToken(fields[1]))
+		}
+		return "Read file"
+	}
+
+	if len(cmd) > 90 {
+		return cmd[:87] + "..."
+	}
+	return cmd
+}
+
+func extractFlagValues(fields []string, flag string) []string {
+	var out []string
+	for i := 0; i < len(fields)-1; i++ {
+		if fields[i] != flag {
+			continue
+		}
+		value := trimShellToken(fields[i+1])
+		if value == "" || strings.HasPrefix(value, "-") {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
+func trimShellToken(token string) string {
+	token = strings.TrimSpace(token)
+	token = strings.Trim(token, "\"'")
+	token = strings.TrimSuffix(token, ";")
+	return token
+}
+
+func formatCodexToolDisplay(toolName string, params map[string]interface{}) string {
+	switch toolName {
+	case "exec_command":
+		cmd := ""
+		if raw, ok := params["command"].(string); ok {
+			cmd = raw
+		}
+		if strings.TrimSpace(cmd) == "" {
+			if raw, ok := params["cmd"].(string); ok {
+				cmd = raw
+			}
+		}
+		cmd = strings.TrimSpace(cmd)
+		if cmd == "" {
+			return "Ran command"
+		}
+		if len(cmd) > 140 {
+			cmd = cmd[:137] + "..."
+		}
+		return "Ran " + cmd
+	case "apply_patch":
+		if in, ok := params["input"].(string); ok {
+			if summary := summarizeApplyPatch(in); summary != "" {
+				return summary
+			}
+		}
+		return "Applied patch"
+	case "view_image":
+		path := ""
+		if raw, ok := params["path"].(string); ok {
+			path = compactDotCdevDisplayPath(raw)
+		}
+		if strings.TrimSpace(path) == "" {
+			return "view_image"
+		}
+		return fmt.Sprintf("view_image(path: %s)", path)
+	}
+	if toolName != "" {
+		return toolName
+	}
+	return "tool"
+}
+
+func compactDotCdevDisplayPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if idx := strings.Index(path, "/.cdev/"); idx >= 0 {
+		return path[idx+1:]
+	}
+	return path
+}
+
+func summarizeApplyPatch(input string) string {
+	action := "Applied"
+	file := ""
+	added := 0
+	removed := 0
+
+	for _, line := range strings.Split(input, "\n") {
+		switch {
+		case strings.HasPrefix(line, "*** Add File: "):
+			action = "Added"
+			file = strings.TrimSpace(strings.TrimPrefix(line, "*** Add File: "))
+		case strings.HasPrefix(line, "*** Update File: "):
+			action = "Updated"
+			file = strings.TrimSpace(strings.TrimPrefix(line, "*** Update File: "))
+		case strings.HasPrefix(line, "*** Delete File: "):
+			action = "Deleted"
+			file = strings.TrimSpace(strings.TrimPrefix(line, "*** Delete File: "))
+		case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+			added++
+		case strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
+			removed++
+		}
+	}
+
+	if file == "" {
+		return ""
+	}
+	if action == "Deleted" {
+		return action + " " + file
+	}
+	return fmt.Sprintf("%s %s (+%d -%d)", action, file, added, removed)
+}
+
+func summarizeToolOutput(full string) string {
+	full = strings.TrimSpace(full)
+	if full == "" {
+		return ""
+	}
+	line := full
+	if nl := strings.IndexByte(full, '\n'); nl >= 0 {
+		line = full[:nl]
+	}
+	line = strings.TrimSpace(line)
+	if len(line) > 160 {
+		return line[:157] + "..."
+	}
+	return line
+}
+
+func mustJSON(v interface{}) json.RawMessage {
+	b, _ := json.Marshal(v)
+	return b
+}
+
+func formatCodexMessageJSON(role string, blocks []events.ClaudeMessageContent) (json.RawMessage, error) {
+	if role != "user" && role != "assistant" {
+		return nil, nil
+	}
+	if len(blocks) == 0 {
+		return nil, nil
+	}
+
+	content := make([]map[string]interface{}, 0, len(blocks))
+	for _, b := range blocks {
+		switch b.Type {
+		case "text", "thinking":
+			if strings.TrimSpace(b.Text) == "" {
+				continue
+			}
+			content = append(content, map[string]interface{}{
+				"type": b.Type,
+				"text": b.Text,
+			})
+		case "tool_use":
+			if b.ToolName == "" {
+				continue
+			}
+			content = append(content, map[string]interface{}{
+				"type":  "tool_use",
+				"id":    b.ToolID,
+				"name":  b.ToolName,
+				"input": b.ToolInput,
+			})
+		case "tool_result":
+			if strings.TrimSpace(b.Content) == "" {
+				continue
+			}
+			content = append(content, map[string]interface{}{
+				"type":        "tool_result",
+				"tool_use_id": b.ToolUseID,
+				"content":     b.Content,
+				"is_error":    b.IsError,
+			})
+		}
+	}
+	if len(content) == 0 {
+		return nil, nil
+	}
+
+	msg := map[string]interface{}{
+		"role":    role,
+		"content": content,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
+}
+
+// DeleteSession deletes a specific Codex session.
+func (a *CodexSessionAdapter) DeleteSession(ctx context.Context, sessionID string) error {
+	if a.repoPath == "" {
+		return nil
+	}
+	return codex.DeleteSession(a.repoPath, sessionID)
+}
+
+// DeleteAllSessions deletes all Codex sessions for the repo.
+func (a *CodexSessionAdapter) DeleteAllSessions(ctx context.Context) (int, error) {
+	if a.repoPath == "" {
+		return 0, nil
+	}
+	return codex.DeleteAllSessions(a.repoPath)
+}
+
 // ClientFocusServer interface for server operations.
 // Note: The actual implementation returns *unified.FocusChangeResult, but we use interface{}
 // to avoid circular dependencies.
@@ -606,4 +1460,31 @@ func (a *ClientFocusAdapter) SetSessionFocus(clientID, workspaceID, sessionID st
 		return nil, nil
 	}
 	return a.server.SetSessionFocus(clientID, workspaceID, sessionID)
+}
+
+// WorkspaceConfigProvider provides workspace configuration access.
+type WorkspaceConfigProvider interface {
+	GetWorkspace(id string) (interface{ GetPath() string }, error)
+}
+
+// WorkspacePathResolverAdapter implements methods.WorkspacePathResolver.
+type WorkspacePathResolverAdapter struct {
+	configManager *workspace.ConfigManager
+}
+
+// NewWorkspacePathResolverAdapter creates a new workspace path resolver adapter.
+func NewWorkspacePathResolverAdapter(configManager *workspace.ConfigManager) *WorkspacePathResolverAdapter {
+	return &WorkspacePathResolverAdapter{configManager: configManager}
+}
+
+// GetWorkspacePath resolves workspace ID to its path.
+func (a *WorkspacePathResolverAdapter) GetWorkspacePath(workspaceID string) (string, error) {
+	if a.configManager == nil {
+		return "", nil
+	}
+	ws, err := a.configManager.GetWorkspace(workspaceID)
+	if err != nil {
+		return "", err
+	}
+	return ws.Definition.Path, nil
 }

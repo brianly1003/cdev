@@ -12,10 +12,10 @@ import (
 // --- Mock EventHub ---
 
 type mockEventHub struct {
-	mu       sync.Mutex
-	events   []events.Event
-	started  bool
-	stopped  bool
+	mu      sync.Mutex
+	events  []events.Event
+	started bool
+	stopped bool
 }
 
 func newMockEventHub() *mockEventHub {
@@ -397,6 +397,104 @@ func TestManager_GetPendingToolUse_Initial(t *testing.T) {
 	if name != "" {
 		t.Errorf("pending tool name = %q, want empty", name)
 	}
+}
+
+func TestManager_ParseAndDetectToolUse_MCPPermission(t *testing.T) {
+	hub := newMockEventHub()
+	m := NewManager("claude", nil, 5, hub, false, nil)
+
+	line := `{"type":"assistant","message":{"stop_reason":"tool_use","content":[{"type":"tool_use","id":"toolu_mcp_123","name":"mcp__playwright__browser_navigate","input":{"url":"https://example.com"}}]}}`
+
+	m.parseAndDetectToolUse(line)
+
+	if !m.IsWaitingForInput() {
+		t.Fatal("IsWaitingForInput() = false, want true")
+	}
+
+	toolID, toolName := m.GetPendingToolUse()
+	if toolID != "toolu_mcp_123" {
+		t.Fatalf("pending tool ID = %q, want %q", toolID, "toolu_mcp_123")
+	}
+	if toolName != "mcp__playwright__browser_navigate" {
+		t.Fatalf("pending tool name = %q, want %q", toolName, "mcp__playwright__browser_navigate")
+	}
+
+	eventsList := hub.GetEvents()
+	if len(eventsList) == 0 {
+		t.Fatal("no events published")
+	}
+
+	foundPermission := false
+	for _, event := range eventsList {
+		if event.Type() != events.EventTypeClaudePermission {
+			continue
+		}
+
+		baseEvent, ok := event.(*events.BaseEvent)
+		if !ok {
+			t.Fatalf("event type %q is not *events.BaseEvent", event.Type())
+		}
+
+		payload, ok := baseEvent.Payload.(events.ClaudePermissionPayload)
+		if !ok {
+			t.Fatalf("permission payload has unexpected type %T", baseEvent.Payload)
+		}
+
+		foundPermission = true
+		if payload.ToolUseID != "toolu_mcp_123" {
+			t.Fatalf("payload.ToolUseID = %q, want %q", payload.ToolUseID, "toolu_mcp_123")
+		}
+		if payload.ToolName != "mcp__playwright__browser_navigate" {
+			t.Fatalf("payload.ToolName = %q, want %q", payload.ToolName, "mcp__playwright__browser_navigate")
+		}
+		if payload.Description == "" {
+			t.Fatal("payload.Description is empty")
+		}
+	}
+
+	if !foundPermission {
+		t.Fatalf("expected %q event, got: %v", events.EventTypeClaudePermission, collectEventTypes(eventsList))
+	}
+}
+
+func TestManager_ConvertToClaudeMessagePayload_CompactsViewImagePath(t *testing.T) {
+	hub := newMockEventHub()
+	m := NewManager("claude", nil, 5, hub, false, nil)
+
+	parsed := &events.ParsedClaudeMessage{
+		Type:      "assistant",
+		SessionID: "session-1",
+		Content: []events.ParsedContentBlock{
+			{
+				Type:      "tool_use",
+				ToolName:  "view_image",
+				ToolID:    "tool_1",
+				ToolInput: `{"path":"/Users/brianly/Projects/cdev/.cdev/images/img_6ab0243f-1a6.jpg"}`,
+			},
+		},
+	}
+
+	payload := m.convertToClaudeMessagePayload(parsed)
+	if payload == nil {
+		t.Fatal("expected non-nil payload")
+	}
+	if len(payload.Content) != 1 {
+		t.Fatalf("content length = %d, want 1", len(payload.Content))
+	}
+
+	got, _ := payload.Content[0].ToolInput["path"].(string)
+	want := ".cdev/images/img_6ab0243f-1a6.jpg"
+	if got != want {
+		t.Fatalf("tool path = %q, want %q", got, want)
+	}
+}
+
+func collectEventTypes(eventsList []events.Event) []events.EventType {
+	types := make([]events.EventType, 0, len(eventsList))
+	for _, event := range eventsList {
+		types = append(types, event.Type())
+	}
+	return types
 }
 
 // --- PTY State Tests ---

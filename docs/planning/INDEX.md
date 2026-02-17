@@ -1,7 +1,13 @@
 # Implementation Documentation Index
 
-**Last Updated:** 2026-01-06
-**Status:** Complete and Ready for Implementation
+**Last Updated:** 2026-02-16
+**Status:** Active (roadmap + implementation specs)
+
+---
+
+## 📌 AI Agent Runtime Roadmap (New)
+
+- [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Authoritative phased plan to evolve cdev from monitor/controller into a secure AI Agent runtime platform.
 
 ---
 
@@ -29,21 +35,23 @@ This documentation suite provides **complete end-to-end specifications** for imp
 ### For Engineers / Technical Leads
 
 **Start Here:**
-1. [`AUTO-CLAUDE-COMPARISON-SUMMARY.md`](./AUTO-CLAUDE-COMPARISON-SUMMARY.md) - Overview (15 min)
-2. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - **Complete technical spec** (2 hour read)
+1. [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Current transformation plan (20 min)
+2. [`AUTO-CLAUDE-COMPARISON-SUMMARY.md`](./AUTO-CLAUDE-COMPARISON-SUMMARY.md) - Overview (15 min)
+3. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - **Complete technical spec** (2 hour read)
    - Deep-dive architecture
    - Sprint planning (Sprints 1-3)
    - Auto-Claude analysis
    - Mobile UI designs
-3. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - System diagrams (30 min)
-4. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Developer quick reference (15 min)
+4. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - System diagrams (30 min)
+5. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Developer quick reference (15 min)
 
 ### For Developers (Implementation)
 
 **Start Here:**
-1. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Quick reference (10 min)
-2. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - Visual overview (20 min)
-3. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - Detailed implementation (refer as needed)
+1. [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Phase overview and sequence (20 min)
+2. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Quick reference (10 min)
+3. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - Visual overview (20 min)
+4. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - Detailed implementation (refer as needed)
 
 ---
 

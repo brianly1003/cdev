@@ -285,7 +285,7 @@ func TestClaudeSessionAdapter_NilCache(t *testing.T) {
 		t.Errorf("AgentType should return claude, got %s", agentType)
 	}
 
-	sessions, err := adapter.ListSessions(ctx)
+	sessions, err := adapter.ListSessions(ctx, "")
 	if err != nil {
 		t.Errorf("ListSessions with nil cache should return nil error, got %v", err)
 	}

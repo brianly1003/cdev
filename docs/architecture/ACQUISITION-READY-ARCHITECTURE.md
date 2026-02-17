@@ -445,7 +445,7 @@ func (e *CustomAIExtension) HandleRequest(ctx context.Context, method string, pa
 **Docker Support:**
 ```dockerfile
 # Dockerfile
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o cdev ./cmd/cdev

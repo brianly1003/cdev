@@ -13,13 +13,14 @@ import (
 type ElementType string
 
 const (
-	ElementTypeUserInput     ElementType = "user_input"
-	ElementTypeAssistantText ElementType = "assistant_text"
-	ElementTypeToolCall      ElementType = "tool_call"
-	ElementTypeToolResult    ElementType = "tool_result"
-	ElementTypeDiff          ElementType = "diff"
-	ElementTypeThinking      ElementType = "thinking"
-	ElementTypeInterrupted   ElementType = "interrupted"
+	ElementTypeUserInput         ElementType = "user_input"
+	ElementTypeAssistantText     ElementType = "assistant_text"
+	ElementTypeToolCall          ElementType = "tool_call"
+	ElementTypeToolResult        ElementType = "tool_result"
+	ElementTypeDiff              ElementType = "diff"
+	ElementTypeThinking          ElementType = "thinking"
+	ElementTypeContextCompaction ElementType = "context_compaction"
+	ElementTypeInterrupted       ElementType = "interrupted"
 )
 
 // ToolStatus represents the status of a tool call.
@@ -122,6 +123,11 @@ type ThinkingContent struct {
 	Collapsed bool   `json:"collapsed"`
 }
 
+// ContextCompactionContent represents a context compaction summary element.
+type ContextCompactionContent struct {
+	Summary string `json:"summary"`
+}
+
 // InterruptedContent represents interrupted element content.
 type InterruptedContent struct {
 	ToolCallID string `json:"tool_call_id"`
@@ -206,11 +212,11 @@ func parseUserMessage(content json.RawMessage, uuid, timestamp string, counter *
 
 	// Try as array of content blocks
 	var contentBlocks []struct {
-		Type       string `json:"type"`
-		Text       string `json:"text,omitempty"`
-		Content    string `json:"content,omitempty"`
-		ToolUseID  string `json:"tool_use_id,omitempty"`
-		IsError    bool   `json:"is_error,omitempty"`
+		Type      string `json:"type"`
+		Text      string `json:"text,omitempty"`
+		Content   string `json:"content,omitempty"`
+		ToolUseID string `json:"tool_use_id,omitempty"`
+		IsError   bool   `json:"is_error,omitempty"`
 	}
 
 	if err := json.Unmarshal(content, &contentBlocks); err == nil {
@@ -632,11 +638,28 @@ func formatToolDisplay(toolName string, params map[string]interface{}) string {
 		} else {
 			display = toolName + "()"
 		}
+	case "view_image":
+		if path, ok := params["path"].(string); ok {
+			display = fmt.Sprintf("view_image(path: %s)", compactDotCdevElementPath(path))
+		} else {
+			display = "view_image()"
+		}
 	default:
 		display = toolName + "()"
 	}
 
 	return display
+}
+
+func compactDotCdevElementPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if idx := strings.Index(path, "/.cdev/"); idx >= 0 {
+		return path[idx+1:]
+	}
+	return path
 }
 
 func formatDiffSummary(added, removed int) string {

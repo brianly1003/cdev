@@ -121,6 +121,97 @@ limits:
 	}
 }
 
+func TestLoad_EnvOverrides_ServerPort(t *testing.T) {
+	t.Setenv("CDEV_SERVER_PORT", "9123")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Server.Port != 9123 {
+		t.Fatalf("Server.Port = %d, want 9123", cfg.Server.Port)
+	}
+}
+
+func TestLoad_EnvOverrides_ServerHttpPort_LegacyAlias(t *testing.T) {
+	t.Setenv("CDEV_SERVER_HTTP_PORT", "9456")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Legacy env var should still map into server.port.
+	if cfg.Server.Port != 9456 {
+		t.Fatalf("Server.Port = %d, want 9456", cfg.Server.Port)
+	}
+}
+
+func TestLoad_EnvOverrides_ServerPortTakesPrecedenceOverLegacyHttpPort(t *testing.T) {
+	t.Setenv("CDEV_SERVER_PORT", "9001")
+	t.Setenv("CDEV_SERVER_HTTP_PORT", "9002")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Explicit server.port should win.
+	if cfg.Server.Port != 9001 {
+		t.Fatalf("Server.Port = %d, want 9001", cfg.Server.Port)
+	}
+}
+
+func TestLoad_LegacyHttpPortEnvOverrides_ConfigServerPort(t *testing.T) {
+	tempDir := t.TempDir()
+
+	configContent := `
+server:
+  port: 9000
+  host: "127.0.0.1"
+`
+	configPath := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	t.Setenv("CDEV_SERVER_HTTP_PORT", "9002")
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Env overrides should still apply even if the config file uses server.port.
+	if cfg.Server.Port != 9002 {
+		t.Fatalf("Server.Port = %d, want 9002", cfg.Server.Port)
+	}
+}
+
+func TestLoad_FromFile_LegacyServerHttpPortAlias(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// server.http_port is legacy, but should still be accepted.
+	configContent := `
+server:
+  http_port: 9010
+  host: "127.0.0.1"
+`
+	configPath := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Server.Port != 9010 {
+		t.Fatalf("Server.Port = %d, want 9010", cfg.Server.Port)
+	}
+}
+
 func TestMergeClaudeArgs(t *testing.T) {
 	tests := []struct {
 		name     string

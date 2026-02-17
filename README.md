@@ -37,6 +37,15 @@
 - **Cross-Platform**: Runs on macOS, Windows, and Linux
 - **QR Code Pairing**: Easy mobile device pairing via QR code scan
 
+## AI Agent Transformation Plan
+
+cdev is evolving from a monitor/controller into a goal-driven AI Agent runtime platform.
+The implementation plan is documented here:
+
+- [AI Agent Runtime Roadmap](docs/planning/AI-AGENT-RUNTIME-ROADMAP.md)
+
+The roadmap is phased and security-first so current users can keep running existing workflows during the transition.
+
 ## Quick Start
 
 ### Single Workspace Mode
@@ -140,7 +149,7 @@ For advanced settings, create `~/.cdev/config.yaml`:
 
 ```yaml
 server:
-  http_port: 8766      # Single unified port (HTTP + WebSocket)
+  port: 8766           # Single unified port (HTTP + WebSocket)
   host: "127.0.0.1"
 
 logging:
@@ -161,7 +170,7 @@ Configuration is loaded from:
 
 Environment variables override config file values (prefix: `CDEV_`):
 ```bash
-export CDEV_SERVER_HTTP_PORT=8766
+export CDEV_SERVER_PORT=8766
 ```
 
 ### VS Code Port Forwarding

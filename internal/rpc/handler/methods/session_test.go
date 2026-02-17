@@ -35,12 +35,17 @@ func (m *mockSessionStreamer) GetWatchedSession() string {
 
 // mockSessionProvider is a mock implementation of SessionProvider for testing.
 type mockSessionProvider struct {
-	sessions map[string]*SessionInfo
+	sessions  map[string]*SessionInfo
+	agentType string
 }
 
-func (m *mockSessionProvider) ListSessions(ctx context.Context) ([]SessionInfo, error) {
+func (m *mockSessionProvider) ListSessions(ctx context.Context, projectPath string) ([]SessionInfo, error) {
 	var result []SessionInfo
 	for _, s := range m.sessions {
+		// If projectPath is provided, filter by it
+		if projectPath != "" && s.ProjectPath != projectPath {
+			continue
+		}
 		result = append(result, *s)
 	}
 	return result, nil
@@ -70,6 +75,9 @@ func (m *mockSessionProvider) DeleteAllSessions(ctx context.Context) (int, error
 }
 
 func (m *mockSessionProvider) AgentType() string {
+	if m.agentType != "" {
+		return m.agentType
+	}
 	return "claude"
 }
 
@@ -96,6 +104,18 @@ func TestNewSessionServiceWithNilStreamer(t *testing.T) {
 	}
 	if service.streamer != nil {
 		t.Error("streamer should be nil")
+	}
+}
+
+func TestNewSessionServiceWithTypedNilStreamer(t *testing.T) {
+	var typedNil *mockSessionStreamer
+	service := NewSessionService(typedNil)
+
+	if service == nil {
+		t.Fatal("NewSessionService returned nil")
+	}
+	if service.streamer != nil {
+		t.Error("streamer should be nil for typed nil input")
 	}
 }
 
@@ -136,6 +156,35 @@ func TestWatchSession(t *testing.T) {
 	}
 	if watchResult.Status != "watching" {
 		t.Errorf("Status should be 'watching', got %s", watchResult.Status)
+	}
+}
+
+func TestWatchSessionWithAgentType(t *testing.T) {
+	claudeStreamer := &mockSessionStreamer{}
+	codexStreamer := &mockSessionStreamer{}
+	service := NewSessionService(claudeStreamer)
+	service.RegisterStreamer("codex", codexStreamer)
+
+	provider := &mockSessionProvider{
+		sessions: map[string]*SessionInfo{
+			"session-xyz": {SessionID: "session-xyz", AgentType: "codex"},
+		},
+		agentType: "codex",
+	}
+	service.RegisterProvider(provider)
+
+	params := WatchSessionParams{SessionID: "session-xyz", AgentType: "codex"}
+	paramsJSON, _ := json.Marshal(params)
+
+	_, err := service.WatchSession(context.Background(), paramsJSON)
+	if err != nil {
+		t.Fatalf("WatchSession returned error: %v", err)
+	}
+	if codexStreamer.watchedSession != "session-xyz" {
+		t.Errorf("codex streamer watched %s, want session-xyz", codexStreamer.watchedSession)
+	}
+	if claudeStreamer.watchCalled {
+		t.Error("claude streamer should not be used for codex session")
 	}
 }
 
@@ -235,6 +284,34 @@ func TestWatchSessionWithNilStreamer(t *testing.T) {
 	}
 }
 
+func TestWatchSessionWithTypedNilStreamer(t *testing.T) {
+	var typedNil *mockSessionStreamer
+	service := NewSessionService(typedNil)
+
+	provider := &mockSessionProvider{
+		sessions: map[string]*SessionInfo{
+			"session-123": {SessionID: "session-123", AgentType: "claude"},
+		},
+	}
+	service.RegisterProvider(provider)
+
+	params := WatchSessionParams{SessionID: "session-123"}
+	paramsJSON, _ := json.Marshal(params)
+
+	result, err := service.WatchSession(context.Background(), paramsJSON)
+	if err != nil {
+		t.Fatalf("WatchSession returned error: %v", err)
+	}
+
+	watchResult, ok := result.(WatchSessionResult)
+	if !ok {
+		t.Fatalf("result is not WatchSessionResult: %T", result)
+	}
+	if !watchResult.Watching {
+		t.Error("Watching should be true even with typed nil streamer")
+	}
+}
+
 func TestUnwatchSession(t *testing.T) {
 	streamer := &mockSessionStreamer{
 		watchedSession: "session-123",
@@ -267,6 +344,27 @@ func TestUnwatchSessionWithNilStreamer(t *testing.T) {
 
 	result, err := service.UnwatchSession(context.Background(), nil)
 
+	if err != nil {
+		t.Fatalf("UnwatchSession returned error: %v", err)
+	}
+
+	unwatchResult, ok := result.(UnwatchSessionResult)
+	if !ok {
+		t.Fatalf("result is not UnwatchSessionResult: %T", result)
+	}
+	if unwatchResult.Status != "unwatched" {
+		t.Errorf("Status should be 'unwatched', got %s", unwatchResult.Status)
+	}
+	if unwatchResult.Watching != false {
+		t.Error("Watching should be false")
+	}
+}
+
+func TestUnwatchSessionWithTypedNilStreamer(t *testing.T) {
+	var typedNil *mockSessionStreamer
+	service := NewSessionService(typedNil)
+
+	result, err := service.UnwatchSession(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("UnwatchSession returned error: %v", err)
 	}

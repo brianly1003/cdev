@@ -147,7 +147,8 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	// Environment variable prefix
-	v.SetEnvPrefix("CDOT")
+	// NOTE: Keep this aligned with docs (CDEV_* env overrides).
+	v.SetEnvPrefix("CDEV")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
@@ -160,6 +161,10 @@ func Load(configPath string) (*Config, error) {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 	}
+
+	// Backward compatibility: older docs/configs used server.http_port.
+	// Map it into server.port unless server.port was explicitly set.
+	applyLegacyKeyMappings(v)
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
@@ -177,6 +182,37 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func applyLegacyKeyMappings(v *viper.Viper) {
+	// Treat server.http_port as an alias for server.port.
+	// Precedence:
+	// - `server.port` env override always wins (CDEV_SERVER_PORT)
+	// - legacy `server.http_port` env override wins next (CDEV_SERVER_HTTP_PORT)
+	// - then config file keys (server.port, then server.http_port)
+	portEnv := isEnvSet("CDEV_SERVER_PORT")
+	httpPortEnv := isEnvSet("CDEV_SERVER_HTTP_PORT")
+	portCfg := v.InConfig("server.port")
+	httpPortCfg := v.InConfig("server.http_port")
+
+	if portEnv {
+		return
+	}
+	if httpPortEnv {
+		v.Set("server.port", v.Get("server.http_port"))
+		return
+	}
+	if portCfg {
+		return
+	}
+	if httpPortCfg {
+		v.Set("server.port", v.Get("server.http_port"))
+	}
+}
+
+func isEnvSet(key string) bool {
+	_, ok := os.LookupEnv(key)
+	return ok
 }
 
 // setDefaults sets default configuration values.

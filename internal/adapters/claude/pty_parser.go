@@ -109,8 +109,9 @@ func NewPTYParser() *PTYParser {
 		// Pattern: "Bash(cmd)" or "Run command: cmd" - must start at line beginning to avoid false positives
 		bashCommandPattern: regexp.MustCompile(`(?i)(?:^Bash\s*\(([^\)]+)\)|^Run(?:ning)?\s+(?:command)?:?\s*(.+)|^Bash\s+command\s*$)`),
 
-		// Pattern: "mcp__server__tool" or "MCP tool"
-		mcpToolPattern: regexp.MustCompile(`(?i)(?:mcp__\w+__\w+|MCP\s+tool)`),
+		// Pattern: "mcp__server__tool" (supports -, _, . in names)
+		// Captures the full MCP tool identifier as group 1.
+		mcpToolPattern: regexp.MustCompile(`(?i)(mcp__[a-z0-9._-]+__[a-z0-9._-]+)`),
 
 		// Pattern: "trust the files in this folder" or "work in this folder" for folder trust prompts
 		trustFolderPattern: regexp.MustCompile(`(?i)(?:trust\s+(?:the\s+)?files?\s+in\s+this\s+folder|Do you want to work in this folder)`),
@@ -305,10 +306,42 @@ func (p *PTYParser) detectPermissionType(line string) {
 		}
 	}
 
-	if p.mcpToolPattern.MatchString(line) {
+	if matches := p.mcpToolPattern.FindStringSubmatch(line); len(matches) > 1 {
 		p.currentPromptType = PermissionTypeMCP
+		p.currentPromptTarget = strings.TrimSpace(matches[1])
 		return
 	}
+
+	// Fallback for prompt lines that only say "MCP tool"
+	// Example: "MCP tool: playwright/browser_navigate"
+	if strings.Contains(strings.ToLower(line), "mcp tool") {
+		p.currentPromptType = PermissionTypeMCP
+		if p.currentPromptTarget == "" {
+			p.currentPromptTarget = extractMCPLabelTarget(line)
+		}
+		return
+	}
+}
+
+func extractMCPLabelTarget(line string) string {
+	lower := strings.ToLower(line)
+	index := strings.Index(lower, "mcp tool")
+	if index == -1 {
+		return ""
+	}
+
+	rest := strings.TrimSpace(line[index+len("mcp tool"):])
+	rest = strings.TrimLeft(rest, ":")
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return ""
+	}
+
+	parts := strings.Fields(rest)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
 }
 
 // detectPermissionFromBuffer analyzes the buffer to detect a complete permission prompt.

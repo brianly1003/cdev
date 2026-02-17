@@ -75,26 +75,26 @@ make build
 
 Expected output:
 ```
-6:30PM INF starting cdev http_port=8766 repo=/path/to/your/project version=e313dc8 ws_port=8765
+6:30PM INF starting cdev mode=terminal port=8766 repo=/path/to/your/project version=e313dc8
 6:30PM INF git repository detected name=project root=/path/to/your/project
 6:30PM INF session started repo_name=project repo_path=/path/to/your/project session_id=abc123...
 
 ╔════════════════════════════════════════════════════════════╗
-║                     cdev ready                       ║
+║                     cdev ready                             ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Session ID: abc123...                                     ║
 ║  Repository: project                                       ║
 ╠════════════════════════════════════════════════════════════╣
-║  WebSocket:  ws://127.0.0.1:8765                          ║
-║  HTTP API:   http://127.0.0.1:8766                        ║
+║  API:        http://127.0.0.1:8766                         ║
+║  WebSocket:  ws://127.0.0.1:8766/ws                        ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Scan QR code with cdev mobile app to connect              ║
 ╚════════════════════════════════════════════════════════════╝
 
   [QR CODE DISPLAYED HERE]
 
+6:30PM INF Unified server background tasks started
 6:30PM INF HTTP server starting addr=127.0.0.1:8766
-6:30PM INF WebSocket server starting addr=127.0.0.1:8765
 6:30PM INF file watcher started debounce_ms=100 path=/path/to/your/project
 ```
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/brianly1003/cdev/internal/rpc/message"
+	"github.com/brianly1003/cdev/internal/session"
 )
 
 // TestDeleteHistorySession_ParamValidation tests the parameter validation
@@ -128,9 +129,9 @@ func TestDeleteHistorySession_ValidParams(t *testing.T) {
 // are correctly classified as SessionNotFound vs InternalError.
 func TestDeleteHistorySession_ErrorClassification(t *testing.T) {
 	tests := []struct {
-		name        string
-		errMsg      string
-		wantCode    int
+		name     string
+		errMsg   string
+		wantCode int
 	}{
 		{
 			name:     "session not found",
@@ -173,6 +174,189 @@ func TestDeleteHistorySession_ErrorClassification(t *testing.T) {
 				t.Errorf("Error code = %d, want %d for message %q", errCode, tt.wantCode, tt.errMsg)
 			}
 		})
+	}
+}
+
+func TestSessionManagerSend_AgentTypeValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		params        string
+		wantErrCode   int
+		wantErrMsg    string
+		wantAgentType string
+	}{
+		{
+			name:        "invalid agent_type",
+			params:      `{"workspace_id":"ws-123","prompt":"hello","agent_type":"gemini"}`,
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type must be one of: claude, codex",
+		},
+		{
+			name:          "codex runtime not configured",
+			params:        `{"workspace_id":"ws-123","prompt":"hello","agent_type":"codex"}`,
+			wantErrCode:   message.AgentNotConfigured,
+			wantErrMsg:    "codex runtime requires session manager context",
+			wantAgentType: "codex",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &SessionManagerService{manager: nil}
+
+			_, err := service.Send(context.Background(), []byte(tt.params))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if err.Code != tt.wantErrCode {
+				t.Errorf("error code = %d, want %d", err.Code, tt.wantErrCode)
+			}
+
+			if tt.wantErrMsg != "" && !containsSubstr(err.Message, tt.wantErrMsg) {
+				t.Errorf("error message = %q, want to contain %q", err.Message, tt.wantErrMsg)
+			}
+
+			if tt.wantAgentType != "" {
+				var data map[string]string
+				if unmarshalErr := json.Unmarshal(err.Data, &data); unmarshalErr != nil {
+					t.Fatalf("failed to parse error data: %v", unmarshalErr)
+				}
+				if data["agent_type"] != tt.wantAgentType {
+					t.Errorf("error data agent_type = %q, want %q", data["agent_type"], tt.wantAgentType)
+				}
+			}
+		})
+	}
+}
+
+func TestSessionManagerStart_AgentTypeValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		params      string
+		wantErrCode int
+		wantErrMsg  string
+	}{
+		{
+			name:        "invalid agent_type",
+			params:      `{"workspace_id":"ws-123","agent_type":"gemini"}`,
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type must be one of: claude, codex",
+		},
+		{
+			name:        "codex runtime not configured",
+			params:      `{"workspace_id":"ws-123","agent_type":"codex"}`,
+			wantErrCode: message.AgentNotConfigured,
+			wantErrMsg:  "codex runtime requires session manager context",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &SessionManagerService{manager: nil}
+
+			_, err := service.Start(context.Background(), []byte(tt.params))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+
+			if err.Code != tt.wantErrCode {
+				t.Errorf("error code = %d, want %d", err.Code, tt.wantErrCode)
+			}
+
+			if tt.wantErrMsg != "" && !containsSubstr(err.Message, tt.wantErrMsg) {
+				t.Errorf("error message = %q, want to contain %q", err.Message, tt.wantErrMsg)
+			}
+		})
+	}
+}
+
+func TestSessionManagerWorkspaceMethods_ManagerNotConfigured(t *testing.T) {
+	service := &SessionManagerService{manager: nil}
+
+	tests := []struct {
+		name       string
+		methodName string
+		params     string
+		call       func(context.Context, json.RawMessage) (interface{}, *message.Error)
+	}{
+		{
+			name:       "workspace session history",
+			methodName: "workspace/session/history",
+			params:     `{"workspace_id":"ws-123","agent_type":"codex"}`,
+			call:       service.History,
+		},
+		{
+			name:       "workspace session messages",
+			methodName: "workspace/session/messages",
+			params:     `{"workspace_id":"ws-123","session_id":"sess-1","agent_type":"codex"}`,
+			call:       service.GetSessionMessages,
+		},
+		{
+			name:       "workspace session delete",
+			methodName: "workspace/session/delete",
+			params:     `{"workspace_id":"ws-123","session_id":"sess-1","agent_type":"codex"}`,
+			call:       service.DeleteHistorySession,
+		},
+		{
+			name:       "workspace session watch",
+			methodName: "workspace/session/watch",
+			params:     `{"workspace_id":"ws-123","session_id":"sess-1","agent_type":"codex"}`,
+			call:       service.WatchSession,
+		},
+		{
+			name:       "workspace session unwatch claude",
+			methodName: "workspace/session/unwatch",
+			params:     `{"agent_type":"claude"}`,
+			call:       service.UnwatchSession,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.call(context.Background(), []byte(tt.params))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if err.Code != message.AgentNotConfigured {
+				t.Fatalf("error code = %d, want %d", err.Code, message.AgentNotConfigured)
+			}
+			if !containsSubstr(err.Message, "session manager is not configured") {
+				t.Fatalf("error message = %q, want manager not configured", err.Message)
+			}
+
+			var data map[string]string
+			if unmarshalErr := json.Unmarshal(err.Data, &data); unmarshalErr != nil {
+				t.Fatalf("failed to parse error data: %v", unmarshalErr)
+			}
+			if data["method"] != tt.methodName {
+				t.Fatalf("error data method = %q, want %q", data["method"], tt.methodName)
+			}
+		})
+	}
+}
+
+func TestSessionManagerUnwatchSession_LegacyWithoutManager(t *testing.T) {
+	service := &SessionManagerService{
+		manager:       nil,
+		codexWatchers: make(map[string]session.WatchInfo),
+	}
+
+	result, err := service.UnwatchSession(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	resMap, ok := result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("result type = %T, want map[string]interface{}", result)
+	}
+
+	if status, _ := resMap["status"].(string); status != "unwatched" {
+		t.Fatalf("status = %v, want unwatched", resMap["status"])
+	}
+	if watching, _ := resMap["watching"].(bool); watching {
+		t.Fatalf("watching = %v, want false", resMap["watching"])
 	}
 }
 

@@ -3,6 +3,8 @@ package methods
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/rpc/handler"
@@ -20,6 +22,9 @@ type SessionInfo struct {
 	// Summary is a brief description of the session.
 	Summary string `json:"summary,omitempty"`
 
+	// FirstPrompt is the first user message (for Codex sessions).
+	FirstPrompt string `json:"first_prompt,omitempty"`
+
 	// MessageCount is the number of messages in the session.
 	MessageCount int `json:"message_count"`
 
@@ -32,8 +37,29 @@ type SessionInfo struct {
 	// Branch is the git branch (if available).
 	Branch string `json:"branch,omitempty"`
 
+	// GitCommit is the git commit hash (if available).
+	GitCommit string `json:"git_commit,omitempty"`
+
+	// GitRepo is the repository URL (if available).
+	GitRepo string `json:"git_repo,omitempty"`
+
 	// ProjectPath is the project this session belongs to.
 	ProjectPath string `json:"project_path,omitempty"`
+
+	// ModelProvider is the AI provider (openai, anthropic, etc.).
+	ModelProvider string `json:"model_provider,omitempty"`
+
+	// Model is the specific model used.
+	Model string `json:"model,omitempty"`
+
+	// CLIVersion is the CLI version that created the session.
+	CLIVersion string `json:"cli_version,omitempty"`
+
+	// FileSize is the session file size in bytes.
+	FileSize int64 `json:"file_size,omitempty"`
+
+	// FilePath is the full path to the session file.
+	FilePath string `json:"file_path,omitempty"`
 }
 
 // SessionMessage represents a raw cached message matching the HTTP API format.
@@ -115,7 +141,8 @@ type SessionElement struct {
 // This is CLI-agnostic and can be implemented for Claude, Gemini, Codex, etc.
 type SessionProvider interface {
 	// ListSessions returns available sessions for the current project.
-	ListSessions(ctx context.Context) ([]SessionInfo, error)
+	// If projectPath is provided, filters sessions to that project path.
+	ListSessions(ctx context.Context, projectPath string) ([]SessionInfo, error)
 
 	// GetSession returns detailed session info.
 	GetSession(ctx context.Context, sessionID string) (*SessionInfo, error)
@@ -149,18 +176,47 @@ type SessionStreamer interface {
 	GetWatchedSession() string
 }
 
+// WorkspacePathResolver resolves workspace path from workspace ID.
+type WorkspacePathResolver interface {
+	GetWorkspacePath(workspaceID string) (string, error)
+}
+
 // SessionService provides session-related RPC methods.
 type SessionService struct {
-	providers map[string]SessionProvider // keyed by agent type
-	streamer  SessionStreamer            // for real-time watching
+	providers         map[string]SessionProvider // keyed by agent type
+	streamer          SessionStreamer            // default streamer (legacy Claude)
+	streamers         map[string]SessionStreamer // per-agent streamers
+	workspaceResolver WorkspacePathResolver      // resolves workspace ID to path
+}
+
+func isNilSessionStreamer(streamer SessionStreamer) bool {
+	if streamer == nil {
+		return true
+	}
+	v := reflect.ValueOf(streamer)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // NewSessionService creates a new session service.
 func NewSessionService(streamer SessionStreamer) *SessionService {
+	if isNilSessionStreamer(streamer) {
+		streamer = nil
+	}
 	return &SessionService{
 		providers: make(map[string]SessionProvider),
 		streamer:  streamer,
+		streamers: make(map[string]SessionStreamer),
 	}
+}
+
+// SetWorkspaceResolver sets the workspace path resolver.
+func (s *SessionService) SetWorkspaceResolver(resolver WorkspacePathResolver) {
+	s.workspaceResolver = resolver
 }
 
 // RegisterProvider registers a session provider for an agent type.
@@ -168,13 +224,22 @@ func (s *SessionService) RegisterProvider(provider SessionProvider) {
 	s.providers[provider.AgentType()] = provider
 }
 
+// RegisterStreamer registers a streamer for a specific agent type.
+func (s *SessionService) RegisterStreamer(agentType string, streamer SessionStreamer) {
+	if agentType == "" || isNilSessionStreamer(streamer) {
+		return
+	}
+	s.streamers[agentType] = streamer
+}
+
 // RegisterMethods registers all session methods with the registry.
 func (s *SessionService) RegisterMethods(r *handler.Registry) {
 	r.RegisterWithMeta("session/list", s.ListSessions, handler.MethodMeta{
 		Summary:     "List sessions",
-		Description: "Returns a list of available sessions from all configured AI agents.",
+		Description: "Returns a list of available sessions from all configured AI agents. For Codex, sessions include rich metadata (git info, model, first prompt).",
 		Params: []handler.OpenRPCParam{
 			{Name: "agent_type", Description: "Filter by agent type (optional)", Required: false, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "project_path", Description: "Filter by project path (optional, for Codex sessions)", Required: false, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "limit", Description: "Maximum number of sessions to return", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
 		},
 		Result: &handler.OpenRPCResult{Name: "SessionListResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionListResult"}},
@@ -224,6 +289,7 @@ func (s *SessionService) RegisterMethods(r *handler.Registry) {
 		Description: "Starts watching a session for real-time updates. The client will receive notifications when new messages are added.",
 		Params: []handler.OpenRPCParam{
 			{Name: "session_id", Description: "Session ID to watch", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "agent_type", Description: "Agent type (optional)", Required: false, Schema: map[string]interface{}{"type": "string"}},
 		},
 		Result: &handler.OpenRPCResult{Name: "SessionWatchResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionWatchResult"}},
 		Errors: []string{"SessionNotFound"},
@@ -232,8 +298,10 @@ func (s *SessionService) RegisterMethods(r *handler.Registry) {
 	r.RegisterWithMeta("session/unwatch", s.UnwatchSession, handler.MethodMeta{
 		Summary:     "Stop watching session",
 		Description: "Stops watching the current session.",
-		Params:      []handler.OpenRPCParam{},
-		Result:      &handler.OpenRPCResult{Name: "SessionUnwatchResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionUnwatchResult"}},
+		Params: []handler.OpenRPCParam{
+			{Name: "agent_type", Description: "Agent type to unwatch (optional, unwatchs all when omitted)", Required: false, Schema: map[string]interface{}{"type": "string"}},
+		},
+		Result: &handler.OpenRPCResult{Name: "SessionUnwatchResult", Schema: map[string]interface{}{"$ref": "#/components/schemas/SessionUnwatchResult"}},
 	})
 }
 
@@ -241,6 +309,9 @@ func (s *SessionService) RegisterMethods(r *handler.Registry) {
 type ListSessionsParams struct {
 	// AgentType filters by agent type (optional, empty = all).
 	AgentType string `json:"agent_type,omitempty"`
+
+	// WorkspaceID filters by workspace (server resolves path automatically).
+	WorkspaceID string `json:"workspace_id,omitempty"`
 
 	// Limit is the max number of sessions to return.
 	Limit int `json:"limit,omitempty"`
@@ -266,6 +337,14 @@ func (s *SessionService) ListSessions(ctx context.Context, params json.RawMessag
 		limit = 50
 	}
 
+	// Resolve project path from workspace ID if provided
+	var projectPath string
+	if p.WorkspaceID != "" && s.workspaceResolver != nil {
+		if resolvedPath, err := s.workspaceResolver.GetWorkspacePath(p.WorkspaceID); err == nil {
+			projectPath = resolvedPath
+		}
+	}
+
 	var allSessions []SessionInfo
 
 	// Collect sessions from all providers (or filtered by agent type)
@@ -274,7 +353,7 @@ func (s *SessionService) ListSessions(ctx context.Context, params json.RawMessag
 			continue
 		}
 
-		sessions, err := provider.ListSessions(ctx)
+		sessions, err := provider.ListSessions(ctx, projectPath)
 		if err != nil {
 			continue // Skip providers that fail
 		}
@@ -510,6 +589,7 @@ func getOffsetFromCursor(afterID string, elements []SessionElement) int {
 // WatchSessionParams for session/watch method.
 type WatchSessionParams struct {
 	SessionID string `json:"session_id"`
+	AgentType string `json:"agent_type,omitempty"`
 }
 
 // WatchSessionResult for session/watch method.
@@ -532,11 +612,27 @@ func (s *SessionService) WatchSession(ctx context.Context, params json.RawMessag
 
 	// Verify session exists by trying to get it
 	sessionFound := false
-	for _, provider := range s.providers {
+	matchedAgentType := ""
+	agentType := strings.TrimSpace(p.AgentType)
+
+	if agentType != "" {
+		provider, ok := s.providers[agentType]
+		if !ok {
+			return nil, message.ErrInvalidParams("invalid agent_type: " + agentType)
+		}
 		session, err := provider.GetSession(ctx, p.SessionID)
 		if err == nil && session != nil {
 			sessionFound = true
-			break
+			matchedAgentType = agentType
+		}
+	} else {
+		for _, provider := range s.providers {
+			session, err := provider.GetSession(ctx, p.SessionID)
+			if err == nil && session != nil {
+				sessionFound = true
+				matchedAgentType = provider.AgentType()
+				break
+			}
 		}
 	}
 
@@ -545,8 +641,12 @@ func (s *SessionService) WatchSession(ctx context.Context, params json.RawMessag
 	}
 
 	// Start watching the session file for real-time updates
-	if s.streamer != nil {
-		if err := s.streamer.WatchSession(p.SessionID); err != nil {
+	streamer := s.streamers[matchedAgentType]
+	if isNilSessionStreamer(streamer) {
+		streamer = s.streamer
+	}
+	if !isNilSessionStreamer(streamer) {
+		if err := streamer.WatchSession(p.SessionID); err != nil {
 			return nil, message.ErrInternalError("failed to watch session: " + err.Error())
 		}
 	}
@@ -565,9 +665,33 @@ type UnwatchSessionResult struct {
 
 // UnwatchSession stops watching the current session.
 func (s *SessionService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-	// Stop watching the session file
-	if s.streamer != nil {
-		s.streamer.UnwatchSession()
+	var p struct {
+		AgentType string `json:"agent_type,omitempty"`
+	}
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, message.ErrInvalidParams("invalid params: " + err.Error())
+		}
+	}
+
+	agentType := strings.TrimSpace(p.AgentType)
+	if agentType != "" {
+		if streamer, ok := s.streamers[agentType]; ok && !isNilSessionStreamer(streamer) {
+			streamer.UnwatchSession()
+		}
+		if agentType == "claude" && !isNilSessionStreamer(s.streamer) {
+			s.streamer.UnwatchSession()
+		}
+	} else {
+		// Legacy behavior: stop all streamers when agent_type is omitted.
+		if !isNilSessionStreamer(s.streamer) {
+			s.streamer.UnwatchSession()
+		}
+		for _, streamer := range s.streamers {
+			if !isNilSessionStreamer(streamer) {
+				streamer.UnwatchSession()
+			}
+		}
 	}
 
 	return UnwatchSessionResult{

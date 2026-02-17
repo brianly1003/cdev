@@ -1035,6 +1035,7 @@ Start watching a session for real-time updates. The client will receive notifica
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | session_id | string | Yes | Session ID to watch |
+| agent_type | string | No | Agent type (optional, recommended for deterministic runtime routing) |
 
 **Result:**
 ```json
@@ -1058,6 +1059,24 @@ Stop watching the current session.
   "watching": false
 }
 ```
+
+---
+
+#### Runtime-Scoped Session Control Methods
+The following methods are runtime-scoped and accept optional `agent_type`:
+
+- `session/start`
+- `session/stop`
+- `session/send`
+- `session/input`
+- `session/respond`
+
+Current behavior:
+
+- If `agent_type` is omitted, cdev defaults to `"claude"`.
+- `agent_type="claude"` is supported for these methods.
+- `agent_type="codex"` is supported for interactive runtime control using Codex CLI (`codex` / `codex resume`) with PTY-backed input routing.
+- Codex history/realtime methods (`session/list|get|messages|elements|watch`) remain available via `agent_type="codex"`.
 
 ---
 

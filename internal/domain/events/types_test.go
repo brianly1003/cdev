@@ -111,6 +111,29 @@ func TestNewEventWithRequestID(t *testing.T) {
 	}
 }
 
+func TestBaseEvent_SetAgentType(t *testing.T) {
+	event := NewEvent(EventTypeClaudeMessage, map[string]string{"k": "v"})
+	event.SetAgentType("codex")
+
+	if event.AgentType != "codex" {
+		t.Fatalf("AgentType = %q, want codex", event.AgentType)
+	}
+
+	jsonBytes, err := event.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON() error = %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v", err)
+	}
+
+	if parsed["agent_type"] != "codex" {
+		t.Fatalf("JSON agent_type = %v, want codex", parsed["agent_type"])
+	}
+}
+
 func TestEventTypes_Constants(t *testing.T) {
 	// Verify all event types are unique
 	types := []EventType{

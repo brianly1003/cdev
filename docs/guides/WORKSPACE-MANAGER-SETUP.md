@@ -62,7 +62,7 @@ This guide walks you through setting up the cdev workspace manager for iOS app i
 ## Prerequisites
 
 - **cdev repository** cloned locally
-- **Go 1.21+** installed
+- **Go 1.24+** installed
 - **VS Code** with Dev Tunnels enabled
 - **Claude CLI** installed and authenticated
 - **cdev-ios app** with workspace integration
@@ -121,7 +121,7 @@ mkdir -p ~/.cdev
 cat > ~/.cdev/config.yaml << 'EOF'
 # Server settings
 server:
-  http_port: 8766
+  port: 8766
   host: "127.0.0.1"
 
 # Logging

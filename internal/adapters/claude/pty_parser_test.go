@@ -143,9 +143,9 @@ func TestPTYParser_DetectPermissionType(t *testing.T) {
 	parser := NewPTYParser()
 
 	tests := []struct {
-		name         string
-		line         string
-		expectedType PermissionType
+		name           string
+		line           string
+		expectedType   PermissionType
 		expectedTarget string
 	}{
 		{
@@ -194,7 +194,19 @@ func TestPTYParser_DetectPermissionType(t *testing.T) {
 			name:           "mcp tool",
 			line:           "mcp__server__tool",
 			expectedType:   PermissionTypeMCP,
-			expectedTarget: "",
+			expectedTarget: "mcp__server__tool",
+		},
+		{
+			name:           "mcp tool with hyphen and dot",
+			line:           "mcp__playwright-1.2__browser_navigate",
+			expectedType:   PermissionTypeMCP,
+			expectedTarget: "mcp__playwright-1.2__browser_navigate",
+		},
+		{
+			name:           "mcp tool label fallback",
+			line:           "MCP tool: playwright/browser_navigate",
+			expectedType:   PermissionTypeMCP,
+			expectedTarget: "playwright/browser_navigate",
 		},
 	}
 
@@ -207,7 +219,7 @@ func TestPTYParser_DetectPermissionType(t *testing.T) {
 				t.Errorf("detectPermissionType(%q) type = %v, want %v",
 					tt.line, parser.currentPromptType, tt.expectedType)
 			}
-			if tt.expectedTarget != "" && parser.currentPromptTarget != tt.expectedTarget {
+			if parser.currentPromptTarget != tt.expectedTarget {
 				t.Errorf("detectPermissionType(%q) target = %q, want %q",
 					tt.line, parser.currentPromptTarget, tt.expectedTarget)
 			}

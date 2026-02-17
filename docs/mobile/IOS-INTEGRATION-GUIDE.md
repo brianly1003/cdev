@@ -536,9 +536,10 @@ Set `create_if_missing` to `true` to create the directory if it doesn't exist.
 
 ### Session Methods
 
-#### `session/start` - Start a Claude session
+#### `session/start` - Start a session (runtime-scoped)
 
-Starts a new Claude CLI session for the specified workspace. Use `resume_session_id` to continue a historical session.
+Starts a new session for the specified workspace. Runtime is selected with `agent_type` (defaults to `claude`).
+Use `resume_session_id` to continue a historical session.
 
 **Parameters:**
 
@@ -546,17 +547,20 @@ Starts a new Claude CLI session for the specified workspace. Use `resume_session
 |-----------|----------|------|-------------|
 | `workspace_id` | Yes | string | Workspace ID to start session in |
 | `resume_session_id` | No | string | Historical session ID to resume (from `workspace/session/history`) |
+| `agent_type` | No | string | Runtime type: `claude` (default) or `codex` |
 
 ```json
 // Request (new session)
 {"jsonrpc": "2.0", "id": 10, "method": "session/start", "params": {
-  "workspace_id": "ws-abc123"
+  "workspace_id": "ws-abc123",
+  "agent_type": "claude"
 }}
 
 // Request (resume historical session)
 {"jsonrpc": "2.0", "id": 10, "method": "session/start", "params": {
   "workspace_id": "ws-abc123",
-  "resume_session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  "resume_session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "agent_type": "claude"
 }}
 
 // Response
@@ -573,6 +577,9 @@ Starts a new Claude CLI session for the specified workspace. Use `resume_session
 }
 ```
 
+**Codex note:** `session/start` supports `agent_type: "codex"` and attaches to
+existing Codex history for the selected workspace.
+
 **Resuming Historical Sessions:**
 
 When a user selects a historical session (status: `historical`) and wants to continue the conversation:
@@ -585,24 +592,27 @@ When a user selects a historical session (status: `historical`) and wants to con
 ```json
 // Request
 {"jsonrpc": "2.0", "id": 11, "method": "session/stop", "params": {
-  "session_id": "sess-xyz789"
+  "session_id": "sess-xyz789",
+  "agent_type": "claude"
 }}
 ```
 
-#### `session/send` - Send a prompt to Claude
+#### `session/send` - Send a prompt to a session
 
 **Important:** This method only works on sessions with `status: "running"`. For historical sessions, you must first resume them using `session/start` with `resume_session_id`.
+`agent_type` defaults to `claude`.
 
 ```json
 // Request
 {"jsonrpc": "2.0", "id": 12, "method": "session/send", "params": {
   "session_id": "sess-xyz789",
   "prompt": "Help me refactor this code",
-  "mode": "new"  // or "continue"
+  "mode": "new",  // or "continue"
+  "agent_type": "claude"
 }}
 
 // Response (success)
-{"jsonrpc": "2.0", "id": 12, "result": {"status": "sent"}}
+{"jsonrpc": "2.0", "id": 12, "result": {"status": "sent", "agent_type": "claude"}}
 
 // Response (error - session not running)
 {
@@ -611,6 +621,17 @@ When a user selects a historical session (status: `historical`) and wants to con
   "error": {
     "code": -32602,
     "message": "session not running: sess-xyz789 (use session/start with resume_session_id to resume historical sessions)"
+  }
+}
+
+// Response (codex runtime)
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "status": "sent",
+    "session_id": "29a08784-7eb4-4751-99b8-8f23ccd76e2b",
+    "agent_type": "codex"
   }
 }
 ```
@@ -622,14 +643,16 @@ When a user selects a historical session (status: `historical`) and wants to con
 {"jsonrpc": "2.0", "id": 13, "method": "session/respond", "params": {
   "session_id": "sess-xyz789",
   "type": "permission",
-  "response": "yes"  // or "no"
+  "response": "yes",  // or "no"
+  "agent_type": "claude"
 }}
 
 // Question response
 {"jsonrpc": "2.0", "id": 14, "method": "session/respond", "params": {
   "session_id": "sess-xyz789",
   "type": "question",
-  "response": "Use the singleton pattern"
+  "response": "Use the singleton pattern",
+  "agent_type": "claude"
 }}
 ```
 
@@ -777,9 +800,11 @@ When a user selects a historical session (status: `historical`) and wants to con
 | `is_context_compaction` | `true` when this is an auto-generated message created by Claude Code when the context window was maxed out |
 | `is_meta` | `true` for system-generated metadata messages (e.g., command caveats) |
 
-#### `workspace/session/watch` - Start watching for live updates
+#### `workspace/session/watch` - Start watching for live updates (Claude)
 
-**Starts watching a session file for real-time message updates.** When new messages are added to the session file, the server emits `claude_message` events. Only one session can be watched at a time.
+**Starts watching a Claude session file for real-time message updates.**
+When new messages are added to the session file, the server emits `claude_message` events.
+Only one session can be watched at a time.
 
 ```json
 // Request
@@ -806,6 +831,19 @@ When a user selects a historical session (status: `historical`) and wants to con
 2. The server starts monitoring the session file for changes
 3. When new messages are appended, you receive `claude_message` events
 4. Call `workspace/session/unwatch` when done, or watch a different session
+
+**Codex watch route:**
+
+For Codex sessions, use `session/watch` with `agent_type: "codex"` instead of
+`workspace/session/watch`.
+
+```json
+// Request (Codex)
+{"jsonrpc": "2.0", "id": 40, "method": "session/watch", "params": {
+  "session_id": "29a08784-7eb4-4751-99b8-8f23ccd76e2b",
+  "agent_type": "codex"
+}}
+```
 
 #### `workspace/session/unwatch` - Stop watching session
 

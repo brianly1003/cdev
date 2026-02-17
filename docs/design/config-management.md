@@ -64,12 +64,12 @@ Priority (highest to lowest):
 │                                                                       │
 │   Option B: Quick config changes                                     │
 │   ──────────────────────────────                                     │
-│   $ cdev config set server.http_port 9000                            │
+│   $ cdev config set server.port 9000                                 │
 │   $ cdev config set logging.level debug                              │
 │                                                                       │
 │   Option C: Environment variables                                    │
 │   ───────────────────────────────                                    │
-│   $ export CDEV_SERVER_HTTP_PORT=9000                                │
+│   $ export CDEV_SERVER_PORT=9000                                     │
 │   $ cdev start                                                       │
 │                                                                       │
 └──────────────────────────────────────────────────────────────────────┘
@@ -84,7 +84,7 @@ Display current effective configuration (merged from all sources).
 ```bash
 $ cdev config
 server:
-  http_port: 8766
+  port: 8766
   host: 127.0.0.1
 logging:
   level: info
@@ -134,8 +134,8 @@ Config dir:  ~/.cdev/
 Set a configuration value. Creates config file if it doesn't exist.
 
 ```bash
-$ cdev config set server.http_port 9000
-Set server.http_port = 9000 in ~/.cdev/config.yaml
+$ cdev config set server.port 9000
+Set server.port = 9000 in ~/.cdev/config.yaml
 
 $ cdev config set logging.level debug
 Set logging.level = debug in ~/.cdev/config.yaml
@@ -145,11 +145,9 @@ Set logging.level = debug in ~/.cdev/config.yaml
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `server.http_port` | int | 8766 | HTTP/WebSocket port |
-| `server.websocket_port` | int | 8765 | Legacy WebSocket port |
+| `server.port` | int | 8766 | Unified port for HTTP API and WebSocket |
 | `server.host` | string | 127.0.0.1 | Bind address |
-| `server.external_ws_url` | string | - | External WebSocket URL for tunnels (auto-derived from `--external-url`) |
-| `server.external_http_url` | string | - | External HTTP URL for tunnels (auto-derived from `--external-url`) |
+| `server.external_url` | string | - | Optional public URL for tunnels/port forwarding (e.g., https://tunnel.devtunnels.ms) |
 | `logging.level` | string | info | Log level: debug, info, warn, error |
 | `logging.format` | string | console | Log format: console, json |
 | `claude.command` | string | claude | Path to claude CLI |
@@ -169,7 +167,7 @@ Set logging.level = debug in ~/.cdev/config.yaml
 Get a configuration value.
 
 ```bash
-$ cdev config get server.http_port
+$ cdev config get server.port
 8766
 
 $ cdev config get logging.level
@@ -188,7 +186,7 @@ The config file uses YAML format with documentation comments:
 # Server settings
 server:
   # Port for HTTP API and WebSocket connections
-  http_port: 8766
+  port: 8766
 
   # Bind address (use 0.0.0.0 to allow external connections)
   host: "127.0.0.1"
@@ -240,7 +238,7 @@ All config values can be overridden via environment variables with `CDEV_` prefi
 
 | Config Key | Environment Variable |
 |------------|---------------------|
-| `server.http_port` | `CDEV_SERVER_HTTP_PORT` |
+| `server.port` | `CDEV_SERVER_PORT` |
 | `server.host` | `CDEV_SERVER_HOST` |
 | `logging.level` | `CDEV_LOGGING_LEVEL` |
 | `claude.command` | `CDEV_CLAUDE_COMMAND` |

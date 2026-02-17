@@ -264,7 +264,9 @@ func (s *SessionStreamer) emitStreamReadComplete(info *completeInfo) {
 		Int64("offset", info.offset).
 		Int64("file_size", info.fileSize).
 		Msg("emitting stream_read_complete event (after 3s delay)")
-	s.hub.Publish(events.NewStreamReadCompleteEvent(info.sessionID, info.messagesCount, info.offset, info.fileSize))
+	event := events.NewStreamReadCompleteEvent(info.sessionID, info.messagesCount, info.offset, info.fileSize)
+	event.SetAgentType("claude")
+	s.hub.Publish(event)
 }
 
 // checkForNewContent checks if the file has grown and reads new lines.
@@ -427,7 +429,9 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 			},
 			Timestamp: raw.Timestamp,
 		}
-		s.hub.Publish(events.NewClaudeMessageEventFull(*payload))
+		event := events.NewClaudeMessageEventFull(*payload)
+		event.SetAgentType("claude")
+		s.hub.Publish(event)
 		return payload
 	}
 
@@ -466,6 +470,7 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 					// Parse input as map
 					var inputMap map[string]interface{}
 					if json.Unmarshal(block.Input, &inputMap) == nil {
+						normalizeStreamerToolInput(cb.ToolName, inputMap)
 						cb.ToolInput = inputMap
 					}
 				}
@@ -537,9 +542,37 @@ func (s *SessionStreamer) parseAndEmitMessage(line, sessionID string) *events.Cl
 			Msg("emitting claude_message with stop_reason")
 	}
 
-	s.hub.Publish(events.NewClaudeMessageEventFull(*payload))
+	event := events.NewClaudeMessageEventFull(*payload)
+	event.SetAgentType("claude")
+	s.hub.Publish(event)
 
 	return payload
+}
+
+func normalizeStreamerToolInput(toolName string, input map[string]interface{}) {
+	if len(input) == 0 {
+		return
+	}
+
+	switch toolName {
+	case "view_image":
+		if path, ok := input["path"].(string); ok {
+			if compact := compactDotCdevStreamerPath(path); compact != "" {
+				input["path"] = compact
+			}
+		}
+	}
+}
+
+func compactDotCdevStreamerPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if idx := strings.Index(path, "/.cdev/"); idx >= 0 {
+		return path[idx+1:]
+	}
+	return path
 }
 
 // Close stops the streamer and releases resources.

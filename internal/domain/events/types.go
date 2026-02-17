@@ -83,6 +83,7 @@ type BaseEvent struct {
 	EventTime   time.Time   `json:"timestamp"`
 	WorkspaceID string      `json:"workspace_id,omitempty"`
 	SessionID   string      `json:"session_id,omitempty"`
+	AgentType   string      `json:"agent_type,omitempty"`
 	Payload     interface{} `json:"payload"`
 	RequestID   string      `json:"request_id,omitempty"`
 }
@@ -91,6 +92,11 @@ type BaseEvent struct {
 func (e *BaseEvent) SetContext(workspaceID, sessionID string) {
 	e.WorkspaceID = workspaceID
 	e.SessionID = sessionID
+}
+
+// SetAgentType sets the agent/runtime type for this event (e.g., "claude", "codex").
+func (e *BaseEvent) SetAgentType(agentType string) {
+	e.AgentType = agentType
 }
 
 // GetWorkspaceID returns the workspace ID.
@@ -152,14 +158,14 @@ func NewEventWithContext(eventType EventType, payload interface{}, workspaceID, 
 
 // GitStatusChangedPayload represents the payload for git_status_changed events.
 type GitStatusChangedPayload struct {
-	Branch        string   `json:"branch"`
-	Ahead         int      `json:"ahead"`
-	Behind        int      `json:"behind"`
-	StagedCount   int      `json:"staged_count"`
-	UnstagedCount int      `json:"unstaged_count"`
-	UntrackedCount int     `json:"untracked_count"`
-	HasConflicts  bool     `json:"has_conflicts"`
-	ChangedFiles  []string `json:"changed_files,omitempty"`
+	Branch         string   `json:"branch"`
+	Ahead          int      `json:"ahead"`
+	Behind         int      `json:"behind"`
+	StagedCount    int      `json:"staged_count"`
+	UnstagedCount  int      `json:"unstaged_count"`
+	UntrackedCount int      `json:"untracked_count"`
+	HasConflicts   bool     `json:"has_conflicts"`
+	ChangedFiles   []string `json:"changed_files,omitempty"`
 }
 
 // GitOperationCompletedPayload represents the payload for git_operation_completed events.
@@ -169,11 +175,11 @@ type GitOperationCompletedPayload struct {
 	Message   string `json:"message,omitempty"`
 	Error     string `json:"error,omitempty"`
 	// Operation-specific fields
-	SHA            string   `json:"sha,omitempty"`             // for commit
-	Branch         string   `json:"branch,omitempty"`          // for checkout
-	FilesAffected  int      `json:"files_affected,omitempty"`  // for stage/unstage/discard/commit
-	CommitsPushed  int      `json:"commits_pushed,omitempty"`  // for push
-	CommitsPulled  int      `json:"commits_pulled,omitempty"`  // for pull
+	SHA             string   `json:"sha,omitempty"`              // for commit
+	Branch          string   `json:"branch,omitempty"`           // for checkout
+	FilesAffected   int      `json:"files_affected,omitempty"`   // for stage/unstage/discard/commit
+	CommitsPushed   int      `json:"commits_pushed,omitempty"`   // for push
+	CommitsPulled   int      `json:"commits_pulled,omitempty"`   // for pull
 	ConflictedFiles []string `json:"conflicted_files,omitempty"` // for pull with conflicts
 }
 

@@ -374,7 +374,7 @@ Set up GitHub Actions for automated testing and builds.
 
 **Implementation:**
 - `.github/workflows/ci.yml`
-  - Tests on Ubuntu + macOS with Go 1.21 and 1.22
+  - Tests on Ubuntu + macOS with Go (from `go.mod`, currently Go 1.24)
   - Race detection enabled (`go test -v -race ./...`)
   - Coverage reporting with Codecov
   - golangci-lint integration

@@ -67,8 +67,8 @@ type Manager struct {
 	ptyParser *PTYParser // Parser for PTY output
 
 	// PTY state tracking
-	ptyState         PTYState            // Current PTY interaction state
-	ptyPromptType    PermissionType      // Type of permission being requested
+	ptyState          PTYState             // Current PTY interaction state
+	ptyPromptType     PermissionType       // Type of permission being requested
 	lastPTYPermission *PTYPermissionPrompt // Last detected permission prompt (for reconnect)
 
 	// Session tracking
@@ -160,6 +160,7 @@ func (m *Manager) publishEvent(event *events.BaseEvent) {
 	}
 	// Set context on the event before publishing
 	event.SetContext(m.workspaceID, m.sessionID)
+	event.SetAgentType("claude")
 	m.hub.Publish(event)
 }
 
@@ -1329,7 +1330,6 @@ func hasLikelySpinnerPrefix(text string) bool {
 	return true
 }
 
-
 // claudeMessage represents a parsed Claude output message.
 type claudeMessage struct {
 	Type      string `json:"type"`
@@ -1408,7 +1408,7 @@ func (m *Manager) parseAndDetectToolUse(line string) {
 					return
 				}
 
-				if permissionTools[content.Name] {
+				if permissionTools[content.Name] || isMCPToolName(content.Name) {
 					m.mu.Lock()
 					m.waitingForInput = true
 					m.pendingToolUseID = content.ID
@@ -1450,6 +1450,19 @@ func generateToolDescription(toolName string, input json.RawMessage) string {
 		return fmt.Sprintf("Use %s tool", toolName)
 	}
 
+	if isMCPToolName(toolName) {
+		if target, ok := params["url"].(string); ok && target != "" {
+			return fmt.Sprintf("Use MCP tool %s on %s", toolName, target)
+		}
+		if target, ok := params["path"].(string); ok && target != "" {
+			return fmt.Sprintf("Use MCP tool %s on %s", toolName, target)
+		}
+		if target, ok := params["selector"].(string); ok && target != "" {
+			return fmt.Sprintf("Use MCP tool %s with selector %s", toolName, target)
+		}
+		return fmt.Sprintf("Use MCP tool: %s", toolName)
+	}
+
 	switch toolName {
 	case "Write":
 		if path, ok := params["file_path"].(string); ok {
@@ -1489,6 +1502,10 @@ func generateToolDescription(toolName string, input json.RawMessage) string {
 	}
 
 	return fmt.Sprintf("Use %s tool", toolName)
+}
+
+func isMCPToolName(toolName string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(toolName)), "mcp__")
 }
 
 // claudeStreamMessage represents a message from Claude CLI stream-json output.
@@ -1569,6 +1586,7 @@ func (m *Manager) convertToClaudeMessagePayload(parsed *events.ParsedClaudeMessa
 			if block.ToolInput != "" {
 				var inputMap map[string]interface{}
 				if err := json.Unmarshal([]byte(block.ToolInput), &inputMap); err == nil {
+					normalizeClaudeToolInput(content.ToolName, inputMap)
 					content.ToolInput = inputMap
 				}
 			}
@@ -1581,6 +1599,32 @@ func (m *Manager) convertToClaudeMessagePayload(parsed *events.ParsedClaudeMessa
 	}
 
 	return payload
+}
+
+func normalizeClaudeToolInput(toolName string, input map[string]interface{}) {
+	if len(input) == 0 {
+		return
+	}
+
+	switch toolName {
+	case "view_image":
+		if path, ok := input["path"].(string); ok {
+			if compact := compactDotCdevPath(path); compact != "" {
+				input["path"] = compact
+			}
+		}
+	}
+}
+
+func compactDotCdevPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	if idx := strings.Index(path, "/.cdev/"); idx >= 0 {
+		return path[idx+1:]
+	}
+	return path
 }
 
 // parseClaudeJSON parses a line of Claude CLI stream-json output and returns structured data.

@@ -76,10 +76,10 @@ var configGetCmd = &cobra.Command{
 
 Keys use dot notation to access nested values.
 
-Examples:
-  cdev config get server.http_port
-  cdev config get logging.level
-  cdev config get claude.command`,
+	Examples:
+	  cdev config get server.port
+	  cdev config get logging.level
+	  cdev config get claude.command`,
 	Args: cobra.ExactArgs(1),
 	RunE: runConfigGet,
 }
@@ -93,10 +93,10 @@ var configSetCmd = &cobra.Command{
 Creates the config file if it doesn't exist.
 Keys use dot notation to access nested values.
 
-Examples:
-  cdev config set server.http_port 9000
-  cdev config set logging.level debug
-  cdev config set claude.skip_permissions true`,
+	Examples:
+	  cdev config set server.port 9000
+	  cdev config set logging.level debug
+	  cdev config set claude.skip_permissions true`,
 	Args: cobra.ExactArgs(2),
 	RunE: runConfigSet,
 }

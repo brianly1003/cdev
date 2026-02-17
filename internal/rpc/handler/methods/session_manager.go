@@ -2,21 +2,29 @@
 package methods
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/adapters/codex"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
+	"github.com/creack/pty"
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 // SessionFocusProvider handles session focus tracking for multi-device awareness.
@@ -27,15 +35,38 @@ type SessionFocusProvider interface {
 // SessionManagerService handles session-related JSON-RPC methods for the new architecture.
 // This replaces the old workspace start/stop with session-based management.
 type SessionManagerService struct {
-	manager       *session.Manager
-	focusProvider SessionFocusProvider
+	manager        *session.Manager
+	focusProvider  SessionFocusProvider
+	sessionService *SessionService
+
+	codexMu         sync.Mutex
+	codexSessions   map[string]*codexPTYSession
+	codexWatchers   map[string]session.WatchInfo
+	runtimeDispatch map[string]sessionRuntimeDispatch
+}
+
+const (
+	sessionManagerAgentClaude = "claude"
+	sessionManagerAgentCodex  = "codex"
+)
+
+type codexPTYSession struct {
+	sessionID   string
+	workspaceID string
+	workspace   string
+	cmd         *exec.Cmd
+	ptmx        *os.File
 }
 
 // NewSessionManagerService creates a new session manager service.
 func NewSessionManagerService(manager *session.Manager) *SessionManagerService {
-	return &SessionManagerService{
-		manager: manager,
+	service := &SessionManagerService{
+		manager:       manager,
+		codexSessions: make(map[string]*codexPTYSession),
+		codexWatchers: make(map[string]session.WatchInfo),
 	}
+	service.ensureRuntimeDispatch()
+	return service
 }
 
 // SetFocusProvider sets the session focus provider for multi-device awareness.
@@ -44,15 +75,21 @@ func (s *SessionManagerService) SetFocusProvider(provider SessionFocusProvider) 
 	s.focusProvider = provider
 }
 
+// SetSessionService sets the shared session service for runtime-scoped delegation.
+func (s *SessionManagerService) SetSessionService(sessionService *SessionService) {
+	s.sessionService = sessionService
+}
+
 // RegisterMethods registers all session management methods with the handler.
 func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	// Session lifecycle methods
 	registry.RegisterWithMeta("session/start", s.Start, handler.MethodMeta{
-		Summary:     "Start or attach to a Claude session for a workspace",
-		Description: "If session_id is provided, validates it exists in .claude/projects and returns it for LIVE session attachment. If session_id doesn't exist, returns empty to let user select from history. If no session_id provided, starts a new managed session.",
+		Summary:     "Start or attach to a session for a workspace",
+		Description: "Starts or attaches to a runtime session (Claude or Codex) for the workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
-			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional session ID to attach to. If provided, validates against .claude/projects source of truth."}},
+			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional session ID to attach to."}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "session",
@@ -61,10 +98,11 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	registry.RegisterWithMeta("session/stop", s.Stop, handler.MethodMeta{
-		Summary:     "Stop a Claude session",
-		Description: "Stops a running Claude CLI session.",
+		Summary:     "Stop a running session",
+		Description: "Stops a running Claude or Codex session process.",
 		Params: []handler.OpenRPCParam{
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -74,13 +112,14 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("session/send", s.Send, handler.MethodMeta{
 		Summary:     "Send a prompt to a session",
-		Description: "Sends a prompt to the Claude CLI. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
+		Description: "Sends a prompt to the selected runtime. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
 		Params: []handler.OpenRPCParam{
 			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Session ID to send to. If empty, workspace_id must be provided to auto-create a session."}},
 			{Name: "workspace_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Workspace ID. Required when session_id is empty to auto-create a new session."}},
 			{Name: "prompt", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}, "default": "new", "description": "Session mode. 'new' starts fresh conversation (default), 'continue' resumes existing."}},
 			{Name: "permission_mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default", "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all permission checks, 'interactive' to use PTY mode for true terminal-like permission prompts."}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -90,11 +129,12 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("session/input", s.Input, handler.MethodMeta{
 		Summary:     "Send input to an interactive session",
-		Description: "Sends keyboard input to a session running in interactive (PTY) mode. Use this to respond to permission prompts. Either 'input' (raw text) or 'key' (special key name) must be provided.",
+		Description: "Sends keyboard input to a session running in interactive (PTY) mode. Either 'input' (raw text) or 'key' (special key name) must be provided.",
 		Params: []handler.OpenRPCParam{
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "input", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Raw text input to send (e.g., '1' for Yes, '2' for Yes all, 'n' for No). A carriage return is auto-appended for text input."}},
 			{Name: "key", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"enter", "escape", "up", "down", "left", "right", "tab", "backspace", "delete", "home", "end", "pageup", "pagedown", "space"}, "description": "Special key name to send. Use 'enter' to confirm prompts, arrow keys for navigation."}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -104,11 +144,12 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("session/respond", s.Respond, handler.MethodMeta{
 		Summary:     "Respond to a permission or question",
-		Description: "Responds to a pending permission request or interactive question from Claude.",
+		Description: "Responds to a pending permission request or interactive question for the selected runtime.",
 		Params: []handler.OpenRPCParam{
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "type", Required: true, Schema: map[string]interface{}{"type": "string", "enum": []string{"permission", "question"}}},
 			{Name: "response", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "result",
@@ -153,11 +194,12 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	registry.RegisterWithMeta("session/history", s.History, handler.MethodMeta{
-		Summary:     "Get historical Claude sessions for a workspace (legacy, use workspace/session/history)",
-		Description: "Returns a list of historical Claude sessions from the session cache for the specified workspace. Sessions are stored at ~/.claude/projects/<encoded-path>.",
+		Summary:     "Get historical sessions for a workspace (legacy, use workspace/session/history)",
+		Description: "Returns historical sessions for the selected runtime in the specified workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "limit", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "history",
@@ -166,11 +208,12 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	registry.RegisterWithMeta("workspace/session/history", s.History, handler.MethodMeta{
-		Summary:     "Get historical Claude sessions for a workspace",
-		Description: "Returns a list of historical Claude sessions from the session cache for the specified workspace. Sessions are stored at ~/.claude/projects/<encoded-path>.",
+		Summary:     "Get historical sessions for a workspace",
+		Description: "Returns historical sessions for the selected runtime in the specified workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "limit", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "history",
@@ -179,14 +222,15 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	registry.RegisterWithMeta("workspace/session/messages", s.GetSessionMessages, handler.MethodMeta{
-		Summary:     "Get messages from a historical Claude session",
-		Description: "Returns paginated messages from a Claude session file for the specified workspace. Use workspace/session/history to get available session IDs.",
+		Summary:     "Get messages from a historical session",
+		Description: "Returns paginated messages from a runtime session file for the specified workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "limit", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 50}},
 			{Name: "offset", Required: false, Schema: map[string]interface{}{"type": "integer", "default": 0}},
 			{Name: "order", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"asc", "desc"}, "default": "asc"}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "messages",
@@ -196,10 +240,11 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("workspace/session/watch", s.WatchSession, handler.MethodMeta{
 		Summary:     "Start watching a session for real-time updates",
-		Description: "Starts watching a session file for new messages. The client will receive claude_message events when new messages are added. Only one session can be watched at a time.",
+		Description: "Starts watching a session file for new messages for the selected runtime. Only one session can be watched per client/runtime.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "watch_info",
@@ -209,8 +254,10 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("workspace/session/unwatch", s.UnwatchSession, handler.MethodMeta{
 		Summary:     "Stop watching the current session",
-		Description: "Stops watching the currently watched session. No more claude_message events will be sent for that session.",
-		Params:      []handler.OpenRPCParam{},
+		Description: "Stops watching the currently watched session for the selected runtime.",
+		Params: []handler.OpenRPCParam{
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
+		},
 		Result: &handler.OpenRPCResult{
 			Name:   "unwatch_info",
 			Schema: map[string]interface{}{"type": "object"},
@@ -232,10 +279,11 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("workspace/session/delete", s.DeleteHistorySession, handler.MethodMeta{
 		Summary:     "Delete a historical session file",
-		Description: "Deletes a Claude session file (.jsonl) from ~/.claude/projects/<encoded-path>/. This permanently removes the session history.",
+		Description: "Deletes a runtime session file from local history storage for the specified workspace.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string", "description": "Workspace ID"}},
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string", "description": "Session ID (UUID) to delete"}},
+			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "delete_result",
@@ -629,15 +677,13 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 }
 
-// Start starts or attaches to a Claude session for a workspace.
-// If session_id is provided, validates it exists in .claude/projects (source of truth).
-// If session_id exists, returns it for LIVE session attachment.
-// If session_id doesn't exist, returns empty session_id to let user select from history.
-// If no session_id provided, starts a new managed session.
+// Start starts or attaches to a session for a workspace.
+// Runtime behavior is selected by agent_type (claude or codex).
 func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
 		SessionID   string `json:"session_id"` // Optional: attach to existing LIVE session
+		AgentType   string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -647,167 +693,18 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
 
-	// If session_id is provided, validate against .claude/projects
-	if p.SessionID != "" {
-		exists, err := s.manager.SessionFileExists(p.WorkspaceID, p.SessionID)
-		if err != nil {
-			return nil, message.NewError(message.InternalError, err.Error())
-		}
-
-		if exists {
-			// Session exists in .claude/projects - activate it for LIVE attachment
-			_ = s.manager.ActivateSession(p.WorkspaceID, p.SessionID)
-			return map[string]interface{}{
-				"session_id":   p.SessionID,
-				"workspace_id": p.WorkspaceID,
-				"source":       "live",
-				"status":       "attached",
-				"message":      "Session found in .claude/projects - ready for LIVE interaction",
-			}, nil
-		} else {
-			// Session doesn't exist - return empty to let user select from history
-			return map[string]interface{}{
-				"session_id":   "",
-				"workspace_id": p.WorkspaceID,
-				"source":       "",
-				"status":       "not_found",
-				"message":      "Session not found in .claude/projects. Use workspace/session/history to select a valid session.",
-			}, nil
-		}
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
 	}
-
-	// No session_id provided - get the latest session from .claude/projects
-	latestSessionID, err := s.manager.GetLatestSessionID(p.WorkspaceID)
-	if err != nil {
-		return nil, message.NewError(message.InternalError, err.Error())
-	}
-
-	if latestSessionID != "" {
-		// Activate the latest session for LIVE attachment
-		_ = s.manager.ActivateSession(p.WorkspaceID, latestSessionID)
-		return map[string]interface{}{
-			"session_id":   latestSessionID,
-			"workspace_id": p.WorkspaceID,
-			"source":       "live",
-			"status":       "attached",
-			"message":      "Latest session found in .claude/projects - ready for LIVE interaction",
-		}, nil
-	}
-
-	// Check if there's already an active managed session for this workspace
-	// This handles the case where iOS app was closed and reopened while Claude
-	// was still waiting for trust folder approval
-	if activeSessionID := s.manager.GetActiveSession(p.WorkspaceID); activeSessionID != "" {
-		if existingSession, err := s.manager.GetSession(activeSessionID); err == nil {
-			status := existingSession.GetStatus()
-			if status == session.StatusRunning || status == session.StatusStarting {
-				// Check if there's a pending permission (e.g., trust folder prompt)
-				result := map[string]interface{}{
-					"session_id":             activeSessionID,
-					"workspace_id":           p.WorkspaceID,
-					"source":                 "managed",
-					"status":                 "existing",
-					"message":                "Returning existing active session (Claude still running)",
-					"has_pending_permission": false,
-				}
-
-				// If there's a pending permission, re-emit the pty_permission event
-				// so the reconnecting client can show the permission dialog
-				if cm := existingSession.ClaudeManager(); cm != nil {
-					if pendingPerm := cm.GetPendingPTYPermission(); pendingPerm != nil {
-						result["has_pending_permission"] = true
-						result["pending_permission_type"] = string(pendingPerm.Type)
-						result["pending_permission_target"] = pendingPerm.Target
-
-						// Re-emit the pty_permission event for the reconnecting client
-						options := make([]events.PTYPromptOption, len(pendingPerm.Options))
-						for i, opt := range pendingPerm.Options {
-							options[i] = events.PTYPromptOption{
-								Key:         opt.Key,
-								Label:       opt.Label,
-								Description: opt.Description,
-								Selected:    opt.Selected,
-							}
-						}
-						s.manager.PublishEvent(events.NewPTYPermissionEventWithSession(
-							string(pendingPerm.Type),
-							pendingPerm.Target,
-							pendingPerm.Description,
-							pendingPerm.Preview,
-							activeSessionID,
-							options,
-						))
-					}
-				}
-
-				return result, nil
-			}
-		}
-	}
-
-	// No sessions found in .claude/projects - start a new managed session
-	// This starts Claude in interactive mode (PTY) waiting for user input
-	newSession, err := s.manager.StartSession(p.WorkspaceID)
-	if err != nil {
-		return nil, message.NewError(message.InternalError, "failed to start session: "+err.Error())
-	}
-
-	// Get workspace for path
-	ws, err := s.manager.GetWorkspace(p.WorkspaceID)
-	if err != nil {
-		return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
-	}
-
-	// Always watch for new session file creation for PTY sessions
-	// Claude creates a NEW session file with a NEW UUID every time it starts
-	// The temporary ID generated by cdev is internal only - we need to detect
-	// the real session ID from Claude and emit session_id_resolved event
-	// so iOS can switch to watching the real session file
-	go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
-
-	// Start Claude in interactive PTY mode (no initial prompt)
-	claudeManager := newSession.ClaudeManager()
-	if claudeManager != nil {
-		// Set up callback to detect when Claude exits without creating a session
-		// This handles the case where user declines trust folder (clicks "No")
-		temporaryID := newSession.ID
-		workspaceID := p.WorkspaceID
-		claudeManager.SetOnPTYComplete(func(sid string) {
-			// Check if there's still an active watcher - if so, Claude exited
-			// without creating a session file (user likely declined trust)
-			if s.manager.HasActiveSessionFileWatcher(workspaceID) {
-				s.manager.FailSessionIDResolution(
-					workspaceID,
-					temporaryID,
-					"trust_declined",
-					"Claude exited without creating a session. User may have declined trust folder.",
-				)
-			}
-		})
-
-		go func() {
-			// Start Claude with empty prompt for interactive mode
-			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID); err != nil {
-				// Log error but don't fail - session is still created
-				// The user can send a prompt via session/send
-				fmt.Printf("Warning: failed to start Claude in interactive mode: %v\n", err)
-			}
-		}()
-	}
-
-	return map[string]interface{}{
-		"session_id":   newSession.ID,
-		"workspace_id": p.WorkspaceID,
-		"source":       "managed",
-		"status":       "started",
-		"message":      "New Claude session started in interactive mode",
-	}, nil
+	return runtimeDispatch.start(ctx, p.WorkspaceID, p.SessionID)
 }
 
 // Stop stops a running session.
 func (s *SessionManagerService) Stop(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		SessionID string `json:"session_id"`
+		AgentType string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -817,18 +714,16 @@ func (s *SessionManagerService) Stop(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	if err := s.manager.StopSession(p.SessionID); err != nil {
-		return nil, message.NewError(message.InternalError, err.Error())
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
 	}
-
-	return map[string]interface{}{
-		"success": true,
-		"message": "Session stopped",
-	}, nil
+	return runtimeDispatch.stop(ctx, p.SessionID)
 }
 
 // Send sends a prompt to a session.
 // If session_id is empty but workspace_id is provided, auto-creates a new session.
+// Runtime behavior is selected by agent_type (claude or codex).
 func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		SessionID      string `json:"session_id"`
@@ -836,6 +731,7 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		Prompt         string `json:"prompt"`
 		Mode           string `json:"mode"`            // "new" or "continue"
 		PermissionMode string `json:"permission_mode"` // "default", "acceptEdits", "bypassPermissions", "plan", "interactive"
+		AgentType      string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -845,12 +741,13 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "prompt is required")
 	}
 
-	// Validate permission_mode if provided
-	if p.PermissionMode != "" {
-		validModes := map[string]bool{"default": true, "acceptEdits": true, "bypassPermissions": true, "plan": true, "interactive": true}
-		if !validModes[p.PermissionMode] {
-			return nil, message.NewError(message.InvalidParams, "permission_mode must be one of: default, acceptEdits, bypassPermissions, plan, interactive")
-		}
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
+	}
+
+	if err := validatePermissionMode(p.PermissionMode); err != nil {
+		return nil, err
 	}
 
 	// Default mode to "new" if not specified
@@ -858,74 +755,7 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		p.Mode = "new"
 	}
 
-	// Auto-create session if session_id is empty but workspace_id is provided
-	if p.SessionID == "" {
-		if p.WorkspaceID == "" {
-			return nil, message.NewError(message.InvalidParams, "either session_id or workspace_id is required")
-		}
-
-		// Auto-create a new session for this workspace
-		newSession, err := s.manager.StartSession(p.WorkspaceID)
-		if err != nil {
-			return nil, message.NewError(message.InternalError, "failed to auto-create session: "+err.Error())
-		}
-
-		p.SessionID = newSession.ID
-
-		// Get workspace for path (needed for session file watcher)
-		ws, err := s.manager.GetWorkspace(p.WorkspaceID)
-		if err != nil {
-			return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
-		}
-
-		// Always watch for new session file creation for PTY sessions
-		// Claude creates a NEW session file with a NEW UUID every time
-		go s.manager.WatchForNewSessionFile(ctx, p.WorkspaceID, newSession.ID, ws.Definition.Path)
-
-		// Start Claude with the prompt immediately (don't wait for user input)
-		claudeManager := newSession.ClaudeManager()
-		if claudeManager != nil {
-			// Set up callback to detect when Claude exits without creating a session
-			temporaryID := newSession.ID
-			workspaceID := p.WorkspaceID
-			claudeManager.SetOnPTYComplete(func(sid string) {
-				if s.manager.HasActiveSessionFileWatcher(workspaceID) {
-					s.manager.FailSessionIDResolution(
-						workspaceID,
-						temporaryID,
-						"trust_declined",
-						"Claude exited without creating a session. User may have declined trust folder.",
-					)
-				}
-			})
-
-			// Start Claude with PTY and the prompt
-			go func() {
-				if err := claudeManager.StartWithPTY(ctx, p.Prompt, "new", newSession.ID); err != nil {
-					// Log error but session was created
-					fmt.Printf("Warning: failed to start Claude with prompt: %v\n", err)
-				}
-			}()
-		}
-
-		return map[string]interface{}{
-			"status":       "sent",
-			"session_id":   p.SessionID,
-			"workspace_id": p.WorkspaceID,
-			"auto_created": true,
-			"message":      "New session created and prompt sent",
-		}, nil
-	}
-
-	// Session ID provided - send to existing session
-	if err := s.manager.SendPrompt(p.SessionID, p.Prompt, p.Mode, p.PermissionMode); err != nil {
-		return nil, message.NewError(message.InternalError, err.Error())
-	}
-
-	return map[string]interface{}{
-		"status":     "sent",
-		"session_id": p.SessionID,
-	}, nil
+	return runtimeDispatch.send(ctx, p.WorkspaceID, p.SessionID, p.Prompt, p.Mode, p.PermissionMode)
 }
 
 // Input sends keyboard input to an interactive (PTY) session.
@@ -937,6 +767,7 @@ func (s *SessionManagerService) Input(ctx context.Context, params json.RawMessag
 		SessionID string `json:"session_id"`
 		Input     string `json:"input"`
 		Key       string `json:"key"` // Special key name (alternative to input)
+		AgentType string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -946,49 +777,11 @@ func (s *SessionManagerService) Input(ctx context.Context, params json.RawMessag
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	// If a special key is provided, use SendKey (handles key codes for LIVE sessions)
-	if p.Key != "" {
-		// Validate key name
-		validKeys := map[string]bool{
-			"enter": true, "return": true, "escape": true, "esc": true,
-			"up": true, "down": true, "left": true, "right": true,
-			"tab": true, "backspace": true, "delete": true,
-			"home": true, "end": true, "pageup": true, "pagedown": true, "space": true,
-		}
-		if !validKeys[p.Key] {
-			return nil, message.NewError(message.InvalidParams, "unknown key: "+p.Key+". Valid keys: enter, escape, up, down, left, right, tab, backspace, delete, home, end, pageup, pagedown, space")
-		}
-
-		if err := s.manager.SendKey(p.SessionID, p.Key); err != nil {
-			return nil, message.NewError(message.InternalError, err.Error())
-		}
-
-		// Emit pty_permission_resolved event so other devices can dismiss their permission popups
-		clientID, _ := ctx.Value(handler.ClientIDKey).(string)
-		s.manager.EmitPermissionResolved(p.SessionID, clientID, p.Key)
-
-		return map[string]interface{}{
-			"status": "sent",
-			"key":    p.Key,
-		}, nil
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
 	}
-
-	// If text input is provided, use SendInput
-	if p.Input != "" {
-		if err := s.manager.SendInput(p.SessionID, p.Input); err != nil {
-			return nil, message.NewError(message.InternalError, err.Error())
-		}
-
-		// Emit pty_permission_resolved event so other devices can dismiss their permission popups
-		clientID, _ := ctx.Value(handler.ClientIDKey).(string)
-		s.manager.EmitPermissionResolved(p.SessionID, clientID, p.Input)
-
-		return map[string]interface{}{
-			"status": "sent",
-		}, nil
-	}
-
-	return nil, message.NewError(message.InvalidParams, "either 'input' or 'key' is required")
+	return runtimeDispatch.input(ctx, p.SessionID, p.Input, p.Key)
 }
 
 // Respond responds to a permission or question.
@@ -997,6 +790,7 @@ func (s *SessionManagerService) Respond(ctx context.Context, params json.RawMess
 		SessionID string `json:"session_id"`
 		Type      string `json:"type"`     // "permission" or "question"
 		Response  string `json:"response"` // "yes"/"no" for permission, or text for question
+		AgentType string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -1012,24 +806,11 @@ func (s *SessionManagerService) Respond(ctx context.Context, params json.RawMess
 		return nil, message.NewError(message.InvalidParams, "response is required")
 	}
 
-	var err error
-	switch p.Type {
-	case "permission":
-		allow := p.Response == "yes" || p.Response == "true" || p.Response == "allow"
-		err = s.manager.RespondToPermission(p.SessionID, allow)
-	case "question":
-		err = s.manager.RespondToQuestion(p.SessionID, p.Response)
-	default:
-		return nil, message.NewError(message.InvalidParams, "type must be 'permission' or 'question'")
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
 	}
-
-	if err != nil {
-		return nil, message.NewError(message.InternalError, err.Error())
-	}
-
-	return map[string]interface{}{
-		"status": "responded",
-	}, nil
+	return runtimeDispatch.respond(ctx, p.SessionID, p.Type, p.Response)
 }
 
 // Active returns a list of active sessions.
@@ -1088,11 +869,12 @@ func (s *SessionManagerService) State(ctx context.Context, params json.RawMessag
 	return sess.ToRuntimeState(), nil
 }
 
-// History returns historical Claude sessions for a workspace.
+// History returns historical sessions for a workspace.
 func (s *SessionManagerService) History(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
 		Limit       int    `json:"limit"`
+		AgentType   string `json:"agent_type,omitempty"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -1108,7 +890,25 @@ func (s *SessionManagerService) History(ctx context.Context, params json.RawMess
 		limit = 50
 	}
 
-	history, err := s.manager.ListHistory(p.WorkspaceID, limit)
+	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
+	}
+	if rpcErr := s.ensureSessionManagerConfigured("workspace/session/history"); rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	var (
+		history []session.HistoryInfo
+		err     error
+	)
+
+	switch agentType {
+	case sessionManagerAgentCodex:
+		history, err = s.listCodexHistory(p.WorkspaceID, limit)
+	default:
+		history, err = s.manager.ListHistory(p.WorkspaceID, limit)
+	}
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
@@ -1119,7 +919,7 @@ func (s *SessionManagerService) History(ctx context.Context, params json.RawMess
 	}, nil
 }
 
-// GetSessionMessages returns messages from a historical Claude session.
+// GetSessionMessages returns messages from a historical session.
 func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
@@ -1127,6 +927,7 @@ func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params j
 		Limit       int    `json:"limit"`
 		Offset      int    `json:"offset"`
 		Order       string `json:"order"`
+		AgentType   string `json:"agent_type,omitempty"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -1153,22 +954,46 @@ func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params j
 		order = "asc"
 	}
 
-	result, err := s.manager.GetSessionMessages(p.WorkspaceID, p.SessionID, limit, p.Offset, order)
-	if err != nil {
-		if strings.Contains(err.Error(), "session not found") {
-			return nil, message.ErrSessionNotFound(p.SessionID)
-		}
-		return nil, message.NewError(message.InternalError, err.Error())
+	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
+	}
+	if rpcErr := s.ensureSessionManagerConfigured("workspace/session/messages"); rpcErr != nil {
+		return nil, rpcErr
 	}
 
-	return result, nil
+	switch agentType {
+	case sessionManagerAgentCodex:
+		if _, err := s.resolveCodexSessionForWorkspace(p.WorkspaceID, p.SessionID); err != nil {
+			if strings.Contains(err.Error(), "session not found") {
+				return nil, message.ErrSessionNotFound(p.SessionID)
+			}
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+
+		result, rpcErr := s.getRuntimeSessionMessages(ctx, sessionManagerAgentCodex, p.SessionID, limit, p.Offset, order)
+		if rpcErr != nil {
+			return nil, rpcErr
+		}
+		return result, nil
+	default:
+		result, err := s.manager.GetSessionMessages(p.WorkspaceID, p.SessionID, limit, p.Offset, order)
+		if err != nil {
+			if strings.Contains(err.Error(), "session not found") {
+				return nil, message.ErrSessionNotFound(p.SessionID)
+			}
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+		return result, nil
+	}
 }
 
-// DeleteHistorySession deletes a historical Claude session file.
+// DeleteHistorySession deletes a historical session file.
 func (s *SessionManagerService) DeleteHistorySession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
 		SessionID   string `json:"session_id"`
+		AgentType   string `json:"agent_type,omitempty"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -1181,8 +1006,22 @@ func (s *SessionManagerService) DeleteHistorySession(ctx context.Context, params
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	if err := s.manager.DeleteHistorySession(p.WorkspaceID, p.SessionID); err != nil {
-		// Check if it's a "not found" error
+	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
+	}
+	if rpcErr := s.ensureSessionManagerConfigured("workspace/session/delete"); rpcErr != nil {
+		return nil, rpcErr
+	}
+
+	var err error
+	switch agentType {
+	case sessionManagerAgentCodex:
+		err = s.deleteCodexWorkspaceSession(p.WorkspaceID, p.SessionID)
+	default:
+		err = s.manager.DeleteHistorySession(p.WorkspaceID, p.SessionID)
+	}
+	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, message.NewError(message.SessionNotFound, err.Error())
 		}
@@ -1924,6 +1763,7 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 	var p struct {
 		WorkspaceID string `json:"workspace_id"`
 		SessionID   string `json:"session_id"`
+		AgentType   string `json:"agent_type,omitempty"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -1936,35 +1776,145 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
+	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	if dispatchErr != nil {
+		return nil, dispatchErr
+	}
+	if rpcErr := s.ensureSessionManagerConfigured("workspace/session/watch"); rpcErr != nil {
+		return nil, rpcErr
+	}
+
 	// Get client ID for tracking watchers
 	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
 
-	info, err := s.manager.WatchWorkspaceSession(clientID, p.WorkspaceID, p.SessionID)
-	if err != nil {
-		if strings.Contains(err.Error(), "session not found") {
-			return nil, message.ErrSessionNotFound(p.SessionID)
+	switch agentType {
+	case sessionManagerAgentCodex:
+		if _, err := s.resolveCodexSessionForWorkspace(p.WorkspaceID, p.SessionID); err != nil {
+			if strings.Contains(err.Error(), "session not found") {
+				return nil, message.ErrSessionNotFound(p.SessionID)
+			}
+			return nil, message.NewError(message.InternalError, err.Error())
 		}
-		return nil, message.NewError(message.InternalError, err.Error())
-	}
 
-	// Also update focus tracking so this client appears in the session's viewers list
-	if s.focusProvider != nil && clientID != "" {
-		_, _ = s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
-	}
+		if rpcErr := s.watchRuntimeSession(ctx, sessionManagerAgentCodex, p.SessionID); rpcErr != nil {
+			return nil, rpcErr
+		}
 
-	return map[string]interface{}{
-		"status":       "watching",
-		"watching":     info.Watching,
-		"workspace_id": info.WorkspaceID,
-		"session_id":   info.SessionID,
-	}, nil
+		if clientID != "" {
+			s.codexMu.Lock()
+			s.codexWatchers[clientID] = session.WatchInfo{
+				WorkspaceID: p.WorkspaceID,
+				SessionID:   p.SessionID,
+				Watching:    true,
+			}
+			s.codexMu.Unlock()
+		}
+
+		if s.focusProvider != nil && clientID != "" {
+			_, _ = s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
+		}
+
+		return map[string]interface{}{
+			"status":       "watching",
+			"watching":     true,
+			"workspace_id": p.WorkspaceID,
+			"session_id":   p.SessionID,
+		}, nil
+	default:
+		info, err := s.manager.WatchWorkspaceSession(clientID, p.WorkspaceID, p.SessionID)
+		if err != nil {
+			if strings.Contains(err.Error(), "session not found") {
+				return nil, message.ErrSessionNotFound(p.SessionID)
+			}
+			return nil, message.NewError(message.InternalError, err.Error())
+		}
+
+		// Also update focus tracking so this client appears in the session's viewers list
+		if s.focusProvider != nil && clientID != "" {
+			_, _ = s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
+		}
+
+		return map[string]interface{}{
+			"status":       "watching",
+			"watching":     info.Watching,
+			"workspace_id": info.WorkspaceID,
+			"session_id":   info.SessionID,
+		}, nil
+	}
 }
 
 // UnwatchSession stops watching the current session.
 // Returns the previous watch info.
 func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
+	var p struct {
+		AgentType string `json:"agent_type,omitempty"`
+	}
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
+		}
+	}
+
+	agentType := strings.ToLower(strings.TrimSpace(p.AgentType))
+	if agentType != "" {
+		if _, _, dispatchErr := s.resolveRuntimeDispatch(agentType); dispatchErr != nil {
+			return nil, dispatchErr
+		}
+	}
+
 	// Get client ID for tracking watchers
 	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+
+	// If no agent_type is provided, preserve legacy behavior and unwatch both runtimes.
+	if agentType == "" {
+		claudeInfo := session.WatchInfo{Watching: false}
+		if s.manager != nil {
+			if watchedInfo := s.manager.UnwatchWorkspaceSession(clientID); watchedInfo != nil {
+				claudeInfo = *watchedInfo
+			}
+		}
+		_ = s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex)
+		if clientID != "" {
+			s.codexMu.Lock()
+			delete(s.codexWatchers, clientID)
+			s.codexMu.Unlock()
+		}
+
+		return map[string]interface{}{
+			"status":       "unwatched",
+			"watching":     claudeInfo.Watching,
+			"workspace_id": claudeInfo.WorkspaceID,
+			"session_id":   claudeInfo.SessionID,
+		}, nil
+	}
+
+	if agentType == sessionManagerAgentCodex {
+		if rpcErr := s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex); rpcErr != nil {
+			return nil, rpcErr
+		}
+
+		info := session.WatchInfo{Watching: false}
+		if clientID != "" {
+			s.codexMu.Lock()
+			if watchedInfo, ok := s.codexWatchers[clientID]; ok {
+				info.WorkspaceID = watchedInfo.WorkspaceID
+				info.SessionID = watchedInfo.SessionID
+			}
+			delete(s.codexWatchers, clientID)
+			s.codexMu.Unlock()
+		}
+
+		return map[string]interface{}{
+			"status":       "unwatched",
+			"watching":     false,
+			"workspace_id": info.WorkspaceID,
+			"session_id":   info.SessionID,
+		}, nil
+	}
+
+	if rpcErr := s.ensureSessionManagerConfigured("workspace/session/unwatch"); rpcErr != nil {
+		return nil, rpcErr
+	}
 
 	info := s.manager.UnwatchWorkspaceSession(clientID)
 
@@ -1974,6 +1924,20 @@ func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.
 		"workspace_id": info.WorkspaceID,
 		"session_id":   info.SessionID,
 	}, nil
+}
+
+func (s *SessionManagerService) ensureSessionManagerConfigured(method string) *message.Error {
+	if s.manager != nil {
+		return nil
+	}
+
+	return message.NewErrorWithData(
+		message.AgentNotConfigured,
+		"session manager is not configured",
+		map[string]string{
+			"method": method,
+		},
+	)
 }
 
 // FileInfo represents a file in the listing (matches HTTP API format).
@@ -2459,4 +2423,566 @@ func (s *SessionManagerService) ActivateSession(ctx context.Context, params json
 		"session_id":   p.SessionID,
 		"message":      "Session activated",
 	}, nil
+}
+
+var errCodexSessionNotRunning = errors.New("codex session is not running")
+
+func (s *SessionManagerService) startCodexSession(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error) {
+	if s.manager == nil {
+		return nil, message.NewErrorWithData(
+			message.AgentNotConfigured,
+			"codex runtime requires session manager context",
+			map[string]string{
+				"agent_type": sessionManagerAgentCodex,
+				"method":     "session/start",
+			},
+		)
+	}
+
+	ws, err := s.manager.GetWorkspace(workspaceID)
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
+	}
+
+	if sessionID != "" {
+		if _, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID); err != nil {
+			return map[string]interface{}{
+				"session_id":   "",
+				"workspace_id": workspaceID,
+				"source":       "",
+				"status":       "not_found",
+				"agent_type":   sessionManagerAgentCodex,
+				"message":      "Session not found in Codex history.",
+			}, nil
+		}
+		return map[string]interface{}{
+			"session_id":   sessionID,
+			"workspace_id": workspaceID,
+			"source":       "history",
+			"status":       "attached",
+			"agent_type":   sessionManagerAgentCodex,
+			"message":      "Codex session is ready for interaction",
+		}, nil
+	}
+
+	_ = codex.GetGlobalIndexCache().Refresh()
+	entries, _ := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
+	if len(entries) > 0 {
+		return map[string]interface{}{
+			"session_id":   entries[0].SessionID,
+			"workspace_id": workspaceID,
+			"source":       "history",
+			"status":       "attached",
+			"agent_type":   sessionManagerAgentCodex,
+			"message":      "Latest Codex session is ready for interaction",
+		}, nil
+	}
+
+	return map[string]interface{}{
+		"session_id":   "",
+		"workspace_id": workspaceID,
+		"source":       "",
+		"status":       "ready",
+		"agent_type":   sessionManagerAgentCodex,
+		"message":      "No previous Codex session found. Use session/send with mode=\"new\" to start one.",
+	}, nil
+}
+
+func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID, sessionID, prompt, mode string) (interface{}, *message.Error) {
+	if s.manager == nil {
+		return nil, message.NewErrorWithData(
+			message.AgentNotConfigured,
+			"codex runtime requires session manager context",
+			map[string]string{
+				"agent_type": sessionManagerAgentCodex,
+				"method":     "session/send",
+			},
+		)
+	}
+	if mode != "new" && mode != "continue" {
+		return nil, message.NewError(message.InvalidParams, "mode must be one of: new, continue")
+	}
+
+	workspacePath := ""
+	if workspaceID != "" {
+		ws, err := s.manager.GetWorkspace(workspaceID)
+		if err != nil {
+			return nil, message.NewError(message.InternalError, "failed to get workspace: "+err.Error())
+		}
+		workspacePath = ws.Definition.Path
+	}
+
+	if sessionID == "" && mode == "continue" {
+		if workspacePath == "" {
+			return nil, message.NewError(message.InvalidParams, "workspace_id is required when mode is continue and session_id is empty")
+		}
+		_ = codex.GetGlobalIndexCache().Refresh()
+		entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(workspacePath)
+		if err != nil || len(entries) == 0 {
+			return nil, message.NewError(message.SessionNotFound, "no Codex session found to continue")
+		}
+		sessionID = entries[0].SessionID
+	}
+
+	if sessionID != "" && workspacePath == "" {
+		if entry, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID); err == nil && entry != nil {
+			workspacePath = entry.ProjectPath
+		}
+	}
+	if workspacePath == "" {
+		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
+	}
+
+	// For deterministic mobile behavior, session/send always launches a Codex process.
+	// Interactive in-session typing remains available via session/input and session/respond.
+	if sessionID != "" {
+		_ = s.stopCodexSession(sessionID)
+	}
+
+	// New Codex session: start interactive codex with prompt and resolve session id from ~/.codex/sessions.
+	if sessionID == "" {
+		before := s.snapshotCodexSessionIDs(workspacePath)
+		temporaryID := "codex-temp-" + uuid.NewString()
+		if err := s.startCodexProcess(ctx, temporaryID, workspaceID, workspacePath, "", prompt); err != nil {
+			return nil, codexRuntimeError("session/send", err)
+		}
+
+		realID, err := s.resolveNewCodexSessionID(workspacePath, before, 10*time.Second)
+		if err == nil && realID != "" {
+			s.remapCodexSessionID(temporaryID, realID)
+			evt := events.NewSessionIDResolvedEvent(temporaryID, realID, workspaceID, "")
+			evt.SetAgentType(sessionManagerAgentCodex)
+			s.manager.PublishEvent(evt)
+			sessionID = realID
+		} else {
+			sessionID = temporaryID
+		}
+
+		return map[string]interface{}{
+			"status":       "sent",
+			"session_id":   sessionID,
+			"workspace_id": workspaceID,
+			"auto_created": true,
+			"agent_type":   sessionManagerAgentCodex,
+			"delivery":     "new_process",
+			"message":      "Codex prompt sent",
+		}, nil
+	}
+
+	if err := s.startCodexProcess(ctx, sessionID, workspaceID, workspacePath, sessionID, prompt); err != nil {
+		return nil, codexRuntimeError("session/send", err)
+	}
+	log.Debug().
+		Str("session_id", sessionID).
+		Str("workspace_id", workspaceID).
+		Str("workspace_path", workspacePath).
+		Str("mode", mode).
+		Msg("started codex resume process for session/send")
+
+	return map[string]interface{}{
+		"status":     "sent",
+		"session_id": sessionID,
+		"agent_type": sessionManagerAgentCodex,
+		"delivery":   "resume_process",
+		"source":     "resume_command",
+	}, nil
+}
+
+func (s *SessionManagerService) respondCodexSession(sessionID, responseType, response string) error {
+	switch responseType {
+	case "permission":
+		normalized := strings.ToLower(strings.TrimSpace(response))
+		switch normalized {
+		case "yes", "true", "allow", "approved":
+			return s.sendCodexInput(sessionID, "y")
+		case "no", "false", "deny", "denied":
+			return s.sendCodexInput(sessionID, "n")
+		default:
+			return s.sendCodexInput(sessionID, response)
+		}
+	case "question":
+		return s.sendCodexInput(sessionID, response)
+	default:
+		return fmt.Errorf("type must be 'permission' or 'question'")
+	}
+}
+
+func (s *SessionManagerService) stopCodexSession(sessionID string) error {
+	codexSession := s.getCodexSession(sessionID)
+	if codexSession == nil {
+		return nil
+	}
+
+	if codexSession.cmd != nil && codexSession.cmd.Process != nil {
+		_ = codexSession.cmd.Process.Signal(os.Interrupt)
+
+		// Best-effort fallback if Codex ignores SIGINT.
+		go func(expectedID string, proc *os.Process) {
+			time.Sleep(2 * time.Second)
+			s.codexMu.Lock()
+			stillRunning := s.codexSessions[expectedID] != nil
+			s.codexMu.Unlock()
+			if stillRunning {
+				_ = proc.Kill()
+			}
+		}(sessionID, codexSession.cmd.Process)
+	}
+
+	return nil
+}
+
+func (s *SessionManagerService) sendCodexInput(sessionID, input string) error {
+	codexSession := s.getCodexSession(sessionID)
+	if codexSession == nil || codexSession.ptmx == nil {
+		return fmt.Errorf("%w: %s", errCodexSessionNotRunning, sessionID)
+	}
+
+	encoded := encodeCodexPTYInput(input)
+	_, err := codexSession.ptmx.Write([]byte(encoded))
+	if err != nil {
+		return fmt.Errorf("failed to write Codex PTY input: %w", err)
+	}
+	return nil
+}
+
+func encodeCodexPTYInput(input string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(input))
+	keyNameToSequence := map[string]string{
+		"enter": "\r", "return": "\r",
+		"escape": "\x1b", "esc": "\x1b",
+		"up": "\x1b[A", "down": "\x1b[B", "right": "\x1b[C", "left": "\x1b[D",
+		"tab": "\t", "backspace": "\x7f", "space": " ",
+	}
+	if seq, ok := keyNameToSequence[trimmed]; ok {
+		return seq
+	}
+
+	isSpecialKey := false
+	if len(input) > 0 {
+		first := input[0]
+		if first < 0x20 || first == 0x7f {
+			isSpecialKey = true
+		}
+	}
+	if isSpecialKey || strings.HasSuffix(input, "\r") || strings.HasSuffix(input, "\n") {
+		return input
+	}
+	return input + "\r"
+}
+
+func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessionID, workspaceID, workspacePath, resumeSessionID, prompt string) error {
+	args := []string{"--no-alt-screen"}
+	if resumeSessionID != "" {
+		args = append(args, "resume", resumeSessionID)
+	}
+	if prompt != "" {
+		args = append(args, prompt)
+	}
+
+	cmd := exec.CommandContext(ctx, "codex", args...)
+	cmd.Dir = workspacePath
+
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return err
+	}
+	_ = pty.Setsize(ptmx, &pty.Winsize{Rows: 40, Cols: 120})
+
+	codexSession := &codexPTYSession{
+		sessionID:   mapSessionID,
+		workspaceID: workspaceID,
+		workspace:   workspacePath,
+		cmd:         cmd,
+		ptmx:        ptmx,
+	}
+
+	s.codexMu.Lock()
+	s.codexSessions[mapSessionID] = codexSession
+	s.codexMu.Unlock()
+
+	s.publishCodexPTYState(mapSessionID, "running")
+
+	go s.streamCodexOutput(codexSession)
+	go s.waitCodexProcess(codexSession)
+	return nil
+}
+
+func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession) {
+	scanner := bufio.NewScanner(codexSession.ptmx)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		evt := events.NewPTYOutputEventWithSession(line, line, "running", codexSession.sessionID)
+		evt.SetAgentType(sessionManagerAgentCodex)
+		s.manager.PublishEvent(evt)
+	}
+}
+
+func (s *SessionManagerService) waitCodexProcess(codexSession *codexPTYSession) {
+	waitErr := codexSession.cmd.Wait()
+	_ = codexSession.ptmx.Close()
+
+	s.codexMu.Lock()
+	if current := s.codexSessions[codexSession.sessionID]; current == codexSession {
+		delete(s.codexSessions, codexSession.sessionID)
+	}
+	s.codexMu.Unlock()
+
+	if waitErr != nil {
+		evt := events.NewPTYOutputEventWithSession(waitErr.Error(), waitErr.Error(), "error", codexSession.sessionID)
+		evt.SetAgentType(sessionManagerAgentCodex)
+		s.manager.PublishEvent(evt)
+	}
+	s.publishCodexPTYState(codexSession.sessionID, "idle")
+}
+
+func (s *SessionManagerService) publishCodexPTYState(sessionID, state string) {
+	evt := events.NewPTYStateEventWithSession(state, false, "", sessionID)
+	evt.SetAgentType(sessionManagerAgentCodex)
+	s.manager.PublishEvent(evt)
+}
+
+func (s *SessionManagerService) emitCodexPermissionResolved(ctx context.Context, sessionID, input string) {
+	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+	evt := events.NewPTYPermissionResolvedEvent(sessionID, "", clientID, input)
+	evt.SetAgentType(sessionManagerAgentCodex)
+	s.manager.PublishEvent(evt)
+}
+
+func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) ([]session.HistoryInfo, error) {
+	ws, err := s.manager.GetWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = codex.GetGlobalIndexCache().Refresh()
+	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	if limit > 0 && len(entries) > limit {
+		entries = entries[:limit]
+	}
+
+	history := make([]session.HistoryInfo, 0, len(entries))
+	for _, entry := range entries {
+		summary := strings.TrimSpace(entry.Summary)
+		if summary == "" {
+			summary = strings.TrimSpace(entry.FirstPrompt)
+		}
+		if summary == "" {
+			summary = "Session " + entry.SessionID
+		}
+
+		lastUpdated := entry.Modified
+		if lastUpdated.IsZero() {
+			lastUpdated = entry.Created
+		}
+
+		history = append(history, session.HistoryInfo{
+			SessionID:    entry.SessionID,
+			Summary:      summary,
+			MessageCount: entry.MessageCount,
+			LastUpdated:  lastUpdated,
+			Branch:       entry.GitBranch,
+		})
+	}
+
+	return history, nil
+}
+
+func (s *SessionManagerService) resolveCodexSessionForWorkspace(workspaceID, sessionID string) (*codex.SessionIndexEntry, error) {
+	ws, err := s.manager.GetWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = codex.GetGlobalIndexCache().Refresh()
+	entry, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID)
+	if err != nil || entry == nil {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+	if strings.TrimSpace(entry.ProjectPath) == "" {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	absWorkspace, err := filepath.Abs(ws.Definition.Path)
+	if err != nil {
+		return nil, err
+	}
+	absProject, err := filepath.Abs(entry.ProjectPath)
+	if err != nil {
+		return nil, err
+	}
+	if !pathWithin(absWorkspace, absProject) {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	return entry, nil
+}
+
+func pathWithin(parent, child string) bool {
+	if parent == "" || child == "" {
+		return false
+	}
+
+	rel, err := filepath.Rel(parent, child)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
+}
+
+func (s *SessionManagerService) getRuntimeSessionMessages(ctx context.Context, agentType, sessionID string, limit, offset int, order string) (interface{}, *message.Error) {
+	if s.sessionService == nil {
+		return nil, message.NewError(message.AgentNotConfigured, "session service is not configured")
+	}
+
+	rawParams, err := json.Marshal(GetSessionMessagesParams{
+		SessionID: sessionID,
+		AgentType: agentType,
+		Limit:     limit,
+		Offset:    offset,
+		Order:     order,
+	})
+	if err != nil {
+		return nil, message.NewError(message.InternalError, "failed to encode runtime messages params: "+err.Error())
+	}
+
+	return s.sessionService.GetSessionMessages(ctx, rawParams)
+}
+
+func (s *SessionManagerService) watchRuntimeSession(ctx context.Context, agentType, sessionID string) *message.Error {
+	if s.sessionService == nil {
+		return message.NewError(message.AgentNotConfigured, "session service is not configured")
+	}
+
+	rawParams, err := json.Marshal(WatchSessionParams{
+		SessionID: sessionID,
+		AgentType: agentType,
+	})
+	if err != nil {
+		return message.NewError(message.InternalError, "failed to encode runtime watch params: "+err.Error())
+	}
+
+	_, rpcErr := s.sessionService.WatchSession(ctx, rawParams)
+	return rpcErr
+}
+
+func (s *SessionManagerService) unwatchRuntimeSession(ctx context.Context, agentType string) *message.Error {
+	if s.sessionService == nil {
+		return message.NewError(message.AgentNotConfigured, "session service is not configured")
+	}
+
+	var rawParams json.RawMessage
+	if strings.TrimSpace(agentType) != "" {
+		encoded, err := json.Marshal(struct {
+			AgentType string `json:"agent_type,omitempty"`
+		}{
+			AgentType: agentType,
+		})
+		if err != nil {
+			return message.NewError(message.InternalError, "failed to encode runtime unwatch params: "+err.Error())
+		}
+		rawParams = encoded
+	}
+
+	_, rpcErr := s.sessionService.UnwatchSession(ctx, rawParams)
+	return rpcErr
+}
+
+func (s *SessionManagerService) deleteCodexWorkspaceSession(workspaceID, sessionID string) error {
+	entry, err := s.resolveCodexSessionForWorkspace(workspaceID, sessionID)
+	if err != nil {
+		return err
+	}
+	if entry.FullPath == "" {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	if err := os.Remove(entry.FullPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("session not found: %s", sessionID)
+		}
+		return fmt.Errorf("failed to delete session file: %w", err)
+	}
+
+	_ = codex.GetGlobalIndexCache().Refresh()
+	return nil
+}
+
+func (s *SessionManagerService) snapshotCodexSessionIDs(workspacePath string) map[string]struct{} {
+	out := make(map[string]struct{})
+	_ = codex.GetGlobalIndexCache().Refresh()
+	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(workspacePath)
+	if err != nil {
+		return out
+	}
+	for _, entry := range entries {
+		out[entry.SessionID] = struct{}{}
+	}
+	return out
+}
+
+func (s *SessionManagerService) resolveNewCodexSessionID(workspacePath string, before map[string]struct{}, timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_ = codex.GetGlobalIndexCache().Refresh()
+		entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(workspacePath)
+		if err == nil && len(entries) > 0 {
+			for _, entry := range entries {
+				if _, exists := before[entry.SessionID]; !exists {
+					return entry.SessionID, nil
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return "", fmt.Errorf("timed out waiting for Codex session id")
+}
+
+func (s *SessionManagerService) remapCodexSessionID(oldSessionID, newSessionID string) {
+	if oldSessionID == "" || newSessionID == "" || oldSessionID == newSessionID {
+		return
+	}
+
+	s.codexMu.Lock()
+	defer s.codexMu.Unlock()
+
+	codexSession := s.codexSessions[oldSessionID]
+	if codexSession == nil {
+		return
+	}
+
+	delete(s.codexSessions, oldSessionID)
+	codexSession.sessionID = newSessionID
+	s.codexSessions[newSessionID] = codexSession
+}
+
+func (s *SessionManagerService) getCodexSession(sessionID string) *codexPTYSession {
+	s.codexMu.Lock()
+	defer s.codexMu.Unlock()
+	return s.codexSessions[sessionID]
+}
+
+func codexRuntimeError(method string, err error) *message.Error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrNotFound) || strings.Contains(strings.ToLower(err.Error()), "executable file not found") {
+		return message.NewErrorWithData(
+			message.AgentNotConfigured,
+			"Codex CLI is not installed or not available on PATH",
+			map[string]string{
+				"agent_type": sessionManagerAgentCodex,
+				"method":     method,
+			},
+		)
+	}
+	return message.NewError(message.InternalError, err.Error())
 }

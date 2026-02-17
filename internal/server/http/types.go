@@ -1,6 +1,8 @@
 // Package http implements the HTTP API server for cdev.
 package http
 
+import "encoding/json"
+
 // HealthResponse represents the health check response.
 type HealthResponse struct {
 	Status string `json:"status" example:"ok"`
@@ -9,7 +11,7 @@ type HealthResponse struct {
 
 // StatusResponse represents the agent status response.
 type StatusResponse struct {
-	SessionID        string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`        // Claude session ID (for continue) - empty if no active session
+	SessionID        string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`       // Claude session ID (for continue) - empty if no active session
 	AgentSessionID   string `json:"agent_session_id" example:"01ce425c-5b91-4f8a-b8dd-5d14644c3494"` // Agent instance ID (generated on startup)
 	Version          string `json:"version" example:"1.0.0"`
 	RepoPath         string `json:"repo_path" example:"/Users/dev/myproject"`
@@ -50,10 +52,10 @@ type RunClaudeResponse struct {
 
 // SessionInfo represents information about a Claude session.
 type SessionInfo struct {
-	SessionID   string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Summary     string `json:"summary" example:"Create a hello world function"`
-	MessageCount int   `json:"message_count" example:"5"`
-	LastUpdated string `json:"last_updated" example:"2024-01-15T10:30:00Z"`
+	SessionID    string `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Summary      string `json:"summary" example:"Create a hello world function"`
+	MessageCount int    `json:"message_count" example:"5"`
+	LastUpdated  string `json:"last_updated" example:"2024-01-15T10:30:00Z"`
 }
 
 // SessionsResponse represents the list of available sessions.
@@ -75,6 +77,46 @@ type SessionMessagesResponse struct {
 	SessionID string           `json:"session_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Messages  []SessionMessage `json:"messages"`
 	Count     int              `json:"count" example:"10"`
+}
+
+// AgentSessionInfo represents information about a session for any agent runtime.
+type AgentSessionInfo struct {
+	SessionID    string `json:"session_id"`
+	AgentType    string `json:"agent_type"`
+	Summary      string `json:"summary,omitempty"`
+	MessageCount int    `json:"message_count"`
+	LastUpdated  string `json:"last_updated"`
+	Branch       string `json:"branch,omitempty"`
+	ProjectPath  string `json:"project_path,omitempty"`
+}
+
+// AgentSessionsResponse represents the list of available sessions for an agent runtime.
+type AgentSessionsResponse struct {
+	Sessions []AgentSessionInfo `json:"sessions"`
+	Current  string             `json:"current,omitempty"`
+	Total    int                `json:"total"`
+	Limit    int                `json:"limit"`
+	Offset   int                `json:"offset"`
+}
+
+// AgentSessionMessage represents a single message in a session (raw message format).
+type AgentSessionMessage struct {
+	Type      string          `json:"type"`
+	UUID      string          `json:"uuid,omitempty"`
+	SessionID string          `json:"session_id,omitempty"`
+	Timestamp string          `json:"timestamp,omitempty"`
+	GitBranch string          `json:"git_branch,omitempty"`
+	Message   json.RawMessage `json:"message"`
+}
+
+// AgentSessionMessagesResponse represents the paginated messages for an agent session.
+type AgentSessionMessagesResponse struct {
+	SessionID string                `json:"session_id"`
+	Messages  []AgentSessionMessage `json:"messages"`
+	Total     int                   `json:"total"`
+	Limit     int                   `json:"limit"`
+	Offset    int                   `json:"offset"`
+	HasMore   bool                  `json:"has_more"`
 }
 
 // StopClaudeResponse represents the response after stopping Claude.
@@ -121,9 +163,9 @@ type GitFileStatus struct {
 
 // GitDiffResponse represents the git diff response for a single file.
 type GitDiffResponse struct {
-	Path       string `json:"path" example:"src/main.ts"`
-	Diff       string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
-	Truncated  bool   `json:"is_truncated,omitempty" example:"false"`
+	Path      string `json:"path" example:"src/main.ts"`
+	Diff      string `json:"diff" example:"@@ -1,3 +1,4 @@\n+new line"`
+	Truncated bool   `json:"is_truncated,omitempty" example:"false"`
 }
 
 // GitDiffAllResponse represents the git diff response for all files.

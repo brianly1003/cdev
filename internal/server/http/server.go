@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/claude"
+	"github.com/brianly1003/cdev/internal/adapters/codex"
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/repository"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
@@ -78,6 +79,9 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 
 	s.mux.HandleFunc("/health", s.handleHealth)
 	s.mux.HandleFunc("/api/status", s.handleStatus)
+	s.mux.HandleFunc("/api/agent/sessions", s.handleAgentSessions)
+	s.mux.HandleFunc("/api/agent/sessions/messages", s.handleAgentSessionMessages)
+	s.mux.HandleFunc("/api/agent/sessions/elements", s.handleAgentSessionElements)
 	s.mux.HandleFunc("/api/claude/sessions", s.handleClaudeSessions)
 	s.mux.HandleFunc("/api/claude/sessions/messages", s.handleClaudeSessionMessages)
 	s.mux.HandleFunc("/api/claude/sessions/elements", s.handleClaudeSessionElements)
@@ -588,6 +592,233 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleAgentSessions handles GET/DELETE /api/agent/sessions?runtime=codex|claude
+func (s *Server) handleAgentSessions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleListAgentSessions(w, r)
+	case http.MethodDelete:
+		s.handleDeleteAgentSessions(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func parseAgentRuntime(r *http.Request) string {
+	runtime := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("runtime")))
+	if runtime == "" {
+		runtime = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("agent_type")))
+	}
+	if runtime == "" {
+		return "claude"
+	}
+	return runtime
+}
+
+// handleListAgentSessions handles GET /api/agent/sessions
+func (s *Server) handleListAgentSessions(w http.ResponseWriter, r *http.Request) {
+	limit := parseIntParam(r, "limit", 20)
+	offset := parseIntParam(r, "offset", 0)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	runtime := parseAgentRuntime(r)
+
+	sessions, total, current, err := s.listAgentSessions(runtime, limit, offset)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, AgentSessionsResponse{
+		Sessions: sessions,
+		Current:  current,
+		Total:    total,
+		Limit:    limit,
+		Offset:   offset,
+	})
+}
+
+// handleDeleteAgentSessions handles DELETE /api/agent/sessions
+func (s *Server) handleDeleteAgentSessions(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+	runtime := parseAgentRuntime(r)
+
+	switch runtime {
+	case "claude":
+		if sessionID != "" {
+			if err := claude.DeleteSession(s.repoPath, sessionID); err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{
+					"error":      err.Error(),
+					"session_id": sessionID,
+				})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"message":    "Session deleted",
+				"session_id": sessionID,
+			})
+			return
+		}
+
+		deleted, err := claude.DeleteAllSessions(s.repoPath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"message": "All sessions deleted",
+			"deleted": deleted,
+		})
+	case "codex":
+		if s.repoPath == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "repository path not configured",
+			})
+			return
+		}
+
+		if sessionID != "" {
+			if err := codex.DeleteSession(s.repoPath, sessionID); err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{
+					"error":      err.Error(),
+					"session_id": sessionID,
+				})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"message":    "Session deleted",
+				"session_id": sessionID,
+			})
+			return
+		}
+
+		deleted, err := codex.DeleteAllSessions(s.repoPath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"message": "All sessions deleted",
+			"deleted": deleted,
+		})
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "unsupported runtime: " + runtime,
+		})
+	}
+}
+
+func (s *Server) listAgentSessions(runtime string, limit, offset int) ([]AgentSessionInfo, int, string, error) {
+	switch runtime {
+	case "claude":
+		var result []AgentSessionInfo
+		var total int
+		if s.sessionCache != nil {
+			sessionList, t, err := s.sessionCache.ListSessionsPaginated(limit, offset)
+			if err != nil {
+				return nil, 0, "", err
+			}
+			total = t
+			result = make([]AgentSessionInfo, len(sessionList))
+			for i, sInfo := range sessionList {
+				result[i] = AgentSessionInfo{
+					SessionID:    sInfo.SessionID,
+					AgentType:    "claude",
+					Summary:      sInfo.Summary,
+					MessageCount: sInfo.MessageCount,
+					LastUpdated:  sInfo.LastUpdated.Format(time.RFC3339),
+					Branch:       sInfo.Branch,
+					ProjectPath:  s.repoPath,
+				}
+			}
+		} else {
+			sessionList, err := claude.ListSessions(s.repoPath)
+			if err != nil {
+				return nil, 0, "", err
+			}
+			total = len(sessionList)
+			if offset > total {
+				offset = total
+			}
+			end := offset + limit
+			if end > total {
+				end = total
+			}
+			sessions := sessionList[offset:end]
+			result = make([]AgentSessionInfo, len(sessions))
+			for i, sInfo := range sessions {
+				result[i] = AgentSessionInfo{
+					SessionID:    sInfo.SessionID,
+					AgentType:    "claude",
+					Summary:      sInfo.Summary,
+					MessageCount: sInfo.MessageCount,
+					LastUpdated:  sInfo.LastUpdated.Format(time.RFC3339),
+					Branch:       sInfo.Branch,
+					ProjectPath:  s.repoPath,
+				}
+			}
+		}
+
+		currentSessionID := ""
+		if s.claudeManager != nil {
+			currentSessionID = s.claudeManager.ClaudeSessionID()
+		}
+
+		return result, total, currentSessionID, nil
+	case "codex":
+		if s.repoPath == "" {
+			return nil, 0, "", fmt.Errorf("repository path not configured")
+		}
+
+		sessionList, err := codex.ListSessionsForWorkspace(s.repoPath)
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		total := len(sessionList)
+		if offset > total {
+			offset = total
+		}
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+
+		sessions := sessionList[offset:end]
+		result := make([]AgentSessionInfo, len(sessions))
+		for i, sInfo := range sessions {
+			result[i] = AgentSessionInfo{
+				SessionID:    sInfo.SessionID,
+				AgentType:    "codex",
+				Summary:      sInfo.Summary,
+				MessageCount: sInfo.MessageCount,
+				LastUpdated:  sInfo.LastUpdated.Format(time.RFC3339),
+				ProjectPath:  sInfo.WorkspacePath,
+			}
+		}
+
+		return result, total, "", nil
+	default:
+		return nil, 0, "", fmt.Errorf("unsupported runtime: %s", runtime)
+	}
+}
+
 // handleListSessions handles GET /api/claude/sessions
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	// Parse pagination parameters
@@ -800,6 +1031,286 @@ func (s *Server) handleClaudeSessionMessages(w http.ResponseWriter, r *http.Requ
 		"limit":      limit,
 		"offset":     offset,
 		"has_more":   end < total,
+	})
+}
+
+// handleAgentSessionMessages handles GET /api/agent/sessions/messages?runtime=codex|claude
+func (s *Server) handleAgentSessionMessages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "session_id query parameter is required",
+		})
+		return
+	}
+
+	limit := parseIntParam(r, "limit", 50)
+	offset := parseIntParam(r, "offset", 0)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	order := r.URL.Query().Get("order")
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
+	runtime := parseAgentRuntime(r)
+
+	switch runtime {
+	case "claude":
+		if s.messageCache != nil {
+			page, err := s.messageCache.GetMessages(sessionID, limit, offset, order)
+			if err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{
+					"error":      err.Error(),
+					"session_id": sessionID,
+				})
+				return
+			}
+
+			messages := make([]AgentSessionMessage, len(page.Messages))
+			for i, m := range page.Messages {
+				messages[i] = AgentSessionMessage{
+					Type:      m.Type,
+					UUID:      m.UUID,
+					SessionID: m.SessionID,
+					Timestamp: m.Timestamp,
+					GitBranch: m.GitBranch,
+					Message:   m.Message,
+				}
+			}
+
+			writeJSON(w, http.StatusOK, AgentSessionMessagesResponse{
+				SessionID: sessionID,
+				Messages:  messages,
+				Total:     page.Total,
+				Limit:     page.Limit,
+				Offset:    page.Offset,
+				HasMore:   page.HasMore,
+			})
+			return
+		}
+
+		messages, err := claude.GetSessionMessages(s.repoPath, sessionID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{
+				"error":      err.Error(),
+				"session_id": sessionID,
+			})
+			return
+		}
+
+		total := len(messages)
+		if offset > total {
+			offset = total
+		}
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+
+		result := make([]AgentSessionMessage, end-offset)
+		for i, m := range messages[offset:end] {
+			result[i] = AgentSessionMessage{
+				Type:      m.Type,
+				UUID:      m.UUID,
+				SessionID: m.SessionID,
+				Timestamp: m.Timestamp,
+				GitBranch: m.GitBranch,
+				Message:   m.Message,
+			}
+		}
+
+		writeJSON(w, http.StatusOK, AgentSessionMessagesResponse{
+			SessionID: sessionID,
+			Messages:  result,
+			Total:     total,
+			Limit:     limit,
+			Offset:    offset,
+			HasMore:   end < total,
+		})
+	case "codex":
+		if s.repoPath == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error": "repository path not configured",
+			})
+			return
+		}
+
+		codexMessages, total, err := codex.GetSessionMessages(s.repoPath, sessionID, limit, offset, order)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{
+				"error":      err.Error(),
+				"session_id": sessionID,
+			})
+			return
+		}
+
+		result := make([]AgentSessionMessage, len(codexMessages))
+		for i, m := range codexMessages {
+			raw, _ := codex.FormatMessageJSON(m.Role, m.Content)
+			result[i] = AgentSessionMessage{
+				Type:      m.Role,
+				SessionID: m.SessionID,
+				Timestamp: m.Timestamp.Format(time.RFC3339Nano),
+				Message:   raw,
+			}
+		}
+
+		hasMore := offset+len(result) < total
+		writeJSON(w, http.StatusOK, AgentSessionMessagesResponse{
+			SessionID: sessionID,
+			Messages:  result,
+			Total:     total,
+			Limit:     limit,
+			Offset:    offset,
+			HasMore:   hasMore,
+		})
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "unsupported runtime: " + runtime,
+		})
+	}
+}
+
+// handleAgentSessionElements handles GET /api/agent/sessions/elements?runtime=codex|claude
+func (s *Server) handleAgentSessionElements(w http.ResponseWriter, r *http.Request) {
+	runtime := parseAgentRuntime(r)
+	if runtime == "claude" {
+		s.handleClaudeSessionElements(w, r)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "session_id query parameter is required",
+		})
+		return
+	}
+
+	if s.repoPath == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "repository path not configured",
+		})
+		return
+	}
+
+	limit := parseIntParam(r, "limit", 50)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	beforeID := r.URL.Query().Get("before")
+	afterID := r.URL.Query().Get("after")
+
+	messages, total, err := codex.GetSessionMessages(s.repoPath, sessionID, 500, 0, "asc")
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{
+			"error":      err.Error(),
+			"session_id": sessionID,
+		})
+		return
+	}
+
+	elements := make([]sessioncache.Element, 0, len(messages))
+	for i, m := range messages {
+		elementType := sessioncache.ElementTypeAssistantText
+		var content interface{} = sessioncache.AssistantTextContent{Text: m.Content}
+		if m.Role == "user" {
+			elementType = sessioncache.ElementTypeUserInput
+			content = sessioncache.UserInputContent{Text: m.Content}
+		}
+
+		contentJSON, _ := json.Marshal(content)
+		elements = append(elements, sessioncache.Element{
+			ID:        fmt.Sprintf("%s-%d", sessionID, i),
+			Type:      elementType,
+			Timestamp: m.Timestamp.Format(time.RFC3339Nano),
+			Content:   contentJSON,
+		})
+	}
+
+	// Apply pagination (before/after + limit)
+	totalElements := len(elements)
+	startIdx := 0
+	endIdx := totalElements
+
+	if afterID != "" {
+		for i, e := range elements {
+			if e.ID == afterID {
+				startIdx = i + 1
+				break
+			}
+		}
+	}
+	if beforeID != "" {
+		for i, e := range elements {
+			if e.ID == beforeID {
+				endIdx = i
+				break
+			}
+		}
+	}
+	if endIdx > startIdx+limit {
+		endIdx = startIdx + limit
+	}
+	if startIdx >= len(elements) {
+		writeJSON(w, http.StatusOK, sessioncache.ElementsResponse{
+			SessionID: sessionID,
+			Elements:  []sessioncache.Element{},
+			Pagination: sessioncache.ElementsPagination{
+				Total:         total,
+				Returned:      0,
+				HasMoreBefore: afterID != "",
+				HasMoreAfter:  false,
+			},
+		})
+		return
+	}
+	if endIdx > len(elements) {
+		endIdx = len(elements)
+	}
+
+	pagination := sessioncache.ElementsPagination{
+		Total:    total,
+		Returned: endIdx - startIdx,
+	}
+	if endIdx-startIdx > 0 {
+		pagination.OldestID = elements[startIdx].ID
+		pagination.NewestID = elements[endIdx-1].ID
+		if beforeID != "" {
+			pagination.HasMoreBefore = true
+		}
+		if afterID != "" || endIdx < totalElements {
+			pagination.HasMoreAfter = endIdx < totalElements
+		}
+	}
+
+	writeJSON(w, http.StatusOK, sessioncache.ElementsResponse{
+		SessionID:  sessionID,
+		Elements:   elements[startIdx:endIdx],
+		Pagination: pagination,
 	})
 }
 

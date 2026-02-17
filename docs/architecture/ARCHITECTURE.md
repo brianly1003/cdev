@@ -2,7 +2,7 @@
 
 **Version**: 1.0.0-POC
 **Target Platforms**: macOS (Intel/Apple Silicon), Windows 10/11
-**Language**: Go 1.22+
+**Language**: Go 1.24+
 
 ---
 
@@ -1436,8 +1436,8 @@ build-windows-amd64:
 
 # Server settings
 server:
-  websocket_port: 8765
-  http_port: 8766
+  # Unified port for HTTP API and WebSocket connections
+  port: 8766
   host: "127.0.0.1"  # Bind to localhost only for security
 
 # Repository settings
@@ -1515,7 +1515,7 @@ func Load() (*Config, error) {
     viper.AddConfigPath("/etc/cdev")
 
     // Environment variable prefix
-    viper.SetEnvPrefix("CDOT")
+    viper.SetEnvPrefix("CDEV")
     viper.AutomaticEnv()
 
     // Set defaults
@@ -1542,8 +1542,7 @@ func Load() (*Config, error) {
 
 | Config Key | Environment Variable | Example |
 |------------|---------------------|---------|
-| `server.websocket_port` | `CDEV_SERVER_WEBSOCKET_PORT` | `8765` |
-| `server.http_port` | `CDEV_SERVER_HTTP_PORT` | `8766` |
+| `server.port` | `CDEV_SERVER_PORT` | `8766` |
 | `repository.path` | `CDEV_REPOSITORY_PATH` | `/path/to/repo` |
 | `claude.command` | `CDEV_CLAUDE_COMMAND` | `/usr/local/bin/claude` |
 | `logging.level` | `CDEV_LOGGING_LEVEL` | `debug` |
