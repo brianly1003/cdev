@@ -50,6 +50,22 @@ func TestSessionManagerProtocolContract_MethodMetadata(t *testing.T) {
 	watchAgent := assertParamContract(t, watchMeta, "agent_type", false)
 	assertSchemaDefault(t, watchAgent, "claude")
 	assertSchemaEnumContains(t, watchAgent, "claude", "codex")
+
+	messagesMeta := registry.GetMeta("workspace/session/messages")
+	if messagesMeta.Summary == "" {
+		t.Fatal("workspace/session/messages summary should not be empty")
+	}
+	assertParamContract(t, messagesMeta, "workspace_id", true)
+	assertParamContract(t, messagesMeta, "session_id", true)
+	messagesAgent := assertParamContract(t, messagesMeta, "agent_type", false)
+	assertSchemaDefault(t, messagesAgent, "claude")
+	assertSchemaEnumContains(t, messagesAgent, "claude", "codex")
+
+	stateMeta := registry.GetMeta("session/state")
+	if stateMeta.Summary == "" {
+		t.Fatal("session/state summary should not be empty")
+	}
+	assertParamContract(t, stateMeta, "session_id", true)
 }
 
 func TestSessionManagerProtocolContract_SessionStart(t *testing.T) {
@@ -193,6 +209,112 @@ func TestSessionManagerProtocolContract_WorkspaceSessionWatch(t *testing.T) {
 	})
 }
 
+func TestSessionManagerProtocolContract_WorkspaceSessionMessages(t *testing.T) {
+	service := NewSessionManagerService(nil)
+
+	t.Run("workspace_id is required", func(t *testing.T) {
+		_, rpcErr := service.GetSessionMessages(context.Background(), []byte(`{"session_id":"sess-1"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if rpcErr.Message != "workspace_id is required" {
+			t.Fatalf("error message = %q, want %q", rpcErr.Message, "workspace_id is required")
+		}
+	})
+
+	t.Run("session_id is required", func(t *testing.T) {
+		_, rpcErr := service.GetSessionMessages(context.Background(), []byte(`{"workspace_id":"ws-1"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if rpcErr.Message != "session_id is required" {
+			t.Fatalf("error message = %q, want %q", rpcErr.Message, "session_id is required")
+		}
+	})
+
+	t.Run("invalid agent_type is rejected", func(t *testing.T) {
+		_, rpcErr := service.GetSessionMessages(context.Background(), []byte(`{"workspace_id":"ws-1","session_id":"sess-1","agent_type":"gemini"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if !containsSubstr(rpcErr.Message, "agent_type must be one of: claude, codex") {
+			t.Fatalf("error message = %q, want runtime enum validation", rpcErr.Message)
+		}
+	})
+
+	t.Run("defaults to claude manager-not-configured", func(t *testing.T) {
+		_, rpcErr := service.GetSessionMessages(context.Background(), []byte(`{"workspace_id":"ws-1","session_id":"sess-1"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.AgentNotConfigured {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.AgentNotConfigured)
+		}
+		if !containsSubstr(rpcErr.Message, "session manager is not configured") {
+			t.Fatalf("error message = %q, want manager not configured", rpcErr.Message)
+		}
+
+		data := decodeErrorData(t, rpcErr)
+		if got := data["method"]; got != "workspace/session/messages" {
+			t.Fatalf("error data method = %q, want %q", got, "workspace/session/messages")
+		}
+	})
+
+	t.Run("codex manager-not-configured includes method", func(t *testing.T) {
+		_, rpcErr := service.GetSessionMessages(context.Background(), []byte(`{"workspace_id":"ws-1","session_id":"sess-1","agent_type":"codex"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.AgentNotConfigured {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.AgentNotConfigured)
+		}
+
+		data := decodeErrorData(t, rpcErr)
+		if got := data["method"]; got != "workspace/session/messages" {
+			t.Fatalf("error data method = %q, want %q", got, "workspace/session/messages")
+		}
+	})
+}
+
+func TestSessionManagerProtocolContract_SessionState(t *testing.T) {
+	service := NewSessionManagerService(nil)
+
+	t.Run("invalid JSON returns invalid params", func(t *testing.T) {
+		_, rpcErr := service.State(context.Background(), []byte(`not valid json`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if !containsSubstr(rpcErr.Message, "failed to parse params") {
+			t.Fatalf("error message = %q, want parse failure", rpcErr.Message)
+		}
+	})
+
+	t.Run("session_id is required", func(t *testing.T) {
+		_, rpcErr := service.State(context.Background(), []byte(`{}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if rpcErr.Message != "session_id is required" {
+			t.Fatalf("error message = %q, want %q", rpcErr.Message, "session_id is required")
+		}
+	})
+}
+
 func assertParamContract(t *testing.T, meta handler.MethodMeta, name string, required bool) handler.OpenRPCParam {
 	t.Helper()
 	param, ok := findParam(meta, name)
@@ -272,4 +394,3 @@ func decodeErrorData(t *testing.T, rpcErr *message.Error) map[string]string {
 	}
 	return data
 }
-
