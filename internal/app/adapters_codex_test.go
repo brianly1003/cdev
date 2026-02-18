@@ -48,7 +48,7 @@ func TestCodexSessionAdapter_GetSessionMessages_SetsStableUUID(t *testing.T) {
 			"payload": map[string]interface{}{
 				"type":      "function_call",
 				"name":      "exec_command",
-				"arguments": `{"cmd":"echo hi"}`,
+				"arguments": `{"cmd":"ls -la"}`,
 				"call_id":   "call-1",
 			},
 		},
@@ -465,6 +465,40 @@ func TestFormatCodexToolDisplay_ViewImage_CompactsDotCdevPath(t *testing.T) {
 func TestSummarizeCodexToolForExplored_SkipsViewImage(t *testing.T) {
 	summary := summarizeCodexToolForExplored("view_image", map[string]interface{}{
 		"path": ".cdev/images/img_6ab0243f-1a6.jpg",
+	})
+	if summary != "" {
+		t.Fatalf("summary=%q, want empty", summary)
+	}
+}
+
+func TestSummarizeCodexToolForExplored_SkipsApplyPatch(t *testing.T) {
+	summary := summarizeCodexToolForExplored("apply_patch", map[string]interface{}{
+		"input": "*** Begin Patch\n*** Update File: a.txt\n+hi\n*** End Patch\n",
+	})
+	if summary != "" {
+		t.Fatalf("summary=%q, want empty", summary)
+	}
+}
+
+func TestSummarizeCodexToolForExplored_FormatsReadAndSearch(t *testing.T) {
+	readSummary := summarizeCodexToolForExplored("exec_command", map[string]interface{}{
+		"cmd": "sed -n '1170,1275p' /Users/brianly/Projects/cdev/internal/app/adapters.go",
+	})
+	if readSummary != "Read adapters.go" {
+		t.Fatalf("readSummary=%q, want %q", readSummary, "Read adapters.go")
+	}
+
+	searchSummary := summarizeCodexToolForExplored("exec_command", map[string]interface{}{
+		"cmd": "rg -n \"claude_message|tool_use\" internal -S",
+	})
+	if searchSummary != "Search claude_message|tool_use in internal" {
+		t.Fatalf("searchSummary=%q, want %q", searchSummary, "Search claude_message|tool_use in internal")
+	}
+}
+
+func TestSummarizeCodexToolForExplored_SkipsExecutionCommands(t *testing.T) {
+	summary := summarizeCodexToolForExplored("exec_command", map[string]interface{}{
+		"cmd": "python3 - <<'PY'\nprint('hello')\nPY",
 	})
 	if summary != "" {
 		t.Fatalf("summary=%q, want empty", summary)

@@ -498,11 +498,9 @@ func summarizeToolForExplored(toolName string, params map[string]interface{}) st
 			return summarizeExecCommand(cmd)
 		}
 	case "apply_patch":
-		if in, ok := params["input"].(string); ok {
-			if summary := summarizeApplyPatchTool(in); summary != "" {
-				return summary
-			}
-		}
+		// apply_patch already appears as its own tool row with patch preview.
+		// Avoid duplicating it in synthetic "Explored" summaries.
+		return ""
 	case "view_image":
 		// view_image already renders as a dedicated tool call row; avoid redundant "Explored" line.
 		return ""
@@ -557,12 +555,210 @@ func summarizeExecCommand(cmd string) string {
 			break
 		}
 		return fmt.Sprintf("List %s", target)
+
+	case "cat", "sed", "nl", "tail", "head":
+		if summary, ok := summarizeReadCommand(fields); ok {
+			return summary
+		}
+		return "Read file"
+
+	case "rg", "grep":
+		return summarizeSearchCommand(cmd, fields)
 	}
 
-	if len(cmd) > 90 {
-		return cmd[:87] + "..."
+	// Handle piped read forms like: nl -ba file | sed -n '1,40p'
+	if strings.Contains(cmd, "| sed ") || strings.Contains(cmd, "| nl ") || strings.Contains(cmd, "| cat ") {
+		if summary, ok := summarizeReadCommand(fields); ok {
+			return summary
+		}
 	}
-	return cmd
+
+	// Non-exploration commands (e.g., python/node/go execution) should stay in
+	// their own "Ran ..." tool rows, not in synthetic "Explored" summaries.
+	return ""
+}
+
+func summarizeSearchCommand(cmd string, fields []string) string {
+	target := "."
+	if t := extractSearchTarget(fields); t != "" {
+		target = t
+	}
+
+	pattern := extractSearchPattern(cmd)
+	if pattern == "" {
+		return fmt.Sprintf("Search in %s", target)
+	}
+	return fmt.Sprintf("Search %s in %s", truncateSearchPattern(pattern), target)
+}
+
+func summarizeReadCommand(fields []string) (string, bool) {
+	targets := extractReadTargets(fields)
+	if len(targets) == 0 {
+		return "", false
+	}
+	return "Read " + strings.Join(targets, ", "), true
+}
+
+func extractReadTargets(fields []string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, 2)
+
+	for i, raw := range fields {
+		if i == 0 {
+			continue
+		}
+
+		tok := trimToolToken(raw)
+		if tok == "" {
+			continue
+		}
+		switch tok {
+		case "|", "||", "&&", ";":
+			return out
+		}
+
+		if strings.HasPrefix(tok, "-") || isLikelySedScriptToken(tok) {
+			continue
+		}
+		if !isLikelyPathToken(tok) {
+			continue
+		}
+
+		name := compactReadTarget(tok)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+
+	return out
+}
+
+func extractSearchTarget(fields []string) string {
+	nonFlagArgs := 0
+	for i, raw := range fields {
+		if i == 0 {
+			continue
+		}
+
+		tok := trimToolToken(raw)
+		if tok == "" {
+			continue
+		}
+		switch tok {
+		case "|", "||", "&&", ";":
+			return ""
+		}
+
+		if strings.HasPrefix(tok, "-") {
+			continue
+		}
+
+		// For rg/grep, the first non-flag arg is usually the pattern; the next
+		// non-flag arg is the search target path.
+		nonFlagArgs++
+		if nonFlagArgs == 1 {
+			continue
+		}
+		return tok
+	}
+	return ""
+}
+
+func extractSearchPattern(cmd string) string {
+	quoted := firstQuotedSegment(cmd)
+	if quoted == "" {
+		return ""
+	}
+	quoted = trimToolToken(quoted)
+	if quoted == "" || isLikelyPathToken(quoted) {
+		return ""
+	}
+	return quoted
+}
+
+func firstQuotedSegment(s string) string {
+	first := -1
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		if s[i] == '"' || s[i] == '\'' {
+			first = i
+			quote = s[i]
+			break
+		}
+	}
+	if first < 0 {
+		return ""
+	}
+
+	for i := first + 1; i < len(s); i++ {
+		if s[i] == quote {
+			return s[first+1 : i]
+		}
+	}
+	return ""
+}
+
+func isLikelyPathToken(tok string) bool {
+	if tok == "" {
+		return false
+	}
+	if strings.ContainsAny(tok, "*?[]|(){}") {
+		return false
+	}
+	if strings.HasPrefix(tok, "/") || strings.HasPrefix(tok, "./") || strings.HasPrefix(tok, "../") || strings.HasPrefix(tok, "~/") {
+		return true
+	}
+	if strings.Contains(tok, "/") {
+		return true
+	}
+	// Plain file names like hub.go, app_test.go.
+	if strings.Contains(tok, ".") && !strings.Contains(tok, ":") {
+		return true
+	}
+	return false
+}
+
+func isLikelySedScriptToken(tok string) bool {
+	s := trimToolToken(tok)
+	if strings.HasSuffix(s, "p") {
+		body := strings.TrimSuffix(s, "p")
+		if body != "" && strings.Trim(body, "0123456789,") == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func compactReadTarget(tok string) string {
+	tok = trimToolToken(tok)
+	if tok == "" {
+		return ""
+	}
+	if idx := strings.Index(tok, "/.cdev/"); idx >= 0 {
+		return tok[idx+1:]
+	}
+	tok = strings.TrimSuffix(tok, "/")
+	if slash := strings.LastIndex(tok, "/"); slash >= 0 && slash+1 < len(tok) {
+		return tok[slash+1:]
+	}
+	return tok
+}
+
+func truncateSearchPattern(pattern string) string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return pattern
+	}
+	if len(pattern) > 72 {
+		return pattern[:69] + "..."
+	}
+	return pattern
 }
 
 func extractToolFlagValues(fields []string, flag string) []string {

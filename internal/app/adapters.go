@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -1161,11 +1162,9 @@ func summarizeCodexToolForExplored(toolName string, params map[string]interface{
 			return summarizeExecCommandForExplored(cmd)
 		}
 	case "apply_patch":
-		if in, ok := params["input"].(string); ok {
-			if summary := summarizeApplyPatch(in); summary != "" {
-				return summary
-			}
-		}
+		// apply_patch already renders as a dedicated Updated/Added tool row with diff preview.
+		// Skip synthetic "Explored" summary to avoid duplicate split presentation.
+		return ""
 	case "view_image":
 		// view_image already appears as its own tool row.
 		return ""
@@ -1181,29 +1180,29 @@ func summarizeCodexToolForExplored(toolName string, params map[string]interface{
 func summarizeExecCommandForExplored(cmd string) string {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
-		return "Run command"
+		return ""
 	}
 
 	fields := strings.Fields(cmd)
 	if len(fields) == 0 {
-		return "Run command"
+		return ""
 	}
 
 	switch fields[0] {
 	case "find":
 		root := "."
 		if len(fields) > 1 && !strings.HasPrefix(fields[1], "-") {
-			root = trimShellToken(fields[1])
+			root = compactExploredSearchTarget(trimShellToken(fields[1]))
 		}
 
 		names := extractFlagValues(fields, "-name")
 		if len(names) > 0 {
-			return fmt.Sprintf("Search %s in %s", names[0], root)
+			return fmt.Sprintf("Search %s in %s", truncateExploredPattern(names[0]), root)
 		}
 
 		paths := extractFlagValues(fields, "-path")
 		if len(paths) > 0 {
-			return fmt.Sprintf("Search %s in %s", paths[0], root)
+			return fmt.Sprintf("Search %s in %s", truncateExploredPattern(paths[0]), root)
 		}
 
 		if strings.Contains(cmd, "-type") {
@@ -1217,22 +1216,31 @@ func summarizeExecCommandForExplored(cmd string) string {
 			if strings.HasPrefix(tok, "-") {
 				continue
 			}
-			target = trimShellToken(tok)
+			target = compactExploredSearchTarget(trimShellToken(tok))
 			break
 		}
 		return fmt.Sprintf("List %s", target)
 
-	case "cat":
-		if len(fields) > 1 {
-			return fmt.Sprintf("Read %s", trimShellToken(fields[1]))
+	case "cat", "sed", "nl", "tail", "head":
+		if summary, ok := summarizeReadCommandForExplored(fields); ok {
+			return summary
 		}
 		return "Read file"
+
+	case "rg", "grep":
+		return summarizeSearchCommandForExplored(cmd, fields)
 	}
 
-	if len(cmd) > 90 {
-		return cmd[:87] + "..."
+	// Handle piped forms like: nl -ba file | sed -n '1,40p'
+	if strings.Contains(cmd, "| sed ") || strings.Contains(cmd, "| nl ") || strings.Contains(cmd, "| cat ") {
+		if summary, ok := summarizeReadCommandForExplored(fields); ok {
+			return summary
+		}
 	}
-	return cmd
+
+	// Non-exploration commands (python/node/go execution, etc.) should only appear
+	// in their dedicated "Ran ..." tool rows, not synthetic "Explored" summaries.
+	return ""
 }
 
 func extractFlagValues(fields []string, flag string) []string {
@@ -1255,6 +1263,203 @@ func trimShellToken(token string) string {
 	token = strings.Trim(token, "\"'")
 	token = strings.TrimSuffix(token, ";")
 	return token
+}
+
+func summarizeSearchCommandForExplored(cmd string, fields []string) string {
+	target := "."
+	if t := extractSearchTargetForExplored(fields); t != "" {
+		target = compactExploredSearchTarget(t)
+	}
+
+	pattern := extractSearchPatternForExplored(cmd)
+	if pattern == "" {
+		return fmt.Sprintf("Search in %s", target)
+	}
+	return fmt.Sprintf("Search %s in %s", truncateExploredPattern(pattern), target)
+}
+
+func summarizeReadCommandForExplored(fields []string) (string, bool) {
+	targets := extractReadTargetsForExplored(fields)
+	if len(targets) == 0 {
+		return "", false
+	}
+	return "Read " + strings.Join(targets, ", "), true
+}
+
+func extractReadTargetsForExplored(fields []string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, 2)
+
+	for i, raw := range fields {
+		if i == 0 {
+			continue
+		}
+		tok := trimShellToken(raw)
+		if tok == "" {
+			continue
+		}
+		switch tok {
+		case "|", "||", "&&", ";":
+			return out
+		}
+		if strings.HasPrefix(tok, "-") || isLikelySedScriptToken(tok) {
+			continue
+		}
+		if !isLikelyPathToken(tok) {
+			continue
+		}
+		name := compactExploredReadTarget(tok)
+		if name == "" {
+			continue
+		}
+		if _, exists := seen[name]; exists {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func extractSearchTargetForExplored(fields []string) string {
+	nonFlagArgs := 0
+	for i, raw := range fields {
+		if i == 0 {
+			continue
+		}
+		tok := trimShellToken(raw)
+		if tok == "" {
+			continue
+		}
+		switch tok {
+		case "|", "||", "&&", ";":
+			return ""
+		}
+		if strings.HasPrefix(tok, "-") {
+			continue
+		}
+		// For rg/grep, first non-flag arg is usually the pattern; the next
+		// non-flag arg is the path target.
+		nonFlagArgs++
+		if nonFlagArgs == 1 {
+			continue
+		}
+		return tok
+	}
+	return ""
+}
+
+func extractSearchPatternForExplored(cmd string) string {
+	quoted := firstQuotedSegment(cmd)
+	if quoted == "" {
+		return ""
+	}
+	quoted = trimShellToken(quoted)
+	if quoted == "" || isLikelyPathToken(quoted) {
+		return ""
+	}
+	return quoted
+}
+
+func firstQuotedSegment(s string) string {
+	first := -1
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		if s[i] == '"' || s[i] == '\'' {
+			first = i
+			quote = s[i]
+			break
+		}
+	}
+	if first < 0 {
+		return ""
+	}
+	for i := first + 1; i < len(s); i++ {
+		if s[i] == quote {
+			return s[first+1 : i]
+		}
+	}
+	return ""
+}
+
+func isLikelyPathToken(tok string) bool {
+	if tok == "" {
+		return false
+	}
+	if strings.ContainsAny(tok, "*?[]|(){}") {
+		return false
+	}
+	if strings.HasPrefix(tok, "/") || strings.HasPrefix(tok, "./") || strings.HasPrefix(tok, "../") || strings.HasPrefix(tok, "~/") {
+		return true
+	}
+	if strings.Contains(tok, "/") {
+		return true
+	}
+	// Plain file names like hub.go, app_test.go.
+	if strings.Contains(tok, ".") && !strings.Contains(tok, ":") {
+		return true
+	}
+	return false
+}
+
+func isLikelySedScriptToken(tok string) bool {
+	s := trimShellToken(tok)
+	if strings.HasSuffix(s, "p") {
+		body := strings.TrimSuffix(s, "p")
+		if body != "" && strings.Trim(body, "0123456789,") == "" {
+			return true
+		}
+	}
+	return false
+}
+
+func compactExploredSearchTarget(token string) string {
+	token = trimShellToken(token)
+	if token == "" {
+		return "."
+	}
+	token = strings.TrimSuffix(token, "/")
+	if token == "" || token == "." {
+		return "."
+	}
+	if idx := strings.Index(token, "/.cdev/"); idx >= 0 {
+		return token[idx+1:]
+	}
+	if strings.HasPrefix(token, "/") {
+		base := filepath.Base(token)
+		if base != "" && base != "." && base != "/" {
+			return base
+		}
+	}
+	return token
+}
+
+func compactExploredReadTarget(token string) string {
+	token = trimShellToken(token)
+	if token == "" {
+		return ""
+	}
+	if idx := strings.Index(token, "/.cdev/"); idx >= 0 {
+		return token[idx+1:]
+	}
+	if strings.Contains(token, "/") {
+		base := filepath.Base(strings.TrimSuffix(token, "/"))
+		if base != "" && base != "." && base != "/" {
+			return base
+		}
+	}
+	return token
+}
+
+func truncateExploredPattern(pattern string) string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return pattern
+	}
+	if len(pattern) > 72 {
+		return pattern[:69] + "..."
+	}
+	return pattern
 }
 
 func formatCodexToolDisplay(toolName string, params map[string]interface{}) string {
