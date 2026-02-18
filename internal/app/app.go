@@ -1052,8 +1052,9 @@ func (w *wsOutputWriter) Write(p []byte) (n int, err error) {
 	// Broadcast PTY output to all WebSocket clients as pty_output event
 	if w.app.hub != nil {
 		text := string(p)
-		// Send same text as both clean and raw (terminal mode sends raw PTY output)
-		event := events.NewPTYOutputEvent(text, text, "running")
+		// Keep PTY state values consistent with PTYState enum consumed by clients.
+		// Send same text as both clean and raw (terminal mode sends raw PTY output).
+		event := events.NewPTYOutputEvent(text, text, "thinking")
 		w.app.hub.Publish(event)
 	}
 	return len(p), nil

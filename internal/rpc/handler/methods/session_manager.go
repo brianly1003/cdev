@@ -48,6 +48,17 @@ type SessionManagerService struct {
 const (
 	sessionManagerAgentClaude = "claude"
 	sessionManagerAgentCodex  = "codex"
+
+	// Codex PTY can emit very high-frequency TUI output. Batch lines briefly to
+	// reduce hub pressure and avoid dropping bursts of pty_output events.
+	codexPTYOutputFlushInterval = 80 * time.Millisecond
+	codexPTYOutputMaxLines      = 12
+	codexPTYOutputMaxBytes      = 8 * 1024
+
+	// Keep PTY state strings aligned with PTYState enum consumed by clients.
+	ptyStateThinking = "thinking"
+	ptyStateIdle     = "idle"
+	ptyStateError    = "error"
 )
 
 type codexPTYSession struct {
@@ -2700,7 +2711,7 @@ func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessio
 	s.codexSessions[mapSessionID] = codexSession
 	s.codexMu.Unlock()
 
-	s.publishCodexPTYState(mapSessionID, "running")
+	s.publishCodexPTYState(mapSessionID, ptyStateThinking)
 
 	go s.streamCodexOutput(codexSession)
 	go s.waitCodexProcess(codexSession)
@@ -2710,15 +2721,68 @@ func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessio
 func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession) {
 	scanner := bufio.NewScanner(codexSession.ptmx)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	linesCh := make(chan string, 64)
+	errCh := make(chan error, 1)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.TrimSpace(line) == "" {
-			continue
+	go func() {
+		defer close(linesCh)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			linesCh <- line
 		}
-		evt := events.NewPTYOutputEventWithSession(line, line, "running", codexSession.sessionID)
-		evt.SetAgentType(sessionManagerAgentCodex)
-		s.manager.PublishEvent(evt)
+		if err := scanner.Err(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	flushTicker := time.NewTicker(codexPTYOutputFlushInterval)
+	defer flushTicker.Stop()
+
+	pending := make([]string, 0, codexPTYOutputMaxLines)
+	pendingBytes := 0
+	flush := func() {
+		if len(pending) == 0 {
+			return
+		}
+		s.publishCodexPTYOutput(codexSession.sessionID, strings.Join(pending, "\n"), ptyStateThinking)
+		pending = pending[:0]
+		pendingBytes = 0
+	}
+
+	for {
+		select {
+		case line, ok := <-linesCh:
+			if !ok {
+				flush()
+				select {
+				case err := <-errCh:
+					if err != nil && !errors.Is(err, os.ErrClosed) {
+						log.Debug().Err(err).Str("session_id", codexSession.sessionID).Msg("codex PTY scan ended with error")
+					}
+				default:
+				}
+				return
+			}
+
+			// Keep very large lines as immediate standalone events.
+			if len(line) >= codexPTYOutputMaxBytes {
+				flush()
+				s.publishCodexPTYOutput(codexSession.sessionID, line, ptyStateThinking)
+				continue
+			}
+
+			pending = append(pending, line)
+			pendingBytes += len(line) + 1 // + newline join cost
+			if len(pending) >= codexPTYOutputMaxLines || pendingBytes >= codexPTYOutputMaxBytes {
+				flush()
+			}
+
+		case <-flushTicker.C:
+			flush()
+		}
 	}
 }
 
@@ -2733,11 +2797,18 @@ func (s *SessionManagerService) waitCodexProcess(codexSession *codexPTYSession) 
 	s.codexMu.Unlock()
 
 	if waitErr != nil {
-		evt := events.NewPTYOutputEventWithSession(waitErr.Error(), waitErr.Error(), "error", codexSession.sessionID)
-		evt.SetAgentType(sessionManagerAgentCodex)
-		s.manager.PublishEvent(evt)
+		s.publishCodexPTYOutput(codexSession.sessionID, waitErr.Error(), ptyStateError)
 	}
-	s.publishCodexPTYState(codexSession.sessionID, "idle")
+	s.publishCodexPTYState(codexSession.sessionID, ptyStateIdle)
+}
+
+func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	evt := events.NewPTYOutputEventWithSession(text, text, state, sessionID)
+	evt.SetAgentType(sessionManagerAgentCodex)
+	s.manager.PublishEvent(evt)
 }
 
 func (s *SessionManagerService) publishCodexPTYState(sessionID, state string) {
