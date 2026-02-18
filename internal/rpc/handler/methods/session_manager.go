@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -39,10 +40,11 @@ type SessionManagerService struct {
 	focusProvider  SessionFocusProvider
 	sessionService *SessionService
 
-	codexMu         sync.Mutex
-	codexSessions   map[string]*codexPTYSession
-	codexWatchers   map[string]session.WatchInfo
-	runtimeDispatch map[string]sessionRuntimeDispatch
+	codexMu             sync.Mutex
+	codexSessions       map[string]*codexPTYSession
+	codexWatchers       map[string]session.WatchInfo
+	codexLastPTYLogLine map[string]string
+	runtimeDispatch     map[string]sessionRuntimeDispatch
 }
 
 const (
@@ -61,6 +63,12 @@ const (
 	ptyStateError    = "error"
 )
 
+var (
+	codexANSIRegex = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[PX^_][^\x1b]*\x1b\\|\x1b[\(\)][AB012]|\x1b[>=]`)
+	// Strip non-printing control chars while keeping newline/tab/carriage-return.
+	codexControlRegex = regexp.MustCompile(`[\x00-\x08\x0b\x0c\x0e-\x1a\x1c-\x1f\x7f]`)
+)
+
 type codexPTYSession struct {
 	sessionID   string
 	workspaceID string
@@ -72,9 +80,10 @@ type codexPTYSession struct {
 // NewSessionManagerService creates a new session manager service.
 func NewSessionManagerService(manager *session.Manager) *SessionManagerService {
 	service := &SessionManagerService{
-		manager:       manager,
-		codexSessions: make(map[string]*codexPTYSession),
-		codexWatchers: make(map[string]session.WatchInfo),
+		manager:             manager,
+		codexSessions:       make(map[string]*codexPTYSession),
+		codexWatchers:       make(map[string]session.WatchInfo),
+		codexLastPTYLogLine: make(map[string]string),
 	}
 	service.ensureRuntimeDispatch()
 	return service
@@ -2794,6 +2803,7 @@ func (s *SessionManagerService) waitCodexProcess(codexSession *codexPTYSession) 
 	if current := s.codexSessions[codexSession.sessionID]; current == codexSession {
 		delete(s.codexSessions, codexSession.sessionID)
 	}
+	delete(s.codexLastPTYLogLine, codexSession.sessionID)
 	s.codexMu.Unlock()
 
 	if waitErr != nil {
@@ -2806,9 +2816,44 @@ func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state str
 	if strings.TrimSpace(text) == "" {
 		return
 	}
+	logLine := normalizeCodexPTYLogText(text)
+	if logLine != "" && s.shouldLogCodexPTYOutput(sessionID, logLine) {
+		log.Debug().
+			Str("clean", truncateCodexPTYLog(logLine, 160)).
+			Str("state", state).
+			Str("session_id", sessionID).
+			Msg("PTY output")
+	}
 	evt := events.NewPTYOutputEventWithSession(text, text, state, sessionID)
 	evt.SetAgentType(sessionManagerAgentCodex)
 	s.manager.PublishEvent(evt)
+}
+
+func (s *SessionManagerService) shouldLogCodexPTYOutput(sessionID, clean string) bool {
+	s.codexMu.Lock()
+	defer s.codexMu.Unlock()
+
+	lastLine := s.codexLastPTYLogLine[sessionID]
+	if clean == lastLine {
+		return false
+	}
+	s.codexLastPTYLogLine[sessionID] = clean
+	return true
+}
+
+func truncateCodexPTYLog(text string, max int) string {
+	normalized := strings.ReplaceAll(text, "\r", "")
+	normalized = strings.ReplaceAll(normalized, "\n", `\n`)
+	if max <= 0 || len(normalized) <= max {
+		return normalized
+	}
+	return normalized[:max-3] + "..."
+}
+
+func normalizeCodexPTYLogText(text string) string {
+	withoutANSI := codexANSIRegex.ReplaceAllString(text, "")
+	withoutControl := codexControlRegex.ReplaceAllString(withoutANSI, "")
+	return strings.TrimSpace(withoutControl)
 }
 
 func (s *SessionManagerService) publishCodexPTYState(sessionID, state string) {
