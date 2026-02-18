@@ -6,10 +6,88 @@ This document covers common issues and their solutions when running cdev.
 
 ## Table of Contents
 
-1. [Session Cache Errors](#session-cache-errors)
-2. [WebSocket Connection Issues](#websocket-connection-issues)
-3. [Claude CLI Issues](#claude-cli-issues)
-4. [Performance Issues](#performance-issues)
+1. [Run Doctor First](#run-doctor-first)
+2. [Session Cache Errors](#session-cache-errors)
+3. [WebSocket Connection Issues](#websocket-connection-issues)
+4. [Claude CLI Issues](#claude-cli-issues)
+5. [Performance Issues](#performance-issues)
+
+---
+
+## Run Doctor First
+
+Before debugging manually, run the local diagnostics command:
+
+```bash
+cdev doctor
+```
+
+Machine-readable output:
+
+```bash
+cdev doctor --json
+```
+
+Strict mode (non-zero exit on warnings or failures):
+
+```bash
+cdev doctor --strict
+```
+
+### Doctor Output Contract (v1.0)
+
+`cdev doctor --json` returns:
+
+```json
+{
+  "version": "1.0",
+  "generated_at": "2026-02-17T12:00:00Z",
+  "overall_status": "ok|warn|fail",
+  "summary": {
+    "total": 12,
+    "ok": 10,
+    "warn": 2,
+    "fail": 0
+  },
+  "checks": [
+    {
+      "id": "config.load",
+      "status": "ok|warn|fail",
+      "message": "human-readable summary",
+      "details": { "key": "value" },
+      "remediation": "action to fix (present for warn/fail)"
+    }
+  ],
+  "config_search_paths": [
+    "config.yaml",
+    "~/.cdev/config.yaml",
+    "/etc/cdev/config.yaml"
+  ]
+}
+```
+
+### Current Check IDs
+
+| Check ID | What it validates | Common remediation |
+|----------|-------------------|--------------------|
+| `config.load` | Effective config can be loaded and validated | Fix YAML or regenerate with `cdev config init --force` |
+| `config.directory` | `~/.cdev` directory exists and is accessible | Run `cdev config init` |
+| `auth.registry_file` | `auth_registry.json` exists and is valid JSON | Start cdev / pair device to initialize auth |
+| `auth.token_secret` | `token_secret.json` exists and is valid JSON | Start cdev once to generate secret |
+| `workspace.registry_file` | `workspaces.yaml` exists and is valid YAML | Start cdev or add workspace from cdev-ios |
+| `repository.path` | Configured `repository.path` exists and is a directory | Fix `repository.path` in config |
+| `runtime.claude_cli` | Claude CLI executable is available | Install `claude` or update `claude.command` |
+| `runtime.codex_cli` | Codex CLI executable is available | Install `codex` |
+| `runtime.git` | Git executable is available | Install `git` or update `git.command` |
+| `sessions.claude_dir` | Claude sessions directory exists | Run a Claude session to bootstrap |
+| `sessions.codex_dir` | Codex sessions directory exists | Run a Codex session to bootstrap |
+| `server.health_endpoint` | `http://<host>:<port>/health` is reachable | Start cdev and verify host/port config |
+
+### Exit Code Rules
+
+- `overall_status = ok` -> exit code `0`
+- `overall_status = warn` -> exit code `0` (or non-zero with `--strict`)
+- `overall_status = fail` -> non-zero exit code
 
 ---
 
@@ -272,5 +350,6 @@ If you encounter issues not covered here:
 
 | Date | Change |
 |------|--------|
+| 2026-02-17 | Added `cdev doctor` usage, output contract (v1.0), check IDs, and exit code behavior |
 | 2024-12-23 | Initial troubleshooting guide |
 | 2024-12-23 | Added "token too long" fix (10MB buffer) |

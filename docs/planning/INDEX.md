@@ -1,6 +1,6 @@
 # Implementation Documentation Index
 
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-17
 **Status:** Active (roadmap + implementation specs)
 
 ---
@@ -8,6 +8,9 @@
 ## 📌 AI Agent Runtime Roadmap (New)
 
 - [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Authoritative phased plan to evolve cdev from monitor/controller into a secure AI Agent runtime platform.
+- [`MARKET-READINESS-EXECUTION-PLAN-2026.md`](./MARKET-READINESS-EXECUTION-PLAN-2026.md) - Actionable 30/60/90 plan to improve extensibility, reliability, onboarding, and mobile UX for cdev + cdev-ios.
+- Day 1 contract artifact: [`../api/RUNTIME-CAPABILITY-REGISTRY.md`](../api/RUNTIME-CAPABILITY-REGISTRY.md)
+- Current execution status: Days 1-6 complete (including `cdev doctor` skeleton and troubleshooting contract).
 
 ---
 
@@ -31,27 +34,30 @@ This documentation suite provides **complete end-to-end specifications** for imp
    - ROI projections
    - Strategic positioning
    - Investment requirements
+2. [`MARKET-READINESS-EXECUTION-PLAN-2026.md`](./MARKET-READINESS-EXECUTION-PLAN-2026.md) - 90-day execution plan with prioritized checklist and KPIs
 
 ### For Engineers / Technical Leads
 
 **Start Here:**
 1. [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Current transformation plan (20 min)
-2. [`AUTO-CLAUDE-COMPARISON-SUMMARY.md`](./AUTO-CLAUDE-COMPARISON-SUMMARY.md) - Overview (15 min)
-3. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - **Complete technical spec** (2 hour read)
+2. [`MARKET-READINESS-EXECUTION-PLAN-2026.md`](./MARKET-READINESS-EXECUTION-PLAN-2026.md) - practical execution sequence and workstreams (20 min)
+3. [`AUTO-CLAUDE-COMPARISON-SUMMARY.md`](./AUTO-CLAUDE-COMPARISON-SUMMARY.md) - Overview (15 min)
+4. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - **Complete technical spec** (2 hour read)
    - Deep-dive architecture
    - Sprint planning (Sprints 1-3)
    - Auto-Claude analysis
    - Mobile UI designs
-4. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - System diagrams (30 min)
-5. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Developer quick reference (15 min)
+5. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - System diagrams (30 min)
+6. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Developer quick reference (15 min)
 
 ### For Developers (Implementation)
 
 **Start Here:**
 1. [`AI-AGENT-RUNTIME-ROADMAP.md`](./AI-AGENT-RUNTIME-ROADMAP.md) - Phase overview and sequence (20 min)
-2. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Quick reference (10 min)
-3. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - Visual overview (20 min)
-4. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - Detailed implementation (refer as needed)
+2. [`MARKET-READINESS-EXECUTION-PLAN-2026.md`](./MARKET-READINESS-EXECUTION-PLAN-2026.md) - weekly checklist and 30/60/90 milestones (20 min)
+3. [`QUICK-START-GUIDE.md`](./QUICK-START-GUIDE.md) - Quick reference (10 min)
+4. [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) - Visual overview (20 min)
+5. [`MULTI-AGENT-IMPLEMENTATION-SPEC.md`](./MULTI-AGENT-IMPLEMENTATION-SPEC.md) - Detailed implementation (refer as needed)
 
 ---
 

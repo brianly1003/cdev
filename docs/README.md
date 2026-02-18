@@ -8,13 +8,16 @@ This directory contains all project documentation organized by category.
 
 | I need to... | Read this |
 |--------------|-----------|
+| Run setup diagnostics | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) (`cdev doctor`) |
 | Integrate with the API | [api/API-REFERENCE.md](./api/API-REFERENCE.md) |
 | Understand the protocol | [api/PROTOCOL.md](./api/PROTOCOL.md) |
+| Understand runtime capability contract | [api/RUNTIME-CAPABILITY-REGISTRY.md](./api/RUNTIME-CAPABILITY-REGISTRY.md) |
 | Understand the architecture | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) |
 | Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
 | Safely access remotely | [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) |
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
 | Turn cdev into an AI Agent runtime | [planning/AI-AGENT-RUNTIME-ROADMAP.md](./planning/AI-AGENT-RUNTIME-ROADMAP.md) |
+| Execute market readiness plan | [planning/MARKET-READINESS-EXECUTION-PLAN-2026.md](./planning/MARKET-READINESS-EXECUTION-PLAN-2026.md) |
 | **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
 | **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
 | **Integrate iOS app** | [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) |
@@ -33,6 +36,7 @@ docs/
 ├── api/                       # API & Integration docs
 │   ├── PROTOCOL.md            # Protocol specification (JSON-RPC 2.0 + legacy)
 │   ├── UNIFIED-API-SPEC.md    # JSON-RPC 2.0 method reference
+│   ├── RUNTIME-CAPABILITY-REGISTRY.md # Runtime contract for server-driven runtime behavior
 │   ├── API-REFERENCE.md       # Complete HTTP and WebSocket API
 │   ├── ELEMENTS-API.md        # Pre-parsed UI elements for mobile
 │   ├── WEBSOCKET-STABILITY.md # WebSocket connection stability guide
@@ -88,6 +92,7 @@ docs/
 |----------|-------------|
 | [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - JSON-RPC 2.0 + legacy formats |
 | [api/UNIFIED-API-SPEC.md](./api/UNIFIED-API-SPEC.md) | **JSON-RPC 2.0 API** - Complete method reference with examples |
+| [api/RUNTIME-CAPABILITY-REGISTRY.md](./api/RUNTIME-CAPABILITY-REGISTRY.md) | Runtime Capability Registry contract (`initialize.capabilities.runtimeRegistry`) |
 | [api/API-REFERENCE.md](./api/API-REFERENCE.md) | Complete HTTP and WebSocket API documentation |
 | [api/ELEMENTS-API.md](./api/ELEMENTS-API.md) | Pre-parsed UI elements for rich mobile rendering |
 | [api/WEBSOCKET-STABILITY.md](./api/WEBSOCKET-STABILITY.md) | WebSocket connection stability and heartbeat |
@@ -187,6 +192,7 @@ docs/
 |----------|-------------|
 | [planning/BACKLOG.md](./planning/BACKLOG.md) | Product backlog with prioritized work items |
 | [planning/AI-AGENT-RUNTIME-ROADMAP.md](./planning/AI-AGENT-RUNTIME-ROADMAP.md) | Phased plan to evolve cdev into a secure AI Agent runtime |
+| [planning/MARKET-READINESS-EXECUTION-PLAN-2026.md](./planning/MARKET-READINESS-EXECUTION-PLAN-2026.md) | Actionable 30/60/90 strategy for cdev + cdev-ios market readiness |
 | [planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md](./planning/READINESS-ROADMAP-SOURCE-OF-TRUTH.md) | **Authoritative** readiness + roadmap status |
 | [planning/POSITIONING-GTM-SOLO-DEV.md](./planning/POSITIONING-GTM-SOLO-DEV.md) | Positioning + go-to-market plan (solo devs) |
 
@@ -214,6 +220,7 @@ docs/
 |----------|----------|---------|--------|
 | PROTOCOL.md | api | 2.0.0 | Current |
 | UNIFIED-API-SPEC.md | api | 1.0 | Current |
+| RUNTIME-CAPABILITY-REGISTRY.md | api | 1.0 | Draft |
 | API-REFERENCE.md | api | 1.1 | Current |
 | ELEMENTS-API.md | api | 1.0 | Current |
 | WEBSOCKET-STABILITY.md | api | 1.0 | Current |
@@ -232,10 +239,11 @@ docs/
 | WORKSPACE-MANAGER-SETUP.md | guides | 1.0 | Current |
 | POC-TESTING-GUIDE.md | guides | 1.0 | Current |
 | CLAUDE-CLI.md | guides | 1.0 | Current |
-| TROUBLESHOOTING.md | guides | 1.0 | Current |
+| TROUBLESHOOTING.md | guides | 1.1 | Current |
 | BACKLOG.md | planning | 1.0 | Active |
 | READINESS-ROADMAP-SOURCE-OF-TRUTH.md | planning | 1.0 | Active |
 | AI-AGENT-RUNTIME-ROADMAP.md | planning | 1.0 | Active |
+| MARKET-READINESS-EXECUTION-PLAN-2026.md | planning | 1.0 | Draft |
 | POSITIONING-GTM-SOLO-DEV.md | planning | 1.0 | Draft |
 
 ---

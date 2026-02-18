@@ -25,6 +25,7 @@ The cdev protocol defines the communication standard between cdev (server) and c
 4. **OpenRPC Discovery** - Auto-generated API specification at `/api/rpc/discover`
 5. **Mobile-Optimized** - Handles network transitions, background states, reconnection
 6. **Capability Negotiation** - LSP-style initialize/initialized handshake
+7. **Runtime Capability Registry** - Server-driven runtime behavior contract via `initialize.capabilities.runtimeRegistry`
 
 ### Transport Layers
 
@@ -160,6 +161,8 @@ The preferred format for new clients. Follows the JSON-RPC 2.0 specification.
 | `repository/files/tree` | Get directory tree |
 | `repository/stats` | Get repository statistics |
 | `repository/index/rebuild` | Trigger index rebuild |
+
+Runtime registry contract reference: `docs/api/RUNTIME-CAPABILITY-REGISTRY.md`
 
 ---
 

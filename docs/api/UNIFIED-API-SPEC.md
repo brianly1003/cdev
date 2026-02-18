@@ -1467,6 +1467,12 @@ Initialize the connection and negotiate capabilities. This follows the LSP-style
 }
 ```
 
+**Runtime Capability Registry (contract extension):**
+- The runtime contract is defined in `docs/api/RUNTIME-CAPABILITY-REGISTRY.md`.
+- Contract field location: `result.capabilities.runtimeRegistry`.
+- This is an additive extension for server-driven runtime behavior.
+- Backend now exposes this payload; clients should still keep legacy fallback for backward compatibility.
+
 #### `initialized`
 Notification from client that initialization is complete. After this, the client can start sending other requests.
 

@@ -173,6 +173,19 @@ Environment variables override config file values (prefix: `CDEV_`):
 export CDEV_SERVER_PORT=8766
 ```
 
+### Diagnostics
+
+```bash
+# Run local setup/runtime diagnostics
+cdev doctor
+
+# JSON output for tooling
+cdev doctor --json
+
+# Fail on warnings (CI-friendly)
+cdev doctor --strict
+```
+
 ### VS Code Port Forwarding
 
 When using VS Code Dev Tunnels for remote access, simply pass the forwarded URL:
@@ -407,7 +420,7 @@ cdev/
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| CLI (Cobra) | ✅ Done | Commands: start, version, config |
+| CLI (Cobra) | ✅ Done | Commands: start, version, config, pair, auth, hook, doctor |
 | Config (Viper) | ✅ Done | YAML + env vars + defaults |
 | Event Types | ✅ Done | All events from spec |
 | Event Hub | ✅ Done | Central dispatcher with fan-out |

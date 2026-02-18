@@ -458,6 +458,7 @@ func (a *App) Start(ctx context.Context) error {
 	}
 
 	// Lifecycle service with capabilities
+	supportedAgents := []string{"claude", "codex"}
 	caps := methods.ServerCapabilities{
 		Agent: &methods.AgentCapabilities{
 			Run:          a.claudeManager != nil,
@@ -490,7 +491,8 @@ func (a *App) Start(ctx context.Context) error {
 			Rebuild: a.repoIndexer != nil,
 		},
 		Notifications:   []string{"agent_log", "agent_state", "file_changed", "git_status"},
-		SupportedAgents: []string{"claude", "codex"},
+		SupportedAgents: supportedAgents,
+		RuntimeRegistry: methods.DefaultRuntimeRegistryWithAgents(supportedAgents),
 	}
 	lifecycleService := methods.NewLifecycleService(a.version, caps)
 	lifecycleService.RegisterMethods(rpcRegistry)

@@ -4,6 +4,8 @@ package methods
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"time"
 
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
@@ -28,6 +30,9 @@ type ServerCapabilities struct {
 
 	// SupportedAgents lists the configured agent types (e.g., "claude", "gemini", "codex")
 	SupportedAgents []string `json:"supportedAgents,omitempty"`
+
+	// RuntimeRegistry describes per-runtime behavior so clients can route without hardcoded branches.
+	RuntimeRegistry *RuntimeCapabilityRegistry `json:"runtimeRegistry,omitempty"`
 }
 
 // AgentCapabilities describes AI agent-related capabilities.
@@ -75,6 +80,52 @@ type RepositoryCapabilities struct {
 	Rebuild bool `json:"rebuild"` // repository/index/rebuild
 }
 
+// RuntimeCapabilityRegistry describes server-driven runtime behavior.
+type RuntimeCapabilityRegistry struct {
+	SchemaVersion  string              `json:"schemaVersion"`
+	GeneratedAt    string              `json:"generatedAt,omitempty"`
+	DefaultRuntime string              `json:"defaultRuntime"`
+	Routing        RuntimeRouting      `json:"routing"`
+	Runtimes       []RuntimeDescriptor `json:"runtimes"`
+}
+
+// RuntimeRouting defines global runtime-routing rules.
+type RuntimeRouting struct {
+	AgentTypeField    string   `json:"agentTypeField"`
+	DefaultAgentType  string   `json:"defaultAgentType"`
+	RequiredOnMethods []string `json:"requiredOnMethods,omitempty"`
+}
+
+// RuntimeDescriptor defines behavior for a specific runtime.
+type RuntimeDescriptor struct {
+	ID                                    string         `json:"id"`
+	DisplayName                           string         `json:"displayName"`
+	Status                                string         `json:"status"`
+	SessionListSource                     string         `json:"sessionListSource"`
+	SessionMessagesSource                 string         `json:"sessionMessagesSource"`
+	SessionWatchSource                    string         `json:"sessionWatchSource"`
+	RequiresWorkspaceActivationOnResume   bool           `json:"requiresWorkspaceActivationOnResume"`
+	RequiresSessionResolutionOnNewSession bool           `json:"requiresSessionResolutionOnNewSession"`
+	SupportsResume                        bool           `json:"supportsResume"`
+	SupportsInteractiveQuestions          bool           `json:"supportsInteractiveQuestions"`
+	SupportsPermissions                   bool           `json:"supportsPermissions"`
+	Methods                               RuntimeMethods `json:"methods"`
+}
+
+// RuntimeMethods maps runtime operations to RPC methods.
+type RuntimeMethods struct {
+	History  string `json:"history"`
+	Messages string `json:"messages"`
+	Watch    string `json:"watch"`
+	Unwatch  string `json:"unwatch"`
+	Start    string `json:"start"`
+	Send     string `json:"send"`
+	Stop     string `json:"stop"`
+	Input    string `json:"input"`
+	Respond  string `json:"respond"`
+	State    string `json:"state,omitempty"`
+}
+
 // LifecycleService handles initialization and shutdown.
 type LifecycleService struct {
 	version      string
@@ -85,6 +136,10 @@ type LifecycleService struct {
 
 // NewLifecycleService creates a new lifecycle service.
 func NewLifecycleService(version string, caps ServerCapabilities) *LifecycleService {
+	if caps.RuntimeRegistry == nil {
+		caps.RuntimeRegistry = DefaultRuntimeRegistryWithAgents(caps.SupportedAgents)
+	}
+
 	return &LifecycleService{
 		version:      version,
 		capabilities: caps,
@@ -233,7 +288,7 @@ func (s *LifecycleService) Shutdown(ctx context.Context, params json.RawMessage)
 
 // DefaultCapabilities returns default server capabilities.
 func DefaultCapabilities() ServerCapabilities {
-	return ServerCapabilities{
+	caps := ServerCapabilities{
 		Agent: &AgentCapabilities{
 			Run:          true,
 			Stop:         true,
@@ -283,13 +338,124 @@ func DefaultCapabilities() ServerCapabilities {
 		},
 		SupportedAgents: []string{"claude"}, // Default to Claude, expandable
 	}
+
+	caps.RuntimeRegistry = DefaultRuntimeRegistryWithAgents(caps.SupportedAgents)
+	return caps
 }
 
 // DefaultCapabilitiesWithAgents returns capabilities with specific agents.
 func DefaultCapabilitiesWithAgents(agents []string) ServerCapabilities {
 	caps := DefaultCapabilities()
 	if len(agents) > 0 {
-		caps.SupportedAgents = agents
+		caps.SupportedAgents = normalizeRuntimeIDs(agents)
 	}
+	caps.RuntimeRegistry = DefaultRuntimeRegistryWithAgents(caps.SupportedAgents)
 	return caps
+}
+
+// DefaultRuntimeRegistryWithAgents builds the runtime capability registry for initialize.
+func DefaultRuntimeRegistryWithAgents(agents []string) *RuntimeCapabilityRegistry {
+	runtimeIDs := normalizeRuntimeIDs(agents)
+	if len(runtimeIDs) == 0 {
+		runtimeIDs = []string{"claude"}
+	}
+
+	defaultRuntime := runtimeIDs[0]
+	for _, runtimeID := range runtimeIDs {
+		if runtimeID == "claude" {
+			defaultRuntime = runtimeID
+			break
+		}
+	}
+
+	runtimes := make([]RuntimeDescriptor, 0, len(runtimeIDs))
+	for _, runtimeID := range runtimeIDs {
+		runtimes = append(runtimes, defaultRuntimeDescriptor(runtimeID))
+	}
+
+	return &RuntimeCapabilityRegistry{
+		SchemaVersion:  "1.0",
+		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
+		DefaultRuntime: defaultRuntime,
+		Routing: RuntimeRouting{
+			AgentTypeField:   "agent_type",
+			DefaultAgentType: defaultRuntime,
+			RequiredOnMethods: []string{
+				"session/start",
+				"session/send",
+				"session/stop",
+				"session/input",
+				"session/respond",
+			},
+		},
+		Runtimes: runtimes,
+	}
+}
+
+func normalizeRuntimeIDs(agents []string) []string {
+	seen := make(map[string]struct{}, len(agents))
+	result := make([]string, 0, len(agents))
+
+	for _, agent := range agents {
+		id := strings.ToLower(strings.TrimSpace(agent))
+		if id == "" {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+
+	return result
+}
+
+func defaultRuntimeDescriptor(runtimeID string) RuntimeDescriptor {
+	descriptor := RuntimeDescriptor{
+		ID:                                    runtimeID,
+		DisplayName:                           defaultRuntimeDisplayName(runtimeID),
+		Status:                                "active",
+		SessionListSource:                     "workspaceHistory",
+		SessionMessagesSource:                 "workspaceScoped",
+		SessionWatchSource:                    "workspaceScoped",
+		RequiresWorkspaceActivationOnResume:   true,
+		RequiresSessionResolutionOnNewSession: true,
+		SupportsResume:                        true,
+		SupportsInteractiveQuestions:          true,
+		SupportsPermissions:                   true,
+		Methods: RuntimeMethods{
+			History:  "workspace/session/history",
+			Messages: "workspace/session/messages",
+			Watch:    "workspace/session/watch",
+			Unwatch:  "workspace/session/unwatch",
+			Start:    "session/start",
+			Send:     "session/send",
+			Stop:     "session/stop",
+			Input:    "session/input",
+			Respond:  "session/respond",
+			State:    "session/state",
+		},
+	}
+
+	switch runtimeID {
+	case "codex":
+		descriptor.RequiresWorkspaceActivationOnResume = false
+		descriptor.RequiresSessionResolutionOnNewSession = false
+	}
+
+	return descriptor
+}
+
+func defaultRuntimeDisplayName(runtimeID string) string {
+	switch runtimeID {
+	case "claude":
+		return "Claude"
+	case "codex":
+		return "Codex"
+	case "gemini":
+		return "Gemini"
+	default:
+		return runtimeID
+	}
 }
