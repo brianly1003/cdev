@@ -70,11 +70,24 @@ var (
 )
 
 type codexPTYSession struct {
+	sessionIDMu sync.RWMutex
 	sessionID   string
 	workspaceID string
 	workspace   string
 	cmd         *exec.Cmd
 	ptmx        *os.File
+}
+
+func (c *codexPTYSession) SessionID() string {
+	c.sessionIDMu.RLock()
+	defer c.sessionIDMu.RUnlock()
+	return c.sessionID
+}
+
+func (c *codexPTYSession) SetSessionID(sessionID string) {
+	c.sessionIDMu.Lock()
+	c.sessionID = sessionID
+	c.sessionIDMu.Unlock()
 }
 
 // NewSessionManagerService creates a new session manager service.
@@ -2756,7 +2769,7 @@ func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession)
 		if len(pending) == 0 {
 			return
 		}
-		s.publishCodexPTYOutput(codexSession.sessionID, strings.Join(pending, "\n"), ptyStateThinking)
+		s.publishCodexPTYOutput(codexSession.SessionID(), strings.Join(pending, "\n"), ptyStateThinking)
 		pending = pending[:0]
 		pendingBytes = 0
 	}
@@ -2769,7 +2782,7 @@ func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession)
 				select {
 				case err := <-errCh:
 					if err != nil && !errors.Is(err, os.ErrClosed) {
-						log.Debug().Err(err).Str("session_id", codexSession.sessionID).Msg("codex PTY scan ended with error")
+						log.Debug().Err(err).Str("session_id", codexSession.SessionID()).Msg("codex PTY scan ended with error")
 					}
 				default:
 				}
@@ -2779,7 +2792,7 @@ func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession)
 			// Keep very large lines as immediate standalone events.
 			if len(line) >= codexPTYOutputMaxBytes {
 				flush()
-				s.publishCodexPTYOutput(codexSession.sessionID, line, ptyStateThinking)
+				s.publishCodexPTYOutput(codexSession.SessionID(), line, ptyStateThinking)
 				continue
 			}
 
@@ -2800,16 +2813,21 @@ func (s *SessionManagerService) waitCodexProcess(codexSession *codexPTYSession) 
 	_ = codexSession.ptmx.Close()
 
 	s.codexMu.Lock()
-	if current := s.codexSessions[codexSession.sessionID]; current == codexSession {
-		delete(s.codexSessions, codexSession.sessionID)
+	currentSessionID := codexSession.SessionID()
+	for sessionID, current := range s.codexSessions {
+		if current != codexSession {
+			continue
+		}
+		delete(s.codexSessions, sessionID)
+		delete(s.codexLastPTYLogLine, sessionID)
 	}
-	delete(s.codexLastPTYLogLine, codexSession.sessionID)
+	delete(s.codexLastPTYLogLine, currentSessionID)
 	s.codexMu.Unlock()
 
 	if waitErr != nil {
-		s.publishCodexPTYOutput(codexSession.sessionID, waitErr.Error(), ptyStateError)
+		s.publishCodexPTYOutput(currentSessionID, waitErr.Error(), ptyStateError)
 	}
-	s.publishCodexPTYState(codexSession.sessionID, ptyStateIdle)
+	s.publishCodexPTYState(currentSessionID, ptyStateIdle)
 }
 
 func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state string) {
@@ -3076,8 +3094,15 @@ func (s *SessionManagerService) remapCodexSessionID(oldSessionID, newSessionID s
 	}
 
 	delete(s.codexSessions, oldSessionID)
-	codexSession.sessionID = newSessionID
+	codexSession.SetSessionID(newSessionID)
 	s.codexSessions[newSessionID] = codexSession
+
+	if lastLine, ok := s.codexLastPTYLogLine[oldSessionID]; ok {
+		if _, exists := s.codexLastPTYLogLine[newSessionID]; !exists {
+			s.codexLastPTYLogLine[newSessionID] = lastLine
+		}
+	}
+	delete(s.codexLastPTYLogLine, oldSessionID)
 }
 
 func (s *SessionManagerService) getCodexSession(sessionID string) *codexPTYSession {

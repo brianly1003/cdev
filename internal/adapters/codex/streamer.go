@@ -492,10 +492,10 @@ func summarizeToolForExplored(toolName string, params map[string]interface{}) st
 	switch toolName {
 	case "exec_command":
 		if cmd, ok := params["command"].(string); ok && strings.TrimSpace(cmd) != "" {
-			return summarizeExecCommand(cmd)
+			return SummarizeExecCommandForExplored(cmd)
 		}
 		if cmd, ok := params["cmd"].(string); ok && strings.TrimSpace(cmd) != "" {
-			return summarizeExecCommand(cmd)
+			return SummarizeExecCommandForExplored(cmd)
 		}
 	case "apply_patch":
 		// apply_patch already appears as its own tool row with patch preview.
@@ -510,6 +510,12 @@ func summarizeToolForExplored(toolName string, params map[string]interface{}) st
 		return toolName
 	}
 	return "tool"
+}
+
+// SummarizeExecCommandForExplored converts a shell command into a compact
+// "Explored" summary line (Search/List/Read) when appropriate.
+func SummarizeExecCommandForExplored(cmd string) string {
+	return summarizeExecCommand(cmd)
 }
 
 func summarizeExecCommand(cmd string) string {
