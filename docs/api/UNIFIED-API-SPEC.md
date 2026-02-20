@@ -1031,6 +1031,8 @@ Delete a specific session or all sessions.
 #### `session/watch`
 Start watching a session for real-time updates. The client will receive notifications when new messages are added.
 
+**Note:** Prefer `workspace/session/watch` for workspace-scoped streaming with explicit `agent_type`.
+
 **Params:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -1050,7 +1052,7 @@ Start watching a session for real-time updates. The client will receive notifica
 #### `session/unwatch`
 Stop watching the current session.
 
-**Params:** None
+**Params:** None. Prefer `workspace/session/unwatch` with explicit `agent_type`.
 
 **Result:**
 ```json
@@ -1073,10 +1075,14 @@ The following methods are runtime-scoped and accept optional `agent_type`:
 
 Current behavior:
 
-- If `agent_type` is omitted, cdev defaults to `"claude"`.
+- If `agent_type` is omitted, cdev defaults to `"claude"` (legacy behavior).
+- **Recommended:** always send `agent_type` explicitly to avoid accidental Claude fallbacks.
 - `agent_type="claude"` is supported for these methods.
-- `agent_type="codex"` is supported for interactive runtime control using Codex CLI (`codex` / `codex resume`) with PTY-backed input routing.
+- `agent_type="codex"` is supported for interactive runtime control using Codex CLI (`codex`) with PTY-backed input routing.
 - Codex history/realtime methods (`session/list|get|messages|elements|watch`) remain available via `agent_type="codex"`.
+
+`session/start` may return status values: `attached`, `started`, `existing`, `not_found`.
+For Codex, `started` can return a temporary session ID (`codex-temp-...`) until the first session file is created, after which the server emits `session_id_resolved` (with `agent_type`) to map the real ID.
 
 ---
 

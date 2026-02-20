@@ -101,8 +101,8 @@
     },
     {
       "name": "workspace/session/history",
-      "summary": "Get historical Claude sessions for a workspace",
-      "description": "Returns a list of historical Claude sessions from the session cache for the specified workspace. Sessions are stored at ~/.claude/projects/<encoded-path>.",
+      "summary": "Get historical sessions for a workspace",
+      "description": "Returns a list of historical sessions from the selected runtime for the specified workspace. Claude sessions are stored at ~/.claude/projects/<encoded-path>. Codex sessions are stored at ~/.codex/sessions/<yyyy>/<mm>/.",
       "params": [
         {
           "name": "workspace_id",
@@ -117,6 +117,15 @@
           "schema": {
             "default": 50,
             "type": "integer"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
+            "type": "string"
           }
         }
       ],
@@ -480,13 +489,22 @@
     },
     {
       "name": "session/stop",
-      "summary": "Stop a Claude session",
-      "description": "Stops a running Claude CLI session.",
+      "summary": "Stop a running session",
+      "description": "Stops a running Claude or Codex session process.",
       "params": [
         {
           "name": "session_id",
           "required": true,
           "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
             "type": "string"
           }
         }
@@ -500,8 +518,8 @@
     },
     {
       "name": "workspace/session/messages",
-      "summary": "Get messages from a historical Claude session",
-      "description": "Returns paginated messages from a Claude session file for the specified workspace. Use workspace/session/history to get available session IDs.",
+      "summary": "Get messages from a historical session",
+      "description": "Returns paginated messages from a runtime session file for the specified workspace. Use workspace/session/history to get available session IDs.",
       "params": [
         {
           "name": "workspace_id",
@@ -539,6 +557,15 @@
           "schema": {
             "default": "asc",
             "enum": ["asc", "desc"],
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
             "type": "string"
           }
         }
@@ -704,8 +731,18 @@
     {
       "name": "workspace/session/unwatch",
       "summary": "Stop watching the current session",
-      "description": "Stops watching the currently watched session. No more claude_message events will be sent for that session.",
-      "params": [],
+      "description": "Stops watching the currently watched session for the selected runtime.",
+      "params": [
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
+            "type": "string"
+          }
+        }
+      ],
       "result": {
         "name": "unwatch_info",
         "schema": {
@@ -1568,7 +1605,7 @@
     {
       "name": "session/send",
       "summary": "Send a prompt to a session",
-      "description": "Sends a prompt to the Claude CLI. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
+      "description": "Sends a prompt to the selected runtime. If session_id is provided, sends to that session. If only workspace_id is provided with mode='new', auto-creates a new session and sends the prompt.",
       "params": [
         {
           "name": "session_id",
@@ -1616,6 +1653,15 @@
               "plan",
               "interactive"
             ],
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
             "type": "string"
           }
         }
@@ -1733,6 +1779,15 @@
             ],
             "type": "string"
           }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
+            "type": "string"
+          }
         }
       ],
       "result": {
@@ -1745,7 +1800,7 @@
     {
       "name": "workspace/session/watch",
       "summary": "Start watching a session for real-time updates",
-      "description": "Starts watching a session file for new messages. The client will receive claude_message events when new messages are added. Only one session can be watched at a time.",
+      "description": "Starts watching a session file for new messages for the selected runtime. Only one session can be watched per client/runtime.",
       "params": [
         {
           "name": "workspace_id",
@@ -1758,6 +1813,15 @@
           "name": "session_id",
           "required": true,
           "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
             "type": "string"
           }
         }
@@ -2109,8 +2173,8 @@
     },
     {
       "name": "session/start",
-      "summary": "Start or attach to a Claude session for a workspace",
-      "description": "If session_id is provided, validates it exists in .claude/projects and returns it for LIVE session attachment. If session_id doesn't exist, returns empty to let user select from history. If no session_id provided, starts a new managed session.",
+      "summary": "Start or attach to a session for a workspace",
+      "description": "Starts or attaches to a runtime session (Claude or Codex) for the workspace. If session_id is provided, attaches when found (status=attached) or returns status=not_found. If no session_id is provided, attaches latest history session when available (status=attached) or starts a new managed session (status=started). If a session is already running for the workspace, status=existing is returned.",
       "params": [
         {
           "name": "workspace_id",
@@ -2123,7 +2187,17 @@
           "name": "session_id",
           "required": false,
           "schema": {
-            "description": "Optional session ID to attach to. If provided, validates against .claude/projects source of truth.",
+            "description": "Optional session ID to attach to.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
+            "description": "Agent runtime type.",
             "type": "string"
           }
         }
@@ -2325,7 +2399,7 @@
     {
       "name": "session/respond",
       "summary": "Respond to a permission or question",
-      "description": "Responds to a pending permission request or interactive question from Claude.",
+      "description": "Responds to a pending permission request or interactive question for the selected runtime.",
       "params": [
         {
           "name": "session_id",
@@ -2346,6 +2420,15 @@
           "name": "response",
           "required": true,
           "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "agent_type",
+          "required": false,
+          "schema": {
+            "default": "claude",
+            "enum": ["claude", "codex"],
             "type": "string"
           }
         }

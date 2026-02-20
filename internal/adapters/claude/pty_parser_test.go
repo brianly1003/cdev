@@ -602,6 +602,11 @@ func TestPTYParser_DetectTrustFolderType(t *testing.T) {
 			line:         "Do you want to work in this folder?",
 			expectedType: PermissionTypeTrustFolder,
 		},
+		{
+			name:         "trust this folder",
+			line:         "Yes, I trust this folder",
+			expectedType: PermissionTypeTrustFolder,
+		},
 	}
 
 	for _, tt := range tests {
@@ -666,6 +671,62 @@ func TestPTYParser_WorkInFolderPrompt(t *testing.T) {
 	}
 
 	t.Logf("Work in folder prompt detected: type=%s, target=%s, options=%+v", prompt.Type, prompt.Target, prompt.Options)
+}
+
+// TestPTYParser_QuickSafetyCheckPrompt tests the "Quick safety check" format
+// where spaces may be stripped from the terminal output.
+func TestPTYParser_QuickSafetyCheckPrompt(t *testing.T) {
+	parser := NewPTYParser()
+
+	lines := []string{
+		"Accessingworkspace:",
+		"/Users/brianly/Projects/mmc",
+		"Quicksafetycheck:Isthisaprojectyoucreatedoroneyoutrust?(Likeyourowncode,awell-knownopensourceproject,orworkfromyourteam).Ifnot,takeamomenttoreviewwhat'sinthisfolderfirst.",
+		"ClaudeCode'llbeabletoread,edit,andexecutefileshere.",
+		"Securityguide",
+		"❯1.Yes,Itrustthisfolder",
+		"2.No,exit",
+		"Entertoconfirm·Esctocancel",
+	}
+
+	var prompt *PTYPermissionPrompt
+	var state PTYState
+
+	for _, line := range lines {
+		prompt, state = parser.ProcessLine(line)
+		if prompt != nil {
+			break
+		}
+	}
+
+	if prompt == nil {
+		t.Fatal("Expected quick safety check prompt to be detected")
+	}
+
+	if state != PTYStatePermission {
+		t.Errorf("State = %v, want %v", state, PTYStatePermission)
+	}
+
+	if prompt.Type != PermissionTypeTrustFolder {
+		t.Errorf("Prompt.Type = %v, want %v", prompt.Type, PermissionTypeTrustFolder)
+	}
+
+	if prompt.Target != "/Users/brianly/Projects/mmc" {
+		t.Errorf("Prompt.Target = %q, want %q", prompt.Target, "/Users/brianly/Projects/mmc")
+	}
+
+	if len(prompt.Options) != 2 {
+		t.Errorf("Prompt.Options count = %d, want 2", len(prompt.Options))
+	}
+
+	if len(prompt.Options) >= 2 {
+		if prompt.Options[0].Key != "1" || prompt.Options[0].Label != "Yes,Itrustthisfolder" {
+			t.Errorf("Option[0] = %+v, want Key=1, Label=Yes,Itrustthisfolder", prompt.Options[0])
+		}
+		if prompt.Options[1].Key != "2" || prompt.Options[1].Label != "No,exit" {
+			t.Errorf("Option[1] = %+v, want Key=2, Label=No,exit", prompt.Options[1])
+		}
+	}
 }
 
 // TestPTYParser_PermissionPanelFormat tests the permission panel format with "Bash command" header

@@ -54,7 +54,11 @@ This is an additive extension and does not remove existing capability fields.
             "session/send",
             "session/stop",
             "session/input",
-            "session/respond"
+            "session/respond",
+            "workspace/session/history",
+            "workspace/session/messages",
+            "workspace/session/watch",
+            "workspace/session/unwatch"
           ]
         },
         "runtimes": [
@@ -91,7 +95,7 @@ This is an additive extension and does not remove existing capability fields.
             "sessionMessagesSource": "workspaceScoped",
             "sessionWatchSource": "workspaceScoped",
             "requiresWorkspaceActivationOnResume": false,
-            "requiresSessionResolutionOnNewSession": false,
+            "requiresSessionResolutionOnNewSession": true,
             "supportsResume": true,
             "supportsInteractiveQuestions": true,
             "supportsPermissions": true,

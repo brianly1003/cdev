@@ -14,6 +14,14 @@ The WebSocket endpoint supports two protocols:
 - **JSON-RPC 2.0** (recommended) - Standard protocol with request/response correlation. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md) for complete method reference.
 - **Legacy commands** (deprecated) - Original command format, will be removed in v3.0
 
+### Runtime Notes (JSON-RPC)
+
+- JSON-RPC is the only interface that supports multiple runtimes (Claude + Codex). HTTP endpoints are Claude-only.
+- Always include `agent_type` in JSON-RPC calls (`session/start`, `session/send`, `session/respond`, `session/input`, `workspace/session/history`, `workspace/session/messages`, `workspace/session/watch`) to avoid defaulting to Claude.
+- `session/start` returns a `status` value: `attached` (history or live session), `existing` (already running), `started` (new managed session), `not_found` (session_id invalid).
+- Codex may return a temporary session ID with prefix `codex-temp-...` until it writes history; listen for the `event/session_id_resolved` JSON-RPC notification to switch to the real session ID.
+- JSON-RPC events include `agent_type` for runtime filtering.
+
 ## Authentication
 
 When `security.require_auth = true` (default), **all HTTP and WebSocket endpoints require bearer auth**.

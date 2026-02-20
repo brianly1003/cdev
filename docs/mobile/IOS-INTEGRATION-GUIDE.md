@@ -226,7 +226,8 @@ class WebSocketManager {
             "status": "running",
             "started_at": "2024-12-24T10:30:00Z",
             "last_active": "2024-12-24T10:35:00Z",
-            "viewers": ["client-id-1", "client-id-2"]
+            "viewers": ["client-id-1", "client-id-2"],
+            "agent_type": "claude"
           },
           {
             "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -234,12 +235,14 @@ class WebSocketManager {
             "status": "historical",
             "summary": "Refactored authentication module",
             "message_count": 42,
-            "last_updated": "2024-12-23T14:20:00Z"
+            "last_updated": "2024-12-23T14:20:00Z",
+            "agent_type": "codex"
           }
         ],
         "active_session_count": 1,
         "has_active_session": true,
-        "active_session_id": "sess-xyz789"
+        "active_session_id": "sess-xyz789",
+        "active_agent_type": "claude"
       }
     ]
   }
@@ -250,7 +253,7 @@ class WebSocketManager {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique session identifier (Claude CLI session UUID) |
+| `id` | string | Unique session identifier (runtime-specific) |
 | `workspace_id` | string | Parent workspace ID |
 | `status` | string | `running` or `historical` (see below) |
 | `started_at` | string | RFC3339 timestamp (running sessions only) |
@@ -259,15 +262,16 @@ class WebSocketManager {
 | `summary` | string | Session summary (historical sessions only) |
 | `message_count` | int | Number of messages (historical sessions only) |
 | `last_updated` | string | RFC3339 timestamp (historical sessions only) |
+| `agent_type` | string | Runtime type: `claude` or `codex` |
 
 **Session Status Types:**
 
 | Status | Description | Can Use `session/send`? |
 |--------|-------------|-------------------------|
-| `running` | Active Claude CLI process, ready for prompts | Yes |
-| `historical` | Past session from `~/.claude/projects/`, not currently running | No - must resume first |
+| `running` | Active session (or currently watched/active) | Yes |
+| `historical` | Past session from history storage (Claude or Codex) | No - must attach first |
 
-**Important:** The `sessions` array includes both running sessions AND historical sessions from Claude's storage. To send prompts to a historical session, you must first resume it using `session/start` with `resume_session_id`.
+**Important:** The `sessions` array includes both running sessions AND historical sessions from Claude or Codex storage. To send prompts to a historical session, you must first attach using `session/start` with `session_id` and `agent_type`.
 
 **Multi-Device Awareness:**
 - Each connected iOS device has a unique `clientId` (returned in `initialize` response)
@@ -539,15 +543,15 @@ Set `create_if_missing` to `true` to create the directory if it doesn't exist.
 #### `session/start` - Start a session (runtime-scoped)
 
 Starts a new session for the specified workspace. Runtime is selected with `agent_type` (defaults to `claude`).
-Use `resume_session_id` to continue a historical session.
+Use `session_id` to attach to a historical session.
 
 **Parameters:**
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
 | `workspace_id` | Yes | string | Workspace ID to start session in |
-| `resume_session_id` | No | string | Historical session ID to resume (from `workspace/session/history`) |
-| `agent_type` | No | string | Runtime type: `claude` (default) or `codex` |
+| `session_id` | No | string | Historical session ID to attach (from `workspace/session/history`) |
+| `agent_type` | No | string | Runtime type: `claude` (default) or `codex`. **Recommended:** always send explicitly to avoid defaulting to Claude. |
 
 ```json
 // Request (new session)
@@ -556,36 +560,43 @@ Use `resume_session_id` to continue a historical session.
   "agent_type": "claude"
 }}
 
-// Request (resume historical session)
+// Request (attach historical session)
 {"jsonrpc": "2.0", "id": 10, "method": "session/start", "params": {
   "workspace_id": "ws-abc123",
-  "resume_session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "agent_type": "claude"
 }}
 
-// Response
+// Response (runtime-scoped)
 {
   "jsonrpc": "2.0",
   "id": 10,
   "result": {
-    "id": "sess-xyz789",
+    "session_id": "sess-xyz789",
     "workspace_id": "ws-abc123",
-    "status": "running",
-    "started_at": "2024-12-24T10:30:00Z",
-    "last_active": "2024-12-24T10:30:00Z"
+    "agent_type": "claude",
+    "status": "attached",
+    "source": "history",
+    "message": "Latest session found - ready for LIVE interaction"
   }
 }
 ```
 
-**Codex note:** `session/start` supports `agent_type: "codex"` and attaches to
-existing Codex history for the selected workspace.
+**Status values:** `attached`, `started`, `existing`, `not_found`.  
+`started` means a new interactive session was launched.  
+`attached` means a historical session was found and resumed for live interaction.
 
-**Resuming Historical Sessions:**
+**Codex note:** `session/start` supports `agent_type: "codex"` and attaches to
+existing Codex history for the selected workspace. If no history exists, cdev starts
+interactive Codex (`codex`) and returns a **temporary** session ID like
+`codex-temp-...`. When Codex writes the first session file, cdev emits
+`session_id_resolved` with the real session ID.
+
+**Attaching Historical Sessions:**
 
 When a user selects a historical session (status: `historical`) and wants to continue the conversation:
-1. Call `session/start` with `resume_session_id` set to the historical session's ID
-2. The new session will continue where the historical session left off
-3. The session will have a new cdev session ID but the same Claude CLI session ID
+1. Call `session/start` with `session_id` set to the historical session's ID
+2. The runtime attaches to that session for live interaction
 
 #### `session/stop` - Stop a session
 
@@ -599,7 +610,7 @@ When a user selects a historical session (status: `historical`) and wants to con
 
 #### `session/send` - Send a prompt to a session
 
-**Important:** This method only works on sessions with `status: "running"`. For historical sessions, you must first resume them using `session/start` with `resume_session_id`.
+**Important:** This method only works on sessions that are active for the selected runtime. For historical sessions, first attach using `session/start` with `session_id`.
 `agent_type` defaults to `claude`.
 
 ```json
@@ -620,7 +631,7 @@ When a user selects a historical session (status: `historical`) and wants to con
   "id": 12,
   "error": {
     "code": -32602,
-    "message": "session not running: sess-xyz789 (use session/start with resume_session_id to resume historical sessions)"
+    "message": "session not running: sess-xyz789 (use session/start with session_id to attach historical sessions)"
   }
 }
 
@@ -635,6 +646,10 @@ When a user selects a historical session (status: `historical`) and wants to con
   }
 }
 ```
+
+**Codex note:** If the session was newly started and only a temporary ID exists,
+continue using it until you receive `session_id_resolved` (which includes `agent_type`)
+and then switch to the real session ID.
 
 #### `session/respond` - Respond to permission/question
 
@@ -701,13 +716,15 @@ When a user selects a historical session (status: `historical`) and wants to con
 
 #### `workspace/session/history` - Get historical sessions for a workspace
 
-**Returns Claude session history from `~/.claude/projects/<encoded-path>`.**
+**Returns session history for the selected runtime.** Defaults to Claude unless
+`agent_type` is provided.
 
 ```json
 // Request
 {"jsonrpc": "2.0", "id": 18, "method": "workspace/session/history", "params": {
   "workspace_id": "ws-abc123",
-  "limit": 20
+  "limit": 20,
+  "agent_type": "claude"
 }}
 
 // Response
@@ -736,13 +753,17 @@ When a user selects a historical session (status: `historical`) and wants to con
 }
 ```
 
-**Path Mapping:**
+**Path Mapping (Claude):**
 - Workspace path: `/Users/brianly/Projects/cdev`
 - Session storage: `~/.claude/projects/-Users-brianly-Projects-cdev`
 
+**Path Mapping (Codex):**
+- Workspace path: `/Users/brianly/Projects/cdev`
+- Session storage: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+
 #### `workspace/session/messages` - Get messages from a historical session
 
-**Returns paginated messages from a Claude session file.**
+**Returns paginated messages from a session file for the selected runtime.**
 
 ```json
 // Request
@@ -751,7 +772,8 @@ When a user selects a historical session (status: `historical`) and wants to con
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "limit": 50,
   "offset": 0,
-  "order": "asc"
+  "order": "asc",
+  "agent_type": "claude"
 }}
 
 // Response
@@ -800,17 +822,19 @@ When a user selects a historical session (status: `historical`) and wants to con
 | `is_context_compaction` | `true` when this is an auto-generated message created by Claude Code when the context window was maxed out |
 | `is_meta` | `true` for system-generated metadata messages (e.g., command caveats) |
 
-#### `workspace/session/watch` - Start watching for live updates (Claude)
+#### `workspace/session/watch` - Start watching for live updates (Claude/Codex)
 
-**Starts watching a Claude session file for real-time message updates.**
-When new messages are added to the session file, the server emits `claude_message` events.
+**Starts watching a session for real-time updates.**
+For Claude, new messages emit `claude_message` events.
+For Codex, updates emit `pty_output` / `pty_state` events.
 Only one session can be watched at a time.
 
 ```json
 // Request
 {"jsonrpc": "2.0", "id": 40, "method": "workspace/session/watch", "params": {
   "workspace_id": "ws-abc123",
-  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "agent_type": "claude"
 }}
 
 // Response
@@ -829,21 +853,11 @@ Only one session can be watched at a time.
 **How it works:**
 1. Call `workspace/session/watch` with the workspace and session ID
 2. The server starts monitoring the session file for changes
-3. When new messages are appended, you receive `claude_message` events
+3. When new output is appended, you receive runtime-specific events
 4. Call `workspace/session/unwatch` when done, or watch a different session
 
-**Codex watch route:**
-
-For Codex sessions, use `session/watch` with `agent_type: "codex"` instead of
-`workspace/session/watch`.
-
-```json
-// Request (Codex)
-{"jsonrpc": "2.0", "id": 40, "method": "session/watch", "params": {
-  "session_id": "29a08784-7eb4-4751-99b8-8f23ccd76e2b",
-  "agent_type": "codex"
-}}
-```
+**Codex watch route:** use the same `workspace/session/watch` call with
+`agent_type: "codex"`. The server emits `pty_output` / `pty_state` events for Codex.
 
 #### `workspace/session/unwatch` - Stop watching session
 
@@ -851,7 +865,7 @@ For Codex sessions, use `session/watch` with `agent_type: "codex"` instead of
 
 ```json
 // Request
-{"jsonrpc": "2.0", "id": 41, "method": "workspace/session/unwatch", "params": {}}
+{"jsonrpc": "2.0", "id": 41, "method": "workspace/session/unwatch", "params": {"agent_type": "claude"}}
 
 // Response
 {
@@ -1380,7 +1394,7 @@ By default, clients receive **all events**. Use these methods to filter events b
 
 ## Events
 
-All events now include `workspace_id` and `session_id` for filtering.
+All events include `workspace_id`, `session_id`, and `agent_type` for filtering.
 
 ### Event Structure
 
@@ -1390,6 +1404,7 @@ All events now include `workspace_id` and `session_id` for filtering.
   "timestamp": "2024-12-24T10:35:00Z",
   "workspace_id": "ws-abc123",
   "session_id": "sess-xyz789",
+  "agent_type": "claude",
   "payload": { ... }
 }
 ```
@@ -1404,9 +1419,20 @@ All events now include `workspace_id` and `session_id` for filtering.
 | `claude_permission` | Permission request |
 | `claude_session_info` | Session ID captured |
 | `claude_log` | Raw Claude CLI output (stream-json format) |
+| `pty_output` | Codex PTY output chunks |
+| `pty_state` | Codex PTY state changes (`thinking`, `idle`, `error`) |
+| `pty_permission` | Parsed PTY permission prompt (Claude interactive) |
+| `session_id_resolved` | Temporary session ID resolved to real ID (Claude/Codex) |
+| `session_id_failed` | Session ID resolution failed (e.g., trust declined) |
+| `stream_read_complete` | JSONL stream reader caught up to end |
 | `heartbeat` | Connection keepalive |
 | `git_status_changed` | Git state changed (staging, commits, branches) |
 | `file_changed` | File created, modified, deleted, or renamed |
+
+**Session ID resolution notes:**
+- `session_id_resolved` maps a temporary session ID (e.g., `codex-temp-...`) to the real session ID.
+- `session_id_failed` indicates the runtime exited before a session was created (e.g., trust declined).
+- Both include `agent_type` so clients can filter by runtime.
 
 ### `claude_log` Event
 

@@ -16,6 +16,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ErrProjectNotFound indicates the requested project has no indexed Codex sessions.
+var ErrProjectNotFound = errors.New("project not found")
+
 // SessionIndexEntry represents a single session in the project index.
 // Modeled after Claude Code's sessions-index.json entries.
 type SessionIndexEntry struct {
@@ -176,7 +179,7 @@ func (c *IndexCache) GetProjectIndex(projectPath string) (*SessionIndex, error) 
 		return idx, nil
 	}
 
-	return nil, errors.New("project not found")
+	return nil, ErrProjectNotFound
 }
 
 // GetSessionsForProject returns all sessions for a specific project path.
@@ -401,7 +404,7 @@ func parseSessionFileForIndex(path string) (*SessionIndexEntry, error) {
 	}
 
 	entry := &SessionIndexEntry{
-		FullPath: path,
+		FullPath:  path,
 		FileMtime: fileInfo.ModTime().UnixMilli(),
 		Modified:  fileInfo.ModTime(),
 		FileSize:  fileInfo.Size(),

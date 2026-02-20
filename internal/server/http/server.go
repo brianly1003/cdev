@@ -154,9 +154,10 @@ func (s *Server) SetPairingHandler(handler *PairingHandler) {
 	s.mux.HandleFunc("/pair", handler.HandlePairPage)
 	s.mux.HandleFunc("/api/pair/info", handler.HandlePairInfo)
 	s.mux.HandleFunc("/api/pair/qr", handler.HandlePairQR)
+	s.mux.HandleFunc("/api/pair/code", handler.HandlePairCode)
 	s.mux.HandleFunc("/api/pair/refresh", handler.HandlePairRefresh)
 
-	log.Info().Msg("pairing routes registered: /pair, /api/pair/info, /api/pair/qr, /api/pair/refresh")
+	log.Info().Msg("pairing routes registered: /pair, /api/pair/info, /api/pair/qr, /api/pair/code, /api/pair/refresh")
 }
 
 // SetAuthHandler sets up authentication endpoints for token exchange and refresh.
@@ -221,6 +222,18 @@ func requestLoggingMiddleware(next http.Handler) http.Handler {
 			Str("path", r.URL.Path).
 			Dur("duration", time.Since(start)).
 			Msg("request completed")
+	})
+}
+
+// rootRedirectMiddleware redirects exact home path requests to /pair.
+func rootRedirectMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			http.Redirect(w, r, "/pair", http.StatusFound)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -481,9 +494,10 @@ func (s *Server) Start() error {
 	}
 
 	// Build middleware chain from inside out:
-	// request -> logging -> rate limit (optional) -> timeout -> cors -> auth -> mux
+	// request -> logging -> rate limit (optional) -> timeout -> cors -> root redirect -> auth -> mux
 	var handler http.Handler = s.mux
 	handler = s.authMiddleware(handler)
+	handler = rootRedirectMiddleware(handler)
 	handler = s.corsMiddleware(handler)
 	handler = timeoutMiddleware(10*time.Second, handler)
 

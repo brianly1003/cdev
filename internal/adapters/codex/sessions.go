@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -484,9 +485,21 @@ func parseTimestamp(ts string) (time.Time, bool) {
 }
 
 func isWithinPath(base, target string) bool {
+	base = normalizePathForCompare(base)
+	target = normalizePathForCompare(target)
 	rel, err := filepath.Rel(base, target)
 	if err != nil {
 		return false
 	}
 	return rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "..")
+}
+
+func normalizePathForCompare(path string) string {
+	cleaned := filepath.Clean(path)
+	switch runtime.GOOS {
+	case "darwin", "windows":
+		return strings.ToLower(cleaned)
+	default:
+		return cleaned
+	}
 }

@@ -113,25 +113,27 @@ func NewPTYParser() *PTYParser {
 		// Captures the full MCP tool identifier as group 1.
 		mcpToolPattern: regexp.MustCompile(`(?i)(mcp__[a-z0-9._-]+__[a-z0-9._-]+)`),
 
-		// Pattern: "trust the files in this folder" or "work in this folder" for folder trust prompts
-		trustFolderPattern: regexp.MustCompile(`(?i)(?:trust\s+(?:the\s+)?files?\s+in\s+this\s+folder|Do you want to work in this folder)`),
+		// Pattern: "trust the files in this folder", "work in this folder", or "trust this folder"
+		// Use \s* to handle prompts where spaces are stripped by terminal rendering.
+		trustFolderPattern: regexp.MustCompile(`(?i)(?:trust\s*(?:the\s*)?files?\s*in\s*this\s*folder|do\s*you\s*want\s*to\s*work\s*in\s*this\s*folder|trust\s*this\s*folder)`),
 
 		// Pattern: "Allow?" or "Do you want to" or numbered options
-		allowPattern: regexp.MustCompile(`(?i)(Do you want to|Allow\?|Enter your choice)`),
+		// Use \s* to handle prompts where spaces are stripped by terminal rendering.
+		allowPattern: regexp.MustCompile(`(?i)(do\s*you\s*want\s*to|allow\?|enter\s*your\s*choice|quick\s*safety\s*check|is\s*this\s*a\s*project\s*you\s*created)`),
 
 		// Pattern: "1. Yes" or "❯ 1. Yes" or "n. No" - handles leading whitespace
 		// Uses (?m) for multiline matching so ^ matches start of each line in buffer
 		// Captures: [1]=cursor (❯ or >), [2]=key (1-9 or y/n), [3]=label
-		optionPattern: regexp.MustCompile(`(?m)^\s*([❯>])?\s*([1-9]|[yn])\.\s+(.+)`),
+		optionPattern: regexp.MustCompile(`(?m)^\s*([❯>])?\s*([1-9]|[yn])\.\s*(.+)`),
 
 		// Pattern for non-numbered options like "Yes, proceed" / "No, exit" in trust folder prompts
 		// Matches: "❯ Yes, proceed" or "No, exit" with optional leading whitespace
 		// Captures: [1]=cursor (❯ or >), [2]=label
-		textOptionPattern: regexp.MustCompile(`(?m)^\s*([❯>])?\s*(Yes,?\s+proceed|No,?\s+exit)`),
+		textOptionPattern: regexp.MustCompile(`(?m)^\s*([❯>])?\s*(Yes,?\s*proceed|No,?\s*exit)`),
 
 		// Pattern to detect end of permission prompt (signals we can extract all options)
 		// Matches "Esc to cancel" or similar closing lines
-		promptEndPattern: regexp.MustCompile(`(?i)^\s*(?:Esc(?:ape)?\s+to\s+cancel|press\s+\d+|enter\s+to\s+confirm)`),
+		promptEndPattern: regexp.MustCompile(`(?i)^\s*(?:Esc(?:ape)?\s*to\s*cancel|press\s*\d+|enter\s*to\s*confirm)`),
 
 		// Thinking patterns - matches Claude's various "processing" indicators
 		// All thinking indicators end with "(esc to interrupt ...)" or "(ctrl+c to interrupt ...)" - use that as the primary pattern
@@ -408,6 +410,11 @@ func (p *PTYParser) detectPermissionFromBuffer() *PTYPermissionPrompt {
 	if prompt.Type == "" {
 		prompt.Type = PermissionTypeUnknown
 	}
+	if prompt.Type == PermissionTypeTrustFolder && prompt.Target == "" {
+		if target := findTrustFolderTarget(p.buffer); target != "" {
+			prompt.Target = target
+		}
+	}
 
 	// Generate description based on type
 	switch prompt.Type {
@@ -539,6 +546,16 @@ func (p *PTYParser) detectPermissionFromBuffer() *PTYPermissionPrompt {
 	})
 
 	return prompt
+}
+
+func findTrustFolderTarget(lines []string) string {
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "~") {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 // hasOptions checks if the buffer contains numbered options.

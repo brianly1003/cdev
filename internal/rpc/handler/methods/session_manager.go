@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -40,11 +41,12 @@ type SessionManagerService struct {
 	focusProvider  SessionFocusProvider
 	sessionService *SessionService
 
-	codexMu             sync.Mutex
-	codexSessions       map[string]*codexPTYSession
-	codexWatchers       map[string]session.WatchInfo
-	codexLastPTYLogLine map[string]string
-	runtimeDispatch     map[string]sessionRuntimeDispatch
+	codexMu              sync.Mutex
+	codexSessions        map[string]*codexPTYSession
+	codexWatchers        map[string]session.WatchInfo
+	codexLastPTYLogLine  map[string]string
+	codexSessionWatchers map[string]context.CancelFunc
+	runtimeDispatch      map[string]sessionRuntimeDispatch
 }
 
 const (
@@ -93,10 +95,11 @@ func (c *codexPTYSession) SetSessionID(sessionID string) {
 // NewSessionManagerService creates a new session manager service.
 func NewSessionManagerService(manager *session.Manager) *SessionManagerService {
 	service := &SessionManagerService{
-		manager:             manager,
-		codexSessions:       make(map[string]*codexPTYSession),
-		codexWatchers:       make(map[string]session.WatchInfo),
-		codexLastPTYLogLine: make(map[string]string),
+		manager:              manager,
+		codexSessions:        make(map[string]*codexPTYSession),
+		codexWatchers:        make(map[string]session.WatchInfo),
+		codexLastPTYLogLine:  make(map[string]string),
+		codexSessionWatchers: make(map[string]context.CancelFunc),
 	}
 	service.ensureRuntimeDispatch()
 	return service
@@ -1867,6 +1870,38 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 			_, _ = s.focusProvider.SetSessionFocus(clientID, p.WorkspaceID, p.SessionID)
 		}
 
+		// If there's a pending PTY permission prompt, re-emit it for this watcher.
+		if existingSession, err := s.manager.GetSession(info.SessionID); err == nil {
+			if cm := existingSession.ClaudeManager(); cm != nil {
+				if pendingPerm := cm.GetPendingPTYPermission(); pendingPerm != nil {
+					options := make([]events.PTYPromptOption, len(pendingPerm.Options))
+					for i, opt := range pendingPerm.Options {
+						options[i] = events.PTYPromptOption{
+							Key:         opt.Key,
+							Label:       opt.Label,
+							Description: opt.Description,
+							Selected:    opt.Selected,
+						}
+					}
+					s.manager.PublishEvent(events.NewPTYPermissionEventWithSession(
+						string(pendingPerm.Type),
+						pendingPerm.Target,
+						pendingPerm.Description,
+						pendingPerm.Preview,
+						info.SessionID,
+						options,
+					))
+
+					log.Info().
+						Str("type", string(pendingPerm.Type)).
+						Str("target", pendingPerm.Target).
+						Int("options", len(pendingPerm.Options)).
+						Str("session_id", info.SessionID).
+						Msg("Re-emitted pending PTY permission for watcher")
+				}
+			}
+		}
+
 		return map[string]interface{}{
 			"status":       "watching",
 			"watching":     info.Watching,
@@ -2499,7 +2534,10 @@ func (s *SessionManagerService) startCodexSession(ctx context.Context, workspace
 	}
 
 	_ = codex.GetGlobalIndexCache().Refresh()
-	entries, _ := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
+	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
+	if err != nil && !errors.Is(err, codex.ErrProjectNotFound) {
+		return nil, message.NewError(message.InternalError, "failed to load Codex history: "+err.Error())
+	}
 	if len(entries) > 0 {
 		return map[string]interface{}{
 			"session_id":   entries[0].SessionID,
@@ -2507,17 +2545,46 @@ func (s *SessionManagerService) startCodexSession(ctx context.Context, workspace
 			"source":       "history",
 			"status":       "attached",
 			"agent_type":   sessionManagerAgentCodex,
-			"message":      "Latest Codex session is ready for interaction",
+			"message":      "Latest Codex session found in history - ready for interaction",
 		}, nil
 	}
 
+	if existing := s.getCodexSessionForWorkspace(workspaceID); existing != nil {
+		return map[string]interface{}{
+			"session_id":   existing.SessionID(),
+			"workspace_id": workspaceID,
+			"source":       "managed",
+			"status":       "attached",
+			"agent_type":   sessionManagerAgentCodex,
+			"message":      "Returning existing active Codex session",
+		}, nil
+	}
+
+	before := s.snapshotCodexSessionIDs(ws.Definition.Path)
+	temporaryID := "codex-temp-" + uuid.NewString()
+	if err := s.startCodexProcess(ctx, temporaryID, workspaceID, ws.Definition.Path, []string{}); err != nil {
+		return nil, codexRuntimeError("session/start", err)
+	}
+
+	realID, err := s.resolveNewCodexSessionID(ws.Definition.Path, before, 10*time.Second)
+	if err == nil && realID != "" {
+		s.remapCodexSessionID(temporaryID, realID)
+		evt := events.NewSessionIDResolvedEvent(temporaryID, realID, workspaceID, "")
+		evt.SetAgentType(sessionManagerAgentCodex)
+		s.manager.PublishEvent(evt)
+		sessionID = realID
+	} else {
+		s.startCodexSessionIDWatcher(ctx, workspaceID, ws.Definition.Path, temporaryID, before)
+		sessionID = temporaryID
+	}
+
 	return map[string]interface{}{
-		"session_id":   "",
+		"session_id":   sessionID,
 		"workspace_id": workspaceID,
-		"source":       "",
-		"status":       "ready",
+		"source":       "managed",
+		"status":       "started",
 		"agent_type":   sessionManagerAgentCodex,
-		"message":      "No previous Codex session found. Use session/send with mode=\"new\" to start one.",
+		"message":      "New Codex session started in interactive mode",
 	}, nil
 }
 
@@ -2592,6 +2659,21 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 
 	// For deterministic mobile behavior, session/send always launches a Codex process.
 	// Interactive in-session typing remains available via session/input and session/respond.
+	if sessionID == "" && mode == "new" {
+		if existing := s.getCodexSessionForWorkspace(workspaceID); existing != nil {
+			if err := s.sendCodexInput(existing.SessionID(), prompt); err != nil {
+				return nil, codexRuntimeError("session/send", err)
+			}
+			return map[string]interface{}{
+				"status":       "sent",
+				"session_id":   existing.SessionID(),
+				"workspace_id": workspaceID,
+				"agent_type":   sessionManagerAgentCodex,
+				"delivery":     "pty_input",
+				"message":      "Codex prompt sent to active session",
+			}, nil
+		}
+	}
 	if sessionID != "" {
 		_ = s.stopCodexSession(sessionID)
 	}
@@ -2600,7 +2682,8 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 	if sessionID == "" {
 		before := s.snapshotCodexSessionIDs(workspacePath)
 		temporaryID := "codex-temp-" + uuid.NewString()
-		if err := s.startCodexProcess(ctx, temporaryID, workspaceID, workspacePath, "", prompt); err != nil {
+		args := buildCodexCLIArgs(workspacePath, "", prompt)
+		if err := s.startCodexProcess(ctx, temporaryID, workspaceID, workspacePath, args); err != nil {
 			return nil, codexRuntimeError("session/send", err)
 		}
 
@@ -2612,6 +2695,7 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 			s.manager.PublishEvent(evt)
 			sessionID = realID
 		} else {
+			s.startCodexSessionIDWatcher(ctx, workspaceID, workspacePath, temporaryID, before)
 			sessionID = temporaryID
 		}
 
@@ -2626,7 +2710,8 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 		}, nil
 	}
 
-	if err := s.startCodexProcess(ctx, sessionID, workspaceID, workspacePath, sessionID, prompt); err != nil {
+	args := buildCodexCLIArgs(workspacePath, sessionID, prompt)
+	if err := s.startCodexProcess(ctx, sessionID, workspaceID, workspacePath, args); err != nil {
 		return nil, codexRuntimeError("session/send", err)
 	}
 	log.Debug().
@@ -2718,6 +2803,10 @@ func codexWorkspacePathsMatch(workspacePath, sessionProjectPath string) bool {
 		absSession = filepath.Clean(sessionProjectPath)
 	}
 
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		absWorkspace = strings.ToLower(absWorkspace)
+		absSession = strings.ToLower(absSession)
+	}
 	if absWorkspace == absSession {
 		return true
 	}
@@ -2764,8 +2853,10 @@ func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string) []string {
 	return args
 }
 
-func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessionID, workspaceID, workspacePath, resumeSessionID, prompt string) error {
-	args := buildCodexCLIArgs(workspacePath, resumeSessionID, prompt)
+func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessionID, workspaceID, workspacePath string, args []string) error {
+	if args == nil {
+		args = []string{}
+	}
 
 	cmd := exec.CommandContext(ctx, "codex", args...)
 	cmd.Dir = workspacePath
@@ -2922,6 +3013,7 @@ func (s *SessionManagerService) waitCodexProcess(codexSession *codexPTYSession) 
 	}
 	delete(s.codexLastPTYLogLine, currentSessionID)
 	s.codexMu.Unlock()
+	s.stopCodexSessionIDWatcher(currentSessionID)
 
 	if waitErr != nil {
 		s.publishCodexPTYOutput(currentSessionID, waitErr.Error(), ptyStateError)
@@ -3005,6 +3097,9 @@ func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) 
 	_ = codex.GetGlobalIndexCache().Refresh()
 	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
 	if err != nil {
+		if errors.Is(err, codex.ErrProjectNotFound) {
+			return []session.HistoryInfo{}, nil
+		}
 		return nil, err
 	}
 
@@ -3054,31 +3149,11 @@ func (s *SessionManagerService) resolveCodexSessionForWorkspace(workspaceID, ses
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
-	absWorkspace, err := filepath.Abs(ws.Definition.Path)
-	if err != nil {
-		return nil, err
-	}
-	absProject, err := filepath.Abs(entry.ProjectPath)
-	if err != nil {
-		return nil, err
-	}
-	if !pathWithin(absWorkspace, absProject) {
+	if !codexWorkspacePathsMatch(ws.Definition.Path, entry.ProjectPath) {
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
 
 	return entry, nil
-}
-
-func pathWithin(parent, child string) bool {
-	if parent == "" || child == "" {
-		return false
-	}
-
-	rel, err := filepath.Rel(parent, child)
-	if err != nil {
-		return false
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
 }
 
 func (s *SessionManagerService) getRuntimeSessionMessages(ctx context.Context, agentType, sessionID string, limit, offset int, order string) (interface{}, *message.Error) {
@@ -3189,6 +3264,82 @@ func (s *SessionManagerService) resolveNewCodexSessionID(workspacePath string, b
 	return "", fmt.Errorf("timed out waiting for Codex session id")
 }
 
+func (s *SessionManagerService) startCodexSessionIDWatcher(ctx context.Context, workspaceID, workspacePath, temporaryID string, before map[string]struct{}) {
+	if workspacePath == "" || temporaryID == "" {
+		return
+	}
+
+	s.codexMu.Lock()
+	if _, exists := s.codexSessionWatchers[temporaryID]; exists {
+		s.codexMu.Unlock()
+		return
+	}
+	watchCtx, cancel := context.WithCancel(ctx)
+	s.codexSessionWatchers[temporaryID] = cancel
+	s.codexMu.Unlock()
+
+	go func() {
+		defer s.stopCodexSessionIDWatcher(temporaryID)
+
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-watchCtx.Done():
+				return
+			case <-ticker.C:
+				if s.getCodexSession(temporaryID) == nil {
+					return
+				}
+
+				_ = codex.GetGlobalIndexCache().Refresh()
+				entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(workspacePath)
+				if err != nil && !errors.Is(err, codex.ErrProjectNotFound) {
+					log.Debug().
+						Err(err).
+						Str("workspace_id", workspaceID).
+						Str("workspace_path", workspacePath).
+						Msg("codex session watcher refresh failed")
+					continue
+				}
+
+				for _, entry := range entries {
+					if _, exists := before[entry.SessionID]; exists {
+						continue
+					}
+					if entry.SessionID == "" {
+						continue
+					}
+
+					s.remapCodexSessionID(temporaryID, entry.SessionID)
+					evt := events.NewSessionIDResolvedEvent(temporaryID, entry.SessionID, workspaceID, entry.FullPath)
+					evt.SetAgentType(sessionManagerAgentCodex)
+					s.manager.PublishEvent(evt)
+					return
+				}
+			}
+		}
+	}()
+}
+
+func (s *SessionManagerService) stopCodexSessionIDWatcher(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+
+	s.codexMu.Lock()
+	cancel, exists := s.codexSessionWatchers[sessionID]
+	if exists {
+		delete(s.codexSessionWatchers, sessionID)
+	}
+	s.codexMu.Unlock()
+
+	if exists {
+		cancel()
+	}
+}
+
 func (s *SessionManagerService) remapCodexSessionID(oldSessionID, newSessionID string) {
 	if oldSessionID == "" || newSessionID == "" || oldSessionID == newSessionID {
 		return
@@ -3218,6 +3369,17 @@ func (s *SessionManagerService) getCodexSession(sessionID string) *codexPTYSessi
 	s.codexMu.Lock()
 	defer s.codexMu.Unlock()
 	return s.codexSessions[sessionID]
+}
+
+func (s *SessionManagerService) getCodexSessionForWorkspace(workspaceID string) *codexPTYSession {
+	s.codexMu.Lock()
+	defer s.codexMu.Unlock()
+	for _, session := range s.codexSessions {
+		if session.workspaceID == workspaceID {
+			return session
+		}
+	}
+	return nil
 }
 
 func codexRuntimeError(method string, err error) *message.Error {

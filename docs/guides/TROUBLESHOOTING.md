@@ -83,6 +83,9 @@ cdev doctor --strict
 | `sessions.codex_dir` | Codex sessions directory exists | Run a Codex session to bootstrap |
 | `server.health_endpoint` | `http://<host>:<port>/health` is reachable | Start cdev and verify host/port config |
 
+**Codex note:** the Codex sessions directory is created only after the first prompt writes a session file.  
+If you see temporary session IDs (`codex-temp-...`) after `session/start`, wait for the first prompt and the `session_id_resolved` event.
+
 ### Exit Code Rules
 
 - `overall_status = ok` -> exit code `0`

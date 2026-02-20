@@ -16,8 +16,8 @@ This document captures observed session schema, the minimal integration surface,
   - `session/elements` with `agent_type=codex`
   - `session/delete` with `agent_type=codex`
 - Codex live stream watching:
-  - `session/watch` with `agent_type=codex`
-  - `session/unwatch`
+  - `workspace/session/watch` with `agent_type=codex`
+  - `workspace/session/unwatch`
 - Event routing now includes `agent_type` in event envelopes.
   - Codex stream events are emitted with `agent_type: "codex"`.
   - Claude stream events are emitted with `agent_type: "claude"`.
@@ -31,7 +31,7 @@ This document captures observed session schema, the minimal integration surface,
   - `session/input`
   - `session/respond`
 - Default remains `agent_type="claude"` when omitted.
-- `agent_type="codex"` now runs Codex CLI interactively via PTY (`codex resume` / `codex`).
+- `agent_type="codex"` now runs Codex CLI interactively via PTY (`codex` with `cmd.Dir` set to the workspace path).
 - `session/input` and `session/respond` route to the active Codex PTY process.
 
 ### Remaining gaps
@@ -79,7 +79,7 @@ Key behaviors:
 
 - Session history: list + message pagination.
 - Live stream: watch JSONL append events and emit normalized `AgentEvent`s.
-- Resume: launch `codex resume` with `--cd <workspace>` and stream updates.
+- Resume/attach: use `session/start` with `session_id` + `agent_type=codex` to attach history; `session/send` starts PTY if no history exists.
 
 ## Runtime dispatch architecture (implemented)
 
@@ -131,7 +131,7 @@ Notes:
 - `session/get` with `agent_type=codex`
 - `session/messages` with `agent_type=codex`
 - `session/elements` with `agent_type=codex`
-- `session/watch` with `agent_type=codex`
+- `workspace/session/watch` with `agent_type=codex`
 - `session/unwatch`
 - `session/start|stop|send|input|respond` execute by runtime using `agent_type`.
 - Codex uses PTY interactive control and emits runtime-tagged events (`agent_type=codex`).

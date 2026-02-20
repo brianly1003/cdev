@@ -2,6 +2,8 @@
 
 This document describes how cdev-ios integrates with LIVE Claude sessions - sessions running in the user's terminal that weren't started by cdev.
 
+> **Scope:** Claude LIVE sessions only. For multi-runtime JSON-RPC flows (Claude + Codex), see `docs/mobile/IOS-INTEGRATION-GUIDE.md` and `docs/api/UNIFIED-API-SPEC.md`. Examples below explicitly set `agent_type: "claude"`.
+
 ---
 
 ## Table of Contents
@@ -76,7 +78,7 @@ Sessions now include a `source` field indicating their origin:
 │  │ managed  │                       │   live   │                │
 │  └────┬─────┘                       └────┬─────┘                │
 │       │                                  │                       │
-│       │◄─────── session/watch ──────────►│                       │
+│       │◄─────── workspace/session/watch ──────────►│                       │
 │       │◄─────── session/send ───────────►│                       │
 │       │                                  │                       │
 │       ▼                                  ▼                       │
@@ -169,7 +171,7 @@ Sessions now include a `source` field indicating their origin:
 │                          │                                       │
 │                          ▼                                       │
 │  5. IOS SENDS MESSAGE (session/send)                             │
-│     {"method":"session/send","params":{"prompt":"Also check..."}}│
+│     {"method":"session/send","params":{"prompt":"Also check...","agent_type":"claude"}}│
 │                          │                                       │
 │                          ▼                                       │
 │  6. CDEV INJECTS INTO TTY                                        │
@@ -190,9 +192,9 @@ Sessions now include a `source` field indicating their origin:
 
 ## API Reference
 
-### workspace/session/history (Enhanced)
+### workspace/session/history (Historical)
 
-Lists all sessions for a workspace, including LIVE sessions.
+Lists historical sessions for a workspace and runtime. LIVE sessions are surfaced via `workspace/list` and `session/active`.
 
 **Request:**
 ```json
@@ -202,7 +204,8 @@ Lists all sessions for a workspace, including LIVE sessions.
   "method": "workspace/session/history",
   "params": {
     "workspace_id": "ws-abc123",
-    "limit": 50
+    "limit": 50,
+    "agent_type": "claude"
   }
 }
 ```
@@ -215,37 +218,21 @@ Lists all sessions for a workspace, including LIVE sessions.
   "result": {
     "sessions": [
       {
-        "id": "def-456",
-        "source": "live",
-        "status": "active",
-        "pid": 67890,
-        "tty": "/dev/ttys002",
-        "summary": "Reviewing codebase structure",
-        "message_count": 15,
-        "last_updated": "2024-12-25T10:35:00Z",
-        "created_at": "2024-12-25T10:20:00Z"
-      },
-      {
         "id": "abc-123",
-        "source": "managed",
-        "status": "running",
-        "pid": 12345,
         "summary": "Fix login authentication bug",
         "message_count": 42,
         "last_updated": "2024-12-25T10:30:00Z",
-        "created_at": "2024-12-25T09:00:00Z"
+        "agent_type": "claude"
       },
       {
-        "id": "ghi-789",
-        "source": "historical",
-        "status": "completed",
+        "id": "def-456",
         "summary": "Added dark mode support",
         "message_count": 128,
         "last_updated": "2024-12-24T15:00:00Z",
-        "created_at": "2024-12-24T14:00:00Z"
+        "agent_type": "claude"
       }
     ],
-    "total": 3
+    "total": 2
   }
 }
 ```
@@ -276,7 +263,8 @@ Works identically for all session types. Watches the JSONL file for changes.
   "method": "workspace/session/watch",
   "params": {
     "workspace_id": "ws-abc123",
-    "session_id": "def-456"
+    "session_id": "def-456",
+    "agent_type": "claude"
   }
 }
 ```
@@ -288,9 +276,7 @@ Works identically for all session types. Watches the JSONL file for changes.
   "id": 2,
   "result": {
     "status": "watching",
-    "session_id": "def-456",
-    "source": "live",
-    "message_count": 15
+    "session_id": "def-456"
   }
 }
 ```
@@ -299,11 +285,12 @@ Works identically for all session types. Watches the JSONL file for changes.
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "claude_message",
+  "method": "event/claude_message",
   "params": {
     "session_id": "def-456",
     "type": "assistant",
     "role": "assistant",
+    "agent_type": "claude",
     "content": [
       {
         "type": "text",
@@ -332,32 +319,20 @@ Sends a message to a session. Behavior varies by session source.
   "method": "session/send",
   "params": {
     "session_id": "def-456",
-    "prompt": "Also check the tests directory"
+    "prompt": "Also check the tests directory",
+    "agent_type": "claude"
   }
 }
 ```
 
-**Response (LIVE session):**
+**Response:**
 ```json
 {
   "jsonrpc": "2.0",
   "id": 3,
   "result": {
     "status": "sent",
-    "method": "tty_injection",
-    "tty": "/dev/ttys002"
-  }
-}
-```
-
-**Response (Managed session):**
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "result": {
-    "status": "sent",
-    "method": "stdin"
+    "agent_type": "claude"
   }
 }
 ```
@@ -387,7 +362,8 @@ Works for both managed and live sessions for permission/question responses.
   "params": {
     "session_id": "def-456",
     "type": "permission",
-    "response": "yes"
+    "response": "yes",
+    "agent_type": "claude"
   }
 }
 ```
@@ -395,6 +371,8 @@ Works for both managed and live sessions for permission/question responses.
 ---
 
 ## iOS Implementation
+
+> **Note:** The UI examples below are from the original LIVE prototype and use a `source` field. Current responses use `agent_type` and `status` instead, and JSON-RPC notifications use the `event/` prefix (for example `event/claude_message`). Map those fields and event names to your client as needed.
 
 ### Session List View
 
@@ -417,7 +395,7 @@ struct SessionListView: View {
     func loadSessions() {
         let request = JSONRPCRequest(
             method: "workspace/session/history",
-            params: ["workspace_id": workspaceId, "limit": 50]
+            params: ["workspace_id": workspaceId, "limit": 50, "agent_type": "claude"]
         )
 
         webSocket.send(request) { result in
@@ -551,7 +529,8 @@ struct SessionDetailView: View {
             method: "workspace/session/watch",
             params: [
                 "workspace_id": workspaceId,
-                "session_id": session.id
+                "session_id": session.id,
+                "agent_type": "claude"
             ]
         )
 
@@ -560,7 +539,7 @@ struct SessionDetailView: View {
         }
 
         // Listen for claude_message events
-        webSocket.onEvent("claude_message") { message in
+        webSocket.onEvent("event/claude_message") { message in
             if message.sessionId == session.id {
                 messages.append(message)
             }
@@ -572,7 +551,8 @@ struct SessionDetailView: View {
             method: "session/send",
             params: [
                 "session_id": session.id,
-                "prompt": inputText
+                "prompt": inputText,
+                "agent_type": "claude"
             ]
         )
 
@@ -623,7 +603,8 @@ func respondToPermission(toolUseId: String, approved: Bool) {
             "type": "permission",
             "tool_use_id": toolUseId,
             "response": approved ? "yes" : "no",
-            "is_error": !approved
+            "is_error": !approved,
+            "agent_type": "claude"
         ]
     )
 

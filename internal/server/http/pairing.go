@@ -2,11 +2,16 @@
 package http
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/pairing"
@@ -23,7 +28,15 @@ type PairingHandler struct {
 	// allowRequestExternal enables deriving HTTP/WS URLs from request headers
 	// when no explicit external URL is configured.
 	allowRequestExternal bool
+	pairingCode          string
+	pairingCodeExpiresAt time.Time
+	pairingCodeMu        sync.Mutex
 }
+
+const (
+	pairingCodeLength = 6
+	pairingCodeTTL    = 10 * time.Minute
+)
 
 // NewPairingHandler creates a new pairing handler.
 func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pairingInfoFn func() *pairing.PairingInfo, allowRequestExternal bool) *PairingHandler {
@@ -39,7 +52,7 @@ func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pa
 // Returns connection info as JSON for the mobile app.
 //
 //	@Summary		Get pairing info
-//	@Description	Returns connection info for mobile app pairing (WebSocket URL, HTTP URL, session ID, token)
+//	@Description	Returns connection info for mobile app pairing (WebSocket URL, HTTP URL, session ID, auth flag)
 //	@Tags			pairing
 //	@Produce		json
 //	@Success		200	{object}	PairingInfoResponse
@@ -59,14 +72,15 @@ func (h *PairingHandler) HandlePairInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response := PairingInfoResponse{
-		WebSocket: info.WebSocket,
-		HTTP:      info.HTTP,
-		SessionID: info.SessionID,
-		RepoName:  info.RepoName,
+		WebSocket:    info.WebSocket,
+		HTTP:         info.HTTP,
+		SessionID:    info.SessionID,
+		RepoName:     info.RepoName,
+		AuthRequired: h.requireAuth && h.tokenManager != nil,
 	}
 
-	// Include token if authentication is required
-	if h.requireAuth && h.tokenManager != nil {
+	// Include token only when explicitly requested
+	if r.URL.Query().Get("include_token") == "1" && h.requireAuth && h.tokenManager != nil {
 		token, expiresAt, err := h.tokenManager.GeneratePairingToken()
 		if err == nil {
 			response.Token = token
@@ -75,6 +89,61 @@ func (h *PairingHandler) HandlePairInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// HandlePairCode handles POST /api/pair/code
+// Exchanges a one-time pairing code for a pairing token.
+//
+//	@Summary		Exchange pairing code
+//	@Description	Exchanges a short pairing code for a pairing token
+//	@Tags			pairing
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	PairingCodeResponse
+//	@Failure		400	{object}	ErrorResponse
+//	@Failure		401	{object}	ErrorResponse
+//	@Router			/api/pair/code [post]
+func (h *PairingHandler) HandlePairCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !h.requireAuth || h.tokenManager == nil {
+		writeJSONError(w, "Pairing code not available", http.StatusBadRequest)
+		return
+	}
+
+	var req PairingCodeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	code := strings.TrimSpace(req.Code)
+	if code == "" {
+		writeJSONError(w, "code is required", http.StatusBadRequest)
+		return
+	}
+
+	if !h.consumePairingCode(code) {
+		writeJSONError(w, "Invalid or expired pairing code", http.StatusUnauthorized)
+		return
+	}
+
+	token, expiresAt, err := h.tokenManager.GeneratePairingToken()
+	if err != nil {
+		writeJSONError(w, "Failed to generate pairing token", http.StatusInternalServerError)
+		return
+	}
+
+	resp := PairingCodeResponse{
+		PairingToken: token,
+		ExpiresAt:    expiresAt.Format(time.RFC3339),
+		ExpiresIn:    int(time.Until(expiresAt).Seconds()),
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // HandlePairQR handles GET /api/pair/qr
@@ -171,6 +240,17 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	pairingCodeBlock := ""
+	if h.requireAuth && h.tokenManager != nil {
+		if code, _ := h.getPairingCode(); code != "" {
+			pairingCodeBlock = `<div class="pair-code">
+                <div class="pair-code-label">Manual Pairing Code</div>
+                <div class="pair-code-value">` + code + `</div>
+                <div class="pair-code-help">Enter this code when connecting manually in the mobile app.</div>
+            </div>`
+		}
+	}
+
 	// Simple HTML page with embedded QR code
 	html := `<!DOCTYPE html>
 <html>
@@ -261,6 +341,33 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         .timer span {
             color: var(--primary);
             font-weight: 600;
+        }
+        .pair-code {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--bg-highlight);
+            border: 1px solid var(--bg-selected);
+            text-align: center;
+        }
+        .pair-code-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 6px;
+        }
+        .pair-code-value {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            font-size: 22px;
+            letter-spacing: 6px;
+            color: var(--success);
+            font-weight: 700;
+        }
+        .pair-code-help {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
         }
         .info {
             text-align: left;
@@ -434,6 +541,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
                 <div class="expired-overlay" id="expiredOverlay">Expired</div>
             </div>
             <div class="timer">Refreshes in <span id="countdown">60</span>s</div>
+            ` + pairingCodeBlock + `
         </div>
 
         <div class="content-section">
@@ -553,8 +661,21 @@ type PairingInfoResponse struct {
 	HTTP           string `json:"http"`
 	SessionID      string `json:"session"`
 	RepoName       string `json:"repo"`
+	AuthRequired   bool   `json:"auth_required"`
 	Token          string `json:"token,omitempty"`
 	TokenExpiresAt string `json:"token_expires_at,omitempty"`
+}
+
+// PairingCodeRequest is the request body for POST /api/pair/code.
+type PairingCodeRequest struct {
+	Code string `json:"code"`
+}
+
+// PairingCodeResponse is the response for POST /api/pair/code.
+type PairingCodeResponse struct {
+	PairingToken string `json:"pairing_token"`
+	ExpiresAt    string `json:"expires_at"`
+	ExpiresIn    int    `json:"expires_in"`
 }
 
 // PairingRefreshResponse is the response for POST /api/pair/refresh.
@@ -577,6 +698,58 @@ func authBadgeText(requireAuth bool) string {
 		return "Auth Required"
 	}
 	return "No Auth Required"
+}
+
+func (h *PairingHandler) getPairingCode() (string, time.Time) {
+	h.pairingCodeMu.Lock()
+	defer h.pairingCodeMu.Unlock()
+
+	now := time.Now()
+	if h.pairingCode == "" || now.After(h.pairingCodeExpiresAt) {
+		code, err := generatePairingCode(pairingCodeLength)
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to generate pairing code")
+			return "", time.Time{}
+		}
+		h.pairingCode = code
+		h.pairingCodeExpiresAt = now.Add(pairingCodeTTL)
+	}
+
+	return h.pairingCode, h.pairingCodeExpiresAt
+}
+
+func (h *PairingHandler) consumePairingCode(code string) bool {
+	h.pairingCodeMu.Lock()
+	defer h.pairingCodeMu.Unlock()
+
+	if h.pairingCode == "" || time.Now().After(h.pairingCodeExpiresAt) {
+		return false
+	}
+
+	if subtle.ConstantTimeCompare([]byte(code), []byte(h.pairingCode)) != 1 {
+		return false
+	}
+
+	h.pairingCode = ""
+	h.pairingCodeExpiresAt = time.Time{}
+	return true
+}
+
+func generatePairingCode(length int) (string, error) {
+	if length <= 0 {
+		return "", errors.New("invalid pairing code length")
+	}
+
+	var builder strings.Builder
+	builder.Grow(length)
+	for i := 0; i < length; i++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			return "", err
+		}
+		builder.WriteByte(byte('0' + n.Int64()))
+	}
+	return builder.String(), nil
 }
 
 func parseInt(s string) (int, error) {

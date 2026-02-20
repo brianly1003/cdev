@@ -26,6 +26,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const agentTypeClaude = "claude"
+
 // Manager orchestrates multiple Claude sessions across workspaces.
 type Manager struct {
 	sessions                map[string]*Session             // keyed by session ID
@@ -41,11 +43,11 @@ type Manager struct {
 	idleTimeout time.Duration
 
 	// Session streaming for live message updates
-	streamer             *sessioncache.SessionStreamer
-	streamerWorkspaceID  string          // Workspace ID of currently watched session
-	streamerSessionID    string          // Session ID currently being watched
-	streamerWatchers     map[string]bool // Client IDs currently watching (for proper cleanup)
-	streamerMu           sync.Mutex
+	streamer            *sessioncache.SessionStreamer
+	streamerWorkspaceID string          // Workspace ID of currently watched session
+	streamerSessionID   string          // Session ID currently being watched
+	streamerWatchers    map[string]bool // Client IDs currently watching (for proper cleanup)
+	streamerMu          sync.Mutex
 
 	// LIVE session support (Claude running in user's terminal)
 	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
@@ -734,12 +736,14 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 							"real_id", sessionID,
 						)
 						m.updateSessionID(workspaceID, temporaryID, sessionID)
-						m.hub.Publish(events.NewSessionIDResolvedEvent(
+						evt := events.NewSessionIDResolvedEvent(
 							temporaryID,
 							sessionID,
 							workspaceID,
 							filepath.Join(sessionsDir, sessionID+".jsonl"),
-						))
+						)
+						evt.SetAgentType(agentTypeClaude)
+						m.hub.Publish(evt)
 						found = true
 					}
 					continue
@@ -779,12 +783,14 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 					m.updateSessionID(workspaceID, temporaryID, realSessionID)
 
 					// Emit the session_id_resolved event
-					m.hub.Publish(events.NewSessionIDResolvedEvent(
+					evt := events.NewSessionIDResolvedEvent(
 						temporaryID,
 						realSessionID,
 						workspaceID,
 						event.Name,
-					))
+					)
+					evt.SetAgentType(agentTypeClaude)
+					m.hub.Publish(evt)
 
 					found = true
 				}
@@ -841,12 +847,14 @@ func (m *Manager) FailSessionIDResolution(workspaceID, temporaryID, reason, mess
 			"temporary_id", temporaryID,
 			"reason", reason,
 		)
-		m.hub.Publish(events.NewSessionIDFailedEvent(
+		evt := events.NewSessionIDFailedEvent(
 			temporaryID,
 			workspaceID,
 			reason,
 			message,
-		))
+		)
+		evt.SetAgentType(agentTypeClaude)
+		m.hub.Publish(evt)
 	}
 }
 

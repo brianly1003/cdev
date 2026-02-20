@@ -10,6 +10,8 @@
 
 The cdev protocol defines the communication standard between cdev (server) and clients (cdev-ios, VS Code extensions, etc.) for remote supervision and control of AI coding assistant sessions.
 
+> **Note:** This document reflects the legacy/transition protocol. For current JSON-RPC method names and multi-runtime behavior (`agent_type` routing, Codex support), use `docs/api/UNIFIED-API-SPEC.md`.
+
 ### Protocol Evolution
 
 | Version | Description |

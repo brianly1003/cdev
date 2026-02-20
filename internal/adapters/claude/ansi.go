@@ -3,6 +3,7 @@ package claude
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -13,6 +14,8 @@ type ANSIParser struct {
 	ansiPattern *regexp.Regexp
 	// Pattern for common control sequences
 	controlPattern *regexp.Regexp
+	// Cursor forward pattern (CSI n C) - used to preserve spacing
+	cursorForwardPattern *regexp.Regexp
 }
 
 // NewANSIParser creates a new ANSI parser.
@@ -26,11 +29,31 @@ func NewANSIParser() *ANSIParser {
 
 		// Control characters that should be stripped
 		controlPattern: regexp.MustCompile(`[\x00-\x08\x0b\x0c\x0e-\x1a\x1c-\x1f\x7f]`),
+		// Cursor forward (CSI n C) to preserve spacing in logs
+		// Example: ESC[4C means move cursor forward 4 cells
+		cursorForwardPattern: regexp.MustCompile(`\x1b\[(\d*)C`),
 	}
 }
 
 // StripCodes removes all ANSI escape codes and control characters from text.
 func (p *ANSIParser) StripCodes(text string) string {
+	// Replace cursor-forward sequences with spaces before stripping
+	if p.cursorForwardPattern != nil {
+		text = p.cursorForwardPattern.ReplaceAllStringFunc(text, func(match string) string {
+			sub := p.cursorForwardPattern.FindStringSubmatch(match)
+			count := 1
+			if len(sub) > 1 && sub[1] != "" {
+				if n, err := strconv.Atoi(sub[1]); err == nil && n > 0 {
+					// Clamp to avoid pathological allocations
+					if n > 200 {
+						n = 200
+					}
+					count = n
+				}
+			}
+			return strings.Repeat(" ", count)
+		})
+	}
 	// Remove ANSI escape sequences
 	result := p.ansiPattern.ReplaceAllString(text, "")
 	// Remove control characters (except newline, carriage return, tab)

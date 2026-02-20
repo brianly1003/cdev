@@ -29,6 +29,8 @@ Claude Code CLI has two modes of operation:
 
 The stream-json mode works for automated permission handling (`acceptEdits`, `bypassPermissions`) but doesn't provide the rich interactive experience users expect on mobile.
 
+**Scope note:** This doc focuses on Claude PTY behavior. When calling JSON-RPC methods, include `agent_type: "claude"` explicitly to avoid default routing.
+
 ### Solution
 
 cdev now supports **three modes** for different use cases:
@@ -527,7 +529,8 @@ class SessionState: ObservableObject {
                 "workspace_id": workspaceId,
                 "session_id": sessionId,
                 "prompt": prompt,
-                "permission_mode": permissionMode.rawValue
+                "permission_mode": permissionMode.rawValue,
+                "agent_type": "claude"
             ]
         )
     }
@@ -538,7 +541,8 @@ class SessionState: ObservableObject {
             method: "session/input",
             params: [
                 "session_id": sessionId,
-                "input": input
+                "input": input,
+                "agent_type": "claude"
             ]
         )
     }
@@ -549,7 +553,8 @@ class SessionState: ObservableObject {
             method: "session/input",
             params: [
                 "session_id": sessionId,
-                "key": key  // "enter", "escape", "up", "down", etc.
+                "key": key,  // "enter", "escape", "up", "down", etc.
+                "agent_type": "claude"
             ]
         )
     }
@@ -580,7 +585,8 @@ Start a prompt with specified permission mode.
         "workspace_id": "ws-123",
         "session_id": "sess-456",
         "prompt": "Create a new Swift file for user authentication",
-        "permission_mode": "interactive"
+        "permission_mode": "interactive",
+        "agent_type": "claude"
     },
     "id": 1
 }
@@ -609,7 +615,8 @@ Send input to the session (text or special key).
     "method": "session/input",
     "params": {
         "session_id": "sess-456",
-        "input": "1"
+        "input": "1",
+        "agent_type": "claude"
     },
     "id": 2
 }
@@ -622,7 +629,8 @@ Send input to the session (text or special key).
     "method": "session/input",
     "params": {
         "session_id": "sess-456",
-        "key": "enter"
+        "key": "enter",
+        "agent_type": "claude"
     },
     "id": 3
 }
@@ -899,7 +907,7 @@ Emitted for Claude's structured messages (headless mode and JSONL watching).
 │  2. Mobile app calls workspace/list                             │
 │     cdev detects LIVE session via ps + lsof                     │
 │                                                                  │
-│  3. Mobile app calls session/watch                              │
+│  3. Mobile app calls workspace/session/watch                    │
 │     cdev starts watching JSONL file for messages                │
 │                                                                  │
 │  4. Mobile app calls session/send or session/input              │

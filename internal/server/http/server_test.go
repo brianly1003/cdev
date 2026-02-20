@@ -214,6 +214,82 @@ func TestAuthMiddleware_AllowsAllowlistedPaths(t *testing.T) {
 	}
 }
 
+func TestRootRedirectMiddleware_RedirectsHome(t *testing.T) {
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	wrapped := rootRedirectMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	if nextCalled {
+		t.Error("expected middleware to handle root redirect without calling next handler")
+	}
+	if resp.StatusCode != http.StatusFound {
+		t.Errorf("expected status 302, got %d", resp.StatusCode)
+	}
+	if location := resp.Header.Get("Location"); location != "/pair" {
+		t.Errorf("expected redirect location /pair, got %q", location)
+	}
+}
+
+func TestRootRedirectMiddleware_PassesThroughNonRoot(t *testing.T) {
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	wrapped := rootRedirectMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	if !nextCalled {
+		t.Error("expected non-root request to pass through to next handler")
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected status 204, got %d", resp.StatusCode)
+	}
+}
+
+func TestRootRedirectMiddleware_AuthEnabledRedirectsBeforeAuth(t *testing.T) {
+	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server.SetAuth(newTestTokenManager(t), true)
+
+	// Mirror Start() middleware order around auth and root redirect.
+	var h http.Handler = server.mux
+	h = server.authMiddleware(h)
+	h = rootRedirectMiddleware(h)
+	h = server.corsMiddleware(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusFound {
+		t.Errorf("expected status 302 at root with auth enabled, got %d", resp.StatusCode)
+	}
+	if location := resp.Header.Get("Location"); location != "/pair" {
+		t.Errorf("expected redirect location /pair, got %q", location)
+	}
+}
+
 func TestServer_HandleStatus_MethodNotAllowed(t *testing.T) {
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
