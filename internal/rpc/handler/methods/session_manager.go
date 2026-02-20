@@ -2,11 +2,11 @@
 package methods
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -2545,6 +2545,30 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 		workspacePath = ws.Definition.Path
 	}
 
+	if sessionID != "" {
+		_ = codex.GetGlobalIndexCache().Refresh()
+		entry, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID)
+		switch {
+		case err != nil || entry == nil:
+			log.Warn().
+				Str("session_id", sessionID).
+				Str("workspace_id", workspaceID).
+				Str("workspace_path", workspacePath).
+				Msg("codex session_id not found in codex history; falling back to workspace latest/new session")
+			sessionID = ""
+		case workspacePath != "" && !codexWorkspacePathsMatch(workspacePath, entry.ProjectPath):
+			log.Warn().
+				Str("session_id", sessionID).
+				Str("workspace_id", workspaceID).
+				Str("workspace_path", workspacePath).
+				Str("session_project_path", entry.ProjectPath).
+				Msg("codex session_id does not match workspace path; falling back to workspace latest/new session")
+			sessionID = ""
+		case workspacePath == "":
+			workspacePath = entry.ProjectPath
+		}
+	}
+
 	if sessionID == "" && mode == "continue" {
 		if workspacePath == "" {
 			return nil, message.NewError(message.InvalidParams, "workspace_id is required when mode is continue and session_id is empty")
@@ -2678,6 +2702,30 @@ func (s *SessionManagerService) sendCodexInput(sessionID, input string) error {
 	return nil
 }
 
+func codexWorkspacePathsMatch(workspacePath, sessionProjectPath string) bool {
+	workspacePath = strings.TrimSpace(workspacePath)
+	sessionProjectPath = strings.TrimSpace(sessionProjectPath)
+	if workspacePath == "" || sessionProjectPath == "" {
+		return true
+	}
+
+	absWorkspace, err := filepath.Abs(workspacePath)
+	if err != nil {
+		absWorkspace = filepath.Clean(workspacePath)
+	}
+	absSession, err := filepath.Abs(sessionProjectPath)
+	if err != nil {
+		absSession = filepath.Clean(sessionProjectPath)
+	}
+
+	if absWorkspace == absSession {
+		return true
+	}
+	workspacePrefix := absWorkspace + string(filepath.Separator)
+	sessionPrefix := absSession + string(filepath.Separator)
+	return strings.HasPrefix(absSession, workspacePrefix) || strings.HasPrefix(absWorkspace, sessionPrefix)
+}
+
 func encodeCodexPTYInput(input string) string {
 	trimmed := strings.TrimSpace(strings.ToLower(input))
 	keyNameToSequence := map[string]string{
@@ -2703,14 +2751,21 @@ func encodeCodexPTYInput(input string) string {
 	return input + "\r"
 }
 
-func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessionID, workspaceID, workspacePath, resumeSessionID, prompt string) error {
-	args := []string{"--no-alt-screen"}
+func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string) []string {
+	args := make([]string, 0, 7)
+	_ = workspacePath // Workspace binding is handled via cmd.Dir.
+	args = append(args, "exec")
 	if resumeSessionID != "" {
 		args = append(args, "resume", resumeSessionID)
 	}
 	if prompt != "" {
 		args = append(args, prompt)
 	}
+	return args
+}
+
+func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessionID, workspaceID, workspacePath, resumeSessionID, prompt string) error {
+	args := buildCodexCLIArgs(workspacePath, resumeSessionID, prompt)
 
 	cmd := exec.CommandContext(ctx, "codex", args...)
 	cmd.Dir = workspacePath
@@ -2741,30 +2796,76 @@ func (s *SessionManagerService) startCodexProcess(ctx context.Context, mapSessio
 }
 
 func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession) {
-	scanner := bufio.NewScanner(codexSession.ptmx)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	linesCh := make(chan string, 64)
+	chunksCh := make(chan string, 64)
 	errCh := make(chan error, 1)
 
 	go func() {
-		defer close(linesCh)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.TrimSpace(line) == "" {
-				continue
+		defer close(chunksCh)
+		readBuf := make([]byte, 8*1024)
+
+		for {
+			n, err := codexSession.ptmx.Read(readBuf)
+			if n > 0 {
+				chunk := string(readBuf[:n])
+				chunksCh <- chunk
 			}
-			linesCh <- line
-		}
-		if err := scanner.Err(); err != nil {
-			errCh <- err
+
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					errCh <- err
+				}
+				return
+			}
 		}
 	}()
 
 	flushTicker := time.NewTicker(codexPTYOutputFlushInterval)
 	defer flushTicker.Stop()
 
+	incompleteLine := ""
 	pending := make([]string, 0, codexPTYOutputMaxLines)
 	pendingBytes := 0
+	queueLine := func(line string) {
+		trimmedLine := strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(trimmedLine) == "" {
+			return
+		}
+
+		// Keep very large lines as immediate standalone events.
+		if len(trimmedLine) >= codexPTYOutputMaxBytes {
+			if len(pending) > 0 {
+				s.publishCodexPTYOutput(codexSession.SessionID(), strings.Join(pending, "\n"), ptyStateThinking)
+				pending = pending[:0]
+				pendingBytes = 0
+			}
+			s.publishCodexPTYOutput(codexSession.SessionID(), trimmedLine, ptyStateThinking)
+			return
+		}
+
+		pending = append(pending, trimmedLine)
+		pendingBytes += len(trimmedLine) + 1 // + newline join cost
+		if len(pending) >= codexPTYOutputMaxLines || pendingBytes >= codexPTYOutputMaxBytes {
+			s.publishCodexPTYOutput(codexSession.SessionID(), strings.Join(pending, "\n"), ptyStateThinking)
+			pending = pending[:0]
+			pendingBytes = 0
+		}
+	}
+	processChunk := func(chunk string) {
+		if chunk == "" {
+			return
+		}
+
+		incompleteLine += chunk
+		for {
+			newlineIdx := strings.IndexByte(incompleteLine, '\n')
+			if newlineIdx < 0 {
+				break
+			}
+			line := incompleteLine[:newlineIdx]
+			incompleteLine = incompleteLine[newlineIdx+1:]
+			queueLine(line)
+		}
+	}
 	flush := func() {
 		if len(pending) == 0 {
 			return
@@ -2776,33 +2877,31 @@ func (s *SessionManagerService) streamCodexOutput(codexSession *codexPTYSession)
 
 	for {
 		select {
-		case line, ok := <-linesCh:
+		case chunk, ok := <-chunksCh:
 			if !ok {
+				if strings.TrimSpace(incompleteLine) != "" {
+					queueLine(incompleteLine)
+					incompleteLine = ""
+				}
 				flush()
 				select {
 				case err := <-errCh:
 					if err != nil && !errors.Is(err, os.ErrClosed) {
-						log.Debug().Err(err).Str("session_id", codexSession.SessionID()).Msg("codex PTY scan ended with error")
+						log.Debug().Err(err).Str("session_id", codexSession.SessionID()).Msg("codex PTY read ended with error")
 					}
 				default:
 				}
 				return
 			}
-
-			// Keep very large lines as immediate standalone events.
-			if len(line) >= codexPTYOutputMaxBytes {
-				flush()
-				s.publishCodexPTYOutput(codexSession.SessionID(), line, ptyStateThinking)
-				continue
-			}
-
-			pending = append(pending, line)
-			pendingBytes += len(line) + 1 // + newline join cost
-			if len(pending) >= codexPTYOutputMaxLines || pendingBytes >= codexPTYOutputMaxBytes {
-				flush()
-			}
+			processChunk(chunk)
 
 		case <-flushTicker.C:
+			// Emit partial line fragments periodically so UI sees progress even
+			// when Codex prints without newline terminators.
+			if strings.TrimSpace(incompleteLine) != "" {
+				queueLine(incompleteLine)
+				incompleteLine = ""
+			}
 			flush()
 		}
 	}
@@ -2834,6 +2933,10 @@ func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state str
 	if strings.TrimSpace(text) == "" {
 		return
 	}
+	cleanText := sanitizeCodexPTYOutputText(text)
+	if strings.TrimSpace(cleanText) == "" {
+		return
+	}
 	logLine := normalizeCodexPTYLogText(text)
 	if logLine != "" && s.shouldLogCodexPTYOutput(sessionID, logLine) {
 		log.Debug().
@@ -2842,7 +2945,7 @@ func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state str
 			Str("session_id", sessionID).
 			Msg("PTY output")
 	}
-	evt := events.NewPTYOutputEventWithSession(text, text, state, sessionID)
+	evt := events.NewPTYOutputEventWithSession(cleanText, text, state, sessionID)
 	evt.SetAgentType(sessionManagerAgentCodex)
 	s.manager.PublishEvent(evt)
 }
@@ -2869,9 +2972,15 @@ func truncateCodexPTYLog(text string, max int) string {
 }
 
 func normalizeCodexPTYLogText(text string) string {
+	return strings.TrimSpace(sanitizeCodexPTYOutputText(text))
+}
+
+func sanitizeCodexPTYOutputText(text string) string {
 	withoutANSI := codexANSIRegex.ReplaceAllString(text, "")
 	withoutControl := codexControlRegex.ReplaceAllString(withoutANSI, "")
-	return strings.TrimSpace(withoutControl)
+	withoutEscape := strings.ReplaceAll(withoutControl, "\x1b", "")
+	normalizedCRLF := strings.ReplaceAll(withoutEscape, "\r\n", "\n")
+	return strings.ReplaceAll(normalizedCRLF, "\r", "\n")
 }
 
 func (s *SessionManagerService) publishCodexPTYState(sessionID, state string) {

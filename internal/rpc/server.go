@@ -291,23 +291,59 @@ func (c *Client) SendEvent(event events.Event) error {
 	// Convert event to JSON-RPC notification
 	method := "event/" + string(event.Type())
 
-	// Extract payload from event
+	// Extract payload and routing context from event.
+	// Keep payload fields at top level for backward compatibility with older clients
+	// that expect params to match the raw payload shape.
 	var params interface{}
 	data, err := event.ToJSON()
 	if err != nil {
 		return err
 	}
 
-	// Parse the event JSON to extract payload
-	var eventData struct {
-		Event     string      `json:"event"`
-		Timestamp string      `json:"timestamp"`
-		Payload   interface{} `json:"payload"`
-	}
+	var eventData map[string]interface{}
 	if err := json.Unmarshal(data, &eventData); err != nil {
 		return err
 	}
-	params = eventData.Payload
+
+	// Preferred shape: payload fields at top-level params + event context fields.
+	if payloadMap, ok := eventData["payload"].(map[string]interface{}); ok {
+		merged := make(map[string]interface{}, len(payloadMap)+4)
+		for k, v := range payloadMap {
+			merged[k] = v
+		}
+		if v, ok := eventData["workspace_id"].(string); ok && v != "" {
+			merged["workspace_id"] = v
+		}
+		if v, ok := eventData["session_id"].(string); ok && v != "" {
+			merged["session_id"] = v
+		}
+		if v, ok := eventData["agent_type"].(string); ok && v != "" {
+			merged["agent_type"] = v
+		}
+		if ts, ok := eventData["timestamp"]; ok {
+			merged["timestamp"] = ts
+		}
+		params = merged
+	} else {
+		// Fallback for non-object payloads.
+		envelope := make(map[string]interface{}, 5)
+		if payload, ok := eventData["payload"]; ok {
+			envelope["payload"] = payload
+		}
+		if v, ok := eventData["workspace_id"].(string); ok && v != "" {
+			envelope["workspace_id"] = v
+		}
+		if v, ok := eventData["session_id"].(string); ok && v != "" {
+			envelope["session_id"] = v
+		}
+		if v, ok := eventData["agent_type"].(string); ok && v != "" {
+			envelope["agent_type"] = v
+		}
+		if ts, ok := eventData["timestamp"]; ok {
+			envelope["timestamp"] = ts
+		}
+		params = envelope
+	}
 
 	return c.SendNotification(method, params)
 }

@@ -1,6 +1,10 @@
 package methods
 
-import "testing"
+import (
+	"reflect"
+	"strings"
+	"testing"
+)
 
 func TestRemapCodexSessionID_UpdatesSessionAndMovesDedupeState(t *testing.T) {
 	service := &SessionManagerService{
@@ -48,5 +52,66 @@ func TestRemapCodexSessionID_DedupeCarriesAcrossRemap(t *testing.T) {
 
 	if logged := service.shouldLogCodexPTYOutput("real", "line"); logged {
 		t.Fatalf("duplicate line should be deduped after remap")
+	}
+}
+
+func TestBuildCodexCLIArgs_NewSessionWithPrompt(t *testing.T) {
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "", "hello")
+	want := []string{"exec", "hello"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildCodexCLIArgs_ResumeSessionWithoutPrompt(t *testing.T) {
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "")
+	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildCodexCLIArgs_ResumeSessionWithPrompt(t *testing.T) {
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildCodexCLIArgs_WithoutWorkspacePath_OmitsCDFlag(t *testing.T) {
+	got := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildCodexCLIArgs_WorkspacePathDoesNotAffectArgs(t *testing.T) {
+	withPath := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	withoutPath := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	if !reflect.DeepEqual(withPath, withoutPath) {
+		t.Fatalf("withPath = %#v, withoutPath = %#v, want equal", withPath, withoutPath)
+	}
+}
+
+func TestSanitizeCodexPTYOutputText_StripsANSIAndControl(t *testing.T) {
+	input := "\x1b[31mERROR:\x1b[0m stream disconnected\x1b[?25h"
+	got := sanitizeCodexPTYOutputText(input)
+	want := "ERROR: stream disconnected"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestSanitizeCodexPTYOutputText_OnlyControlSequencesReturnsEmpty(t *testing.T) {
+	input := "\x1b[?2026h\x1b[33;2H\x1b[0m\x1b[49m\x1b[K\x1b[?2026l"
+	got := sanitizeCodexPTYOutputText(input)
+	if strings.TrimSpace(got) != "" {
+		t.Fatalf("got %q, want empty", got)
 	}
 }

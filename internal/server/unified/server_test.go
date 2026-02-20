@@ -78,6 +78,57 @@ func TestServer_GetClient_NotFound(t *testing.T) {
 	}
 }
 
+func TestUnifiedClient_Send_IncludesEventContextInParams(t *testing.T) {
+	dispatcher := handler.NewDispatcher(handler.NewRegistry())
+	client := NewUnifiedClient(nil, dispatcher, nil)
+
+	event := events.NewEvent(events.EventTypeClaudeMessage, map[string]interface{}{
+		"type": "assistant",
+		"role": "assistant",
+	})
+	event.SetContext("ws-123", "sess-456")
+	event.SetAgentType("codex")
+
+	if err := client.Send(event); err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+
+	select {
+	case data := <-client.send:
+		var notif map[string]interface{}
+		if err := json.Unmarshal(data, &notif); err != nil {
+			t.Fatalf("failed to parse notification: %v", err)
+		}
+
+		if notif["method"] != "event/claude_message" {
+			t.Fatalf("method = %v, want event/claude_message", notif["method"])
+		}
+
+		params, ok := notif["params"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("params is not an object: %T", notif["params"])
+		}
+
+		if params["workspace_id"] != "ws-123" {
+			t.Fatalf("workspace_id = %v, want ws-123", params["workspace_id"])
+		}
+		if params["session_id"] != "sess-456" {
+			t.Fatalf("session_id = %v, want sess-456", params["session_id"])
+		}
+		if params["agent_type"] != "codex" {
+			t.Fatalf("agent_type = %v, want codex", params["agent_type"])
+		}
+		if params["role"] != "assistant" {
+			t.Fatalf("role = %v, want assistant", params["role"])
+		}
+		if _, ok := params["timestamp"]; !ok {
+			t.Fatal("timestamp missing in params")
+		}
+	default:
+		t.Fatal("expected notification in client send queue")
+	}
+}
+
 func TestServer_Broadcast(t *testing.T) {
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
 	hub := testutil.NewMockEventHub()

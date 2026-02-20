@@ -199,7 +199,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             --error: #FC8181;
             --warning: #F6C85D;
             /* Responsive sizing */
-            --qr-size: 180px;
+            --qr-size: clamp(220px, 40vmin, 360px);
             --container-padding: 24px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -223,8 +223,8 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             padding: var(--container-padding);
             text-align: center;
             border: 1px solid var(--bg-highlight);
-            max-width: 380px;
-            width: 100%;
+            max-width: min(92vw, calc(var(--qr-size) + 140px));
+            width: min(92vw, calc(var(--qr-size) + 96px));
             max-height: calc(100vh - 32px);
             box-shadow: 0 4px 24px rgba(0,0,0,0.3);
         }
@@ -244,11 +244,13 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             padding: 8px;
             border-radius: 12px;
             display: inline-block;
+            max-width: 100%;
         }
         .qr-container img {
             display: block;
-            width: var(--qr-size);
-            height: var(--qr-size);
+            width: min(var(--qr-size), 80vw, 80vh);
+            height: auto;
+            aspect-ratio: 1 / 1;
         }
         .timer {
             color: var(--text-tertiary);
@@ -348,7 +350,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* iPhone SE, small phones */
         @media (max-height: 600px) {
             :root {
-                --qr-size: 140px;
+                --qr-size: clamp(190px, 38vmin, 260px);
                 --container-padding: 16px;
             }
             h1 { font-size: 18px; }
@@ -363,7 +365,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* Standard iPhone */
         @media (min-height: 601px) and (max-height: 750px) {
             :root {
-                --qr-size: 160px;
+                --qr-size: clamp(220px, 42vmin, 300px);
                 --container-padding: 20px;
             }
         }
@@ -371,7 +373,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* iPhone Pro Max, iPad */
         @media (min-height: 751px) {
             :root {
-                --qr-size: 200px;
+                --qr-size: clamp(260px, 45vmin, 380px);
                 --container-padding: 28px;
             }
             h1 { font-size: 24px; }
@@ -381,11 +383,11 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* iPad landscape / Desktop */
         @media (min-width: 768px) and (min-height: 600px) {
             :root {
-                --qr-size: 220px;
+                --qr-size: clamp(300px, 48vmin, 420px);
                 --container-padding: 32px;
             }
             .container {
-                max-width: 420px;
+                max-width: min(92vw, calc(var(--qr-size) + 180px));
             }
             h1 { font-size: 26px; }
             .info { font-size: 12px; }
@@ -410,7 +412,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
                 min-width: 0;
             }
             :root {
-                --qr-size: 150px;
+                --qr-size: clamp(200px, 40vmin, 280px);
             }
             h1 { text-align: left; }
             .subtitle { text-align: left; }
@@ -427,7 +429,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 
             <div class="qr-wrapper">
                 <div class="qr-container" id="qrContainer">
-                    <img src="/api/pair/qr?size=256" alt="QR Code" id="qrImage">
+                    <img src="/api/pair/qr?size=512" alt="QR Code" id="qrImage">
                 </div>
                 <div class="expired-overlay" id="expiredOverlay">Expired</div>
             </div>
@@ -446,7 +448,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
                 </div>
                 <div class="info-row">
                     <span class="info-label">Session:</span>
-                    <span class="info-value">` + info.SessionID[:8] + `...</span>
+                    <span class="info-value">` + info.SessionID + `</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Repo:</span>
@@ -480,7 +482,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 
         function refreshQR() {
             const img = document.getElementById('qrImage');
-            img.src = '/api/pair/qr?size=256&t=' + Date.now();
+            img.src = '/api/pair/qr?size=512&t=' + Date.now();
             countdown = REFRESH_INTERVAL;
             expired = false;
             document.getElementById('qrContainer').classList.remove('qr-expired');
