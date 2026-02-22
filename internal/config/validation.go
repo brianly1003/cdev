@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -11,6 +12,10 @@ import (
 func Validate(cfg *Config) error {
 	// Validate server config
 	if err := validateServer(&cfg.Server); err != nil {
+		return err
+	}
+
+	if err := validateSecurity(&cfg.Security, &cfg.Server); err != nil {
 		return err
 	}
 
@@ -32,6 +37,78 @@ func Validate(cfg *Config) error {
 	// Validate limits config
 	if err := validateLimits(&cfg.Limits); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func validateSecurity(cfg *SecurityConfig, serverCfg *ServerConfig) error {
+	if cfg == nil || serverCfg == nil {
+		return nil
+	}
+
+	if cfg.TLSCertFile != "" || cfg.TLSKeyFile != "" {
+		if cfg.TLSCertFile == "" || cfg.TLSKeyFile == "" {
+			return fmt.Errorf("security.tls_cert_file and security.tls_key_file must both be set")
+		}
+
+		if err := validateExistingFile(cfg.TLSCertFile, "security.tls_cert_file"); err != nil {
+			return err
+		}
+		if err := validateExistingFile(cfg.TLSKeyFile, "security.tls_key_file"); err != nil {
+			return err
+		}
+	}
+
+	if cfg.RequireSecureTransport && !cfg.BindLocalhostOnly {
+		if cfg.TLSCertFile == "" || cfg.TLSKeyFile == "" {
+			if serverCfg.ExternalURL == "" {
+				return fmt.Errorf("security.require_secure_transport is true and security.bind_localhost_only is false; configure security.tls_cert_file and security.tls_key_file, or set server.external_url to an https URL")
+			}
+
+			if err := validateExternalURL(serverCfg.ExternalURL, "server.external_url", []string{"https"}); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := validateTrustedProxies(cfg.TrustedProxies); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateExistingFile(path, fieldName string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s does not exist: %s", fieldName, path)
+		}
+		return fmt.Errorf("unable to access %s (%s): %w", fieldName, path, err)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("%s must be a file, not a directory: %s", fieldName, path)
+	}
+
+	return nil
+}
+
+func validateTrustedProxies(trustedProxies []string) error {
+	for _, proxy := range trustedProxies {
+		trimmed := strings.TrimSpace(proxy)
+		if trimmed == "" {
+			return fmt.Errorf("security.trusted_proxies contains an empty value")
+		}
+
+		if net.ParseIP(trimmed) != nil {
+			continue
+		}
+
+		if _, _, err := net.ParseCIDR(trimmed); err != nil {
+			return fmt.Errorf("security.trusted_proxies has invalid CIDR/IP value: %s", trimmed)
+		}
 	}
 
 	return nil

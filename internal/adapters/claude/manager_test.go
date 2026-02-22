@@ -206,6 +206,39 @@ func TestPTYState_Constants(t *testing.T) {
 	}
 }
 
+func TestLooksLikeSpinnerMessage(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "actual thinking phrase",
+			input:    "Thinking…",
+			expected: true,
+		},
+		{
+			name:     "installer notice should be filtered",
+			input:    "Claude Code has switched from npm to native installer. Run `claude install` or see https://docs.anthropic.com/en/docs/claude-code/g",
+			expected: false,
+		},
+		{
+			name:     "short non-spinner line",
+			input:    "ready",
+			expected: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := looksLikeSpinnerMessage(tc.input)
+			if got != tc.expected {
+				t.Fatalf("looksLikeSpinnerMessage(%q) = %v, want %v", tc.input, got, tc.expected)
+			}
+		})
+	}
+}
+
 // --- Permission Type Tests ---
 
 func TestPermissionType_Constants(t *testing.T) {

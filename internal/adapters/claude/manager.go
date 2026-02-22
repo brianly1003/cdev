@@ -1296,6 +1296,9 @@ func looksLikeSpinnerMessage(text string) bool {
 	if text == "" {
 		return false
 	}
+	if isFilteredSpinnerMessage(text) {
+		return false
+	}
 	if !hasLikelySpinnerPrefix(text) {
 		return false
 	}
@@ -1316,6 +1319,13 @@ func looksLikeSpinnerMessage(text string) bool {
 		return false
 	}
 	return true
+}
+
+func isFilteredSpinnerMessage(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "claude code has switched from npm to native installer") ||
+		strings.Contains(lower, "run `claude install`") ||
+		strings.Contains(lower, "docs.anthropic.com/en/docs/claude-code")
 }
 
 func hasLikelySpinnerPrefix(text string) bool {

@@ -40,24 +40,26 @@ The cdev protocol defines the communication standard between cdev (server) and c
 
 ### Authentication
 
-When `security.require_auth = true` (default), **all HTTP and WebSocket endpoints require bearer auth**.
+When `security.require_auth = true` (default), HTTP and WebSocket endpoints require bearer auth except for pairing and auth bootstrap endpoints below.
 
 ```
 Authorization: Bearer <access-token>
 ```
 
-**Unauthenticated allowlist** (for pairing + token exchange):
+**Unauthenticated allowlist** (pairing + token bootstrap):
 - `/health`
 - `/pair`
 - `/api/pair/*`
 - `/api/auth/exchange`
 - `/api/auth/refresh`
+- `/api/auth/revoke`
 
 **Token flow (summary):**
 1. Pairing token is displayed in `/pair` or `/api/pair/info` (QR includes token).
 2. Exchange pairing token via `POST /api/auth/exchange`.
 3. Use returned access token for HTTP + WebSocket requests.
 4. Refresh via `POST /api/auth/refresh`.
+5. Revoke a refresh token via `POST /api/auth/revoke`.
 
 **Note:** Query‑string tokens are not supported.
 

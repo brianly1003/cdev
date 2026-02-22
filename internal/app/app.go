@@ -365,6 +365,7 @@ func (a *App) Start(ctx context.Context) error {
 		a.sessionID,
 		repoName,
 	)
+	a.qrGenerator.SetRequireSecureTransport(a.cfg.Security.RequireSecureTransport && !a.cfg.Security.BindLocalhostOnly)
 
 	// Set external URL if configured (for VS Code port forwarding, tunnels, etc.)
 	if a.cfg.Server.ExternalURL != "" {
@@ -567,6 +568,19 @@ func (a *App) Start(ctx context.Context) error {
 		a.httpServer.SetImageStorageManager(a.imageStorageManager)
 	}
 
+	if a.cfg.Security.TLSCertFile != "" && a.cfg.Security.TLSKeyFile != "" {
+		a.httpServer.SetTLS(a.cfg.Security.TLSCertFile, a.cfg.Security.TLSKeyFile)
+	}
+
+	trustedProxies, err := security.ParseTrustedProxies(a.cfg.Security.TrustedProxies)
+	if err != nil {
+		log.Warn().Err(err).Msg("invalid trusted proxy configuration; proxy headers will be ignored")
+	}
+	a.httpServer.SetTrustedProxies(trustedProxies)
+	a.unifiedServer.SetTrustedProxies(trustedProxies)
+	a.httpServer.SetRequireSecureTransport(a.cfg.Security.RequireSecureTransport && !a.cfg.Security.BindLocalhostOnly)
+	a.unifiedServer.SetRequireSecureTransport(a.cfg.Security.RequireSecureTransport && !a.cfg.Security.BindLocalhostOnly)
+
 	// Set up pairing handler for mobile app connection
 	// Reuse tokenManager if already created for QR code, otherwise create new one
 	if a.tokenManager == nil {
@@ -593,7 +607,17 @@ func (a *App) Start(ctx context.Context) error {
 			httpMiddleware.WithMaxRequests(a.cfg.Security.RateLimit.RequestsPerMinute),
 			httpMiddleware.WithWindow(time.Minute),
 		)
+		wsRateLimiter := httpMiddleware.NewRateLimiter(
+			httpMiddleware.WithMaxRequests(a.cfg.Security.RateLimit.RequestsPerMinute),
+			httpMiddleware.WithWindow(time.Minute),
+		)
+		wsRateLimitKeyExtractor := httpMiddleware.IPKeyExtractor
 		a.httpServer.SetRateLimiter(rateLimiter)
+		if len(trustedProxies) > 0 {
+			a.httpServer.SetRateLimitKeyExtractor(httpMiddleware.NewTrustedProxyIPKeyExtractor(trustedProxies))
+			wsRateLimitKeyExtractor = httpMiddleware.NewTrustedProxyIPKeyExtractor(trustedProxies)
+		}
+		a.unifiedServer.SetWebSocketRateLimiter(wsRateLimiter, wsRateLimitKeyExtractor)
 		a.rateLimiter = rateLimiter
 		log.Info().Int("requests_per_minute", a.cfg.Security.RateLimit.RequestsPerMinute).Msg("rate limiting enabled")
 	}
@@ -609,6 +633,8 @@ func (a *App) Start(ctx context.Context) error {
 			return nil
 		},
 		a.cfg.Server.ExternalURL == "",
+		a.cfg.Security.RequireSecureTransport && !a.cfg.Security.BindLocalhostOnly,
+		a.cfg.Security.TrustedProxies,
 	)
 	a.httpServer.SetPairingHandler(pairingHandler)
 
@@ -934,22 +960,16 @@ func (a *App) getStatus() map[string]interface{} {
 func (a *App) printConnectionInfo() {
 	repoName := filepath.Base(a.cfg.Repository.Path)
 
-	// Determine which URLs to display (external URL takes precedence)
-	wsURL := fmt.Sprintf("ws://%s:%d/ws", a.cfg.Server.Host, a.cfg.Server.Port)
 	httpURL := fmt.Sprintf("http://%s:%d", a.cfg.Server.Host, a.cfg.Server.Port)
-	usingExternal := false
+	wsURL := fmt.Sprintf("ws://%s:%d/ws", a.cfg.Server.Host, a.cfg.Server.Port)
+	usingExternal := a.cfg.Server.ExternalURL != ""
 
-	if a.cfg.Server.ExternalURL != "" {
-		httpURL = strings.TrimRight(a.cfg.Server.ExternalURL, "/")
-		// Derive WebSocket URL from HTTP URL
-		wsURL = httpURL
-		if strings.HasPrefix(wsURL, "https://") {
-			wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
-		} else if strings.HasPrefix(wsURL, "http://") {
-			wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
+	if a.qrGenerator != nil {
+		info := a.qrGenerator.GetPairingInfo()
+		if info != nil {
+			httpURL = info.HTTP
+			wsURL = info.WebSocket
 		}
-		wsURL = wsURL + "/ws"
-		usingExternal = true
 	}
 
 	fmt.Println()

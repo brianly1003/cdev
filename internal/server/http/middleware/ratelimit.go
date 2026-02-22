@@ -2,10 +2,13 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/brianly1003/cdev/internal/security"
 )
 
 // RateLimiter configuration constants.
@@ -223,6 +226,21 @@ func IPKeyExtractor(r *http.Request) string {
 		return addr[:idx]
 	}
 	return addr
+}
+
+// NewTrustedProxyIPKeyExtractor returns an extractor that trusts forwarded headers only
+// when the remote address belongs to one of the trusted proxies.
+func NewTrustedProxyIPKeyExtractor(trustedProxies []*net.IPNet) KeyExtractor {
+	return func(r *http.Request) string {
+		if r == nil {
+			return ""
+		}
+		key := security.RequestClientIP(r, trustedProxies)
+		if key != "" {
+			return key
+		}
+		return IPKeyExtractor(r)
+	}
 }
 
 // indexByte returns the index of the first occurrence of c in s, or -1.

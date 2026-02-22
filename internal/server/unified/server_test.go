@@ -80,7 +80,7 @@ func TestServer_GetClient_NotFound(t *testing.T) {
 
 func TestUnifiedClient_Send_IncludesEventContextInParams(t *testing.T) {
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
-	client := NewUnifiedClient(nil, dispatcher, nil)
+	client := NewUnifiedClient(nil, dispatcher, nil, "", nil)
 
 	event := events.NewEvent(events.EventTypeClaudeMessage, map[string]interface{}{
 		"type": "assistant",

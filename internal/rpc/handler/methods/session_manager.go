@@ -292,7 +292,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		Summary:     "Stop watching the current session",
 		Description: "Stops watching the currently watched session for the selected runtime.",
 		Params: []handler.OpenRPCParam{
-			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude"}},
+			{Name: "agent_type", Required: true, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "unwatch_info",
@@ -777,7 +777,7 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		return nil, message.NewError(message.InvalidParams, "prompt is required")
 	}
 
-	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatchForWorkspaceSession(p.AgentType, p.WorkspaceID, p.SessionID)
 	if dispatchErr != nil {
 		return nil, dispatchErr
 	}
@@ -990,7 +990,7 @@ func (s *SessionManagerService) GetSessionMessages(ctx context.Context, params j
 		order = "asc"
 	}
 
-	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	agentType, _, dispatchErr := s.resolveRuntimeDispatchForWorkspaceSession(p.AgentType, p.WorkspaceID, p.SessionID)
 	if dispatchErr != nil {
 		return nil, dispatchErr
 	}
@@ -1042,7 +1042,7 @@ func (s *SessionManagerService) DeleteHistorySession(ctx context.Context, params
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	agentType, _, dispatchErr := s.resolveRuntimeDispatchForWorkspaceSession(p.AgentType, p.WorkspaceID, p.SessionID)
 	if dispatchErr != nil {
 		return nil, dispatchErr
 	}
@@ -1812,7 +1812,7 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
-	agentType, _, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
+	agentType, _, dispatchErr := s.resolveRuntimeDispatchForWorkspaceSession(p.AgentType, p.WorkspaceID, p.SessionID)
 	if dispatchErr != nil {
 		return nil, dispatchErr
 	}
@@ -1915,7 +1915,7 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 // Returns the previous watch info.
 func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		AgentType string `json:"agent_type,omitempty"`
+		AgentType string `json:"agent_type"`
 	}
 	if len(params) > 0 {
 		if err := json.Unmarshal(params, &p); err != nil {
@@ -1924,37 +1924,16 @@ func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.
 	}
 
 	agentType := strings.ToLower(strings.TrimSpace(p.AgentType))
-	if agentType != "" {
-		if _, _, dispatchErr := s.resolveRuntimeDispatch(agentType); dispatchErr != nil {
-			return nil, dispatchErr
-		}
+	if agentType == "" {
+		return nil, message.NewError(message.InvalidParams, "agent_type is required")
+	}
+
+	if _, _, dispatchErr := s.resolveRuntimeDispatch(agentType); dispatchErr != nil {
+		return nil, dispatchErr
 	}
 
 	// Get client ID for tracking watchers
 	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
-
-	// If no agent_type is provided, preserve legacy behavior and unwatch both runtimes.
-	if agentType == "" {
-		claudeInfo := session.WatchInfo{Watching: false}
-		if s.manager != nil {
-			if watchedInfo := s.manager.UnwatchWorkspaceSession(clientID); watchedInfo != nil {
-				claudeInfo = *watchedInfo
-			}
-		}
-		_ = s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex)
-		if clientID != "" {
-			s.codexMu.Lock()
-			delete(s.codexWatchers, clientID)
-			s.codexMu.Unlock()
-		}
-
-		return map[string]interface{}{
-			"status":       "unwatched",
-			"watching":     claudeInfo.Watching,
-			"workspace_id": claudeInfo.WorkspaceID,
-			"session_id":   claudeInfo.SessionID,
-		}, nil
-	}
 
 	if agentType == sessionManagerAgentCodex {
 		if rpcErr := s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex); rpcErr != nil {
@@ -2847,6 +2826,7 @@ func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string) []string {
 	if resumeSessionID != "" {
 		args = append(args, "resume", resumeSessionID)
 	}
+	// Preserve prompt verbatim (including leading "!") so Codex can interpret bash mode.
 	if prompt != "" {
 		args = append(args, prompt)
 	}

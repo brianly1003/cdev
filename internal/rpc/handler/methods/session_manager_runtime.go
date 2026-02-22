@@ -71,6 +71,13 @@ func (s *SessionManagerService) resolveRuntimeDispatch(rawAgentType string) (str
 	return "", sessionRuntimeDispatch{}, message.NewError(message.InvalidParams, "agent_type must be one of: "+allowed)
 }
 
+func (s *SessionManagerService) resolveRuntimeDispatchForWorkspaceSession(rawAgentType string, workspaceID string, sessionID string) (string, sessionRuntimeDispatch, *message.Error) {
+	_ = workspaceID
+	_ = sessionID
+	s.ensureRuntimeDispatch()
+	return s.resolveRuntimeDispatch(rawAgentType)
+}
+
 func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error) {
 	if s.manager == nil {
 		return nil, message.NewError(message.AgentNotConfigured, "claude session manager is not configured")

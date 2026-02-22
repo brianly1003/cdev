@@ -125,6 +125,19 @@ func TestDeleteHistorySession_ValidParams(t *testing.T) {
 	}
 }
 
+func TestBuildCodexCLIArgs_PreservesBangPrefix(t *testing.T) {
+	args := buildCodexCLIArgs("/tmp", "019c7b09-3a7c-7953-90cf-91c48d81c877", "!ls")
+	want := []string{"exec", "resume", "019c7b09-3a7c-7953-90cf-91c48d81c877", "!ls"}
+	if len(args) != len(want) {
+		t.Fatalf("args len = %d, want %d (%v)", len(args), len(want), args)
+	}
+	for i := range want {
+		if args[i] != want[i] {
+			t.Fatalf("args[%d] = %q, want %q (%v)", i, args[i], want[i], args)
+		}
+	}
+}
+
 // TestDeleteHistorySession_ErrorClassification tests that errors from the manager
 // are correctly classified as SessionNotFound vs InternalError.
 func TestDeleteHistorySession_ErrorClassification(t *testing.T) {
@@ -336,27 +349,57 @@ func TestSessionManagerWorkspaceMethods_ManagerNotConfigured(t *testing.T) {
 	}
 }
 
-func TestSessionManagerUnwatchSession_LegacyWithoutManager(t *testing.T) {
-	service := &SessionManagerService{
-		manager:       nil,
-		codexWatchers: make(map[string]session.WatchInfo),
+func TestSessionManagerUnwatchSession_AgentTypeValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		params      json.RawMessage
+		wantErrCode int
+		wantErrMsg  string
+	}{
+		{
+			name:        "missing params",
+			params:      nil,
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type is required",
+		},
+		{
+			name:        "missing agent_type",
+			params:      []byte(`{}`),
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type is required",
+		},
+		{
+			name:        "blank agent_type",
+			params:      []byte(`{"agent_type":"   "}`),
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type is required",
+		},
+		{
+			name:        "invalid agent_type",
+			params:      []byte(`{"agent_type":"gemini"}`),
+			wantErrCode: message.InvalidParams,
+			wantErrMsg:  "agent_type must be one of: claude, codex",
+		},
 	}
 
-	result, err := service.UnwatchSession(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &SessionManagerService{
+				manager:       nil,
+				codexWatchers: make(map[string]session.WatchInfo),
+			}
 
-	resMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("result type = %T, want map[string]interface{}", result)
-	}
-
-	if status, _ := resMap["status"].(string); status != "unwatched" {
-		t.Fatalf("status = %v, want unwatched", resMap["status"])
-	}
-	if watching, _ := resMap["watching"].(bool); watching {
-		t.Fatalf("watching = %v, want false", resMap["watching"])
+			_, err := service.UnwatchSession(context.Background(), tt.params)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if err.Code != tt.wantErrCode {
+				t.Fatalf("error code = %d, want %d", err.Code, tt.wantErrCode)
+			}
+			if !containsSubstr(err.Message, tt.wantErrMsg) {
+				t.Fatalf("error message = %q, want to contain %q", err.Message, tt.wantErrMsg)
+			}
+		})
 	}
 }
 

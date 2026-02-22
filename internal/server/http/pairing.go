@@ -28,6 +28,10 @@ type PairingHandler struct {
 	// allowRequestExternal enables deriving HTTP/WS URLs from request headers
 	// when no explicit external URL is configured.
 	allowRequestExternal bool
+	// requireSecureTransport requires HTTPS/WSS URLs for non-local deployment.
+	requireSecureTransport bool
+	// trustedProxies contains parsed trusted proxy CIDRs used to trust forwarded headers.
+	trustedProxies []*net.IPNet
 	pairingCode          string
 	pairingCodeExpiresAt time.Time
 	pairingCodeMu        sync.Mutex
@@ -39,12 +43,19 @@ const (
 )
 
 // NewPairingHandler creates a new pairing handler.
-func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pairingInfoFn func() *pairing.PairingInfo, allowRequestExternal bool) *PairingHandler {
+func NewPairingHandler(tokenManager *security.TokenManager, requireAuth bool, pairingInfoFn func() *pairing.PairingInfo, allowRequestExternal bool, requireSecureTransport bool, trustedProxies []string) *PairingHandler {
+	parsedTrustedProxies, err := security.ParseTrustedProxies(trustedProxies)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to parse trusted proxies for pairing URL derivation")
+	}
+
 	return &PairingHandler{
 		tokenManager:         tokenManager,
 		requireAuth:          requireAuth,
 		pairingInfo:          pairingInfoFn,
 		allowRequestExternal: allowRequestExternal,
+		requireSecureTransport: requireSecureTransport,
+		trustedProxies:       parsedTrustedProxies,
 	}
 }
 
@@ -773,14 +784,18 @@ func (h *PairingHandler) pairingInfoForRequest(r *http.Request) *pairing.Pairing
 		return info
 	}
 
-	baseURL, ok := requestBaseURL(r)
+	baseURL, ok := security.RequestBaseURL(r, h.trustedProxies)
 	if !ok {
 		return info
 	}
 
+	if h.requireSecureTransport {
+		baseURL = strings.Replace(baseURL, "http://", "https://", 1)
+	}
+
 	adjusted := *info
 	adjusted.HTTP = baseURL
-	adjusted.WebSocket = deriveWebSocketURL(baseURL)
+	adjusted.WebSocket = security.WebSocketURL(baseURL)
 	return &adjusted
 }
 
@@ -810,62 +825,4 @@ func hostFromURL(raw string) string {
 		return ""
 	}
 	return parsed.Hostname()
-}
-
-func requestBaseURL(r *http.Request) (string, bool) {
-	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
-	if host == "" {
-		host = r.Host
-	}
-	if host == "" {
-		return "", false
-	}
-
-	proto := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
-	if proto == "" {
-		proto = firstForwardedValue(r.Header.Get("X-Forwarded-Scheme"))
-	}
-	if proto == "" {
-		if r.TLS != nil {
-			proto = "https"
-		} else {
-			proto = "http"
-		}
-	}
-
-	proto = strings.ToLower(strings.TrimSpace(proto))
-	if proto != "http" && proto != "https" {
-		return "", false
-	}
-
-	forwardedPort := firstForwardedValue(r.Header.Get("X-Forwarded-Port"))
-	if forwardedPort != "" && !strings.Contains(host, ":") {
-		if (proto == "http" && forwardedPort != "80") || (proto == "https" && forwardedPort != "443") {
-			host = host + ":" + forwardedPort
-		}
-	}
-
-	return proto + "://" + host, true
-}
-
-func deriveWebSocketURL(httpURL string) string {
-	base := strings.TrimRight(httpURL, "/")
-	wsURL := base
-	if strings.HasPrefix(wsURL, "https://") {
-		wsURL = "wss://" + strings.TrimPrefix(wsURL, "https://")
-	} else if strings.HasPrefix(wsURL, "http://") {
-		wsURL = "ws://" + strings.TrimPrefix(wsURL, "http://")
-	}
-	return wsURL + "/ws"
-}
-
-func firstForwardedValue(value string) string {
-	if value == "" {
-		return ""
-	}
-	parts := strings.Split(value, ",")
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.TrimSpace(parts[0])
 }

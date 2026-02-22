@@ -103,6 +103,10 @@ type SecurityConfig struct {
 	TokenExpirySecs   int             `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
 	AllowedOrigins    []string        `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
 	BindLocalhostOnly bool            `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
+	RequireSecureTransport bool       `mapstructure:"require_secure_transport"` // If true, require TLS/WSS for non-localhost use
+	TLSCertFile      string          `mapstructure:"tls_cert_file"`      // Optional TLS certificate file path
+	TLSKeyFile       string          `mapstructure:"tls_key_file"`       // Optional TLS key file path
+	TrustedProxies   []string        `mapstructure:"trusted_proxies"`    // Optional trusted reverse-proxy CIDRs
 	RateLimit         RateLimitConfig `mapstructure:"rate_limit"`          // Rate limiting configuration
 }
 
@@ -270,6 +274,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
+	v.SetDefault("security.require_secure_transport", true)
+	v.SetDefault("security.tls_cert_file", "")
+	v.SetDefault("security.tls_key_file", "")
+	v.SetDefault("security.trusted_proxies", []string{})
 	v.SetDefault("security.rate_limit.enabled", false) // Disabled by default for local dev
 	v.SetDefault("security.rate_limit.requests_per_minute", 100)
 

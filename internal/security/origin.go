@@ -52,18 +52,7 @@ func (oc *OriginChecker) CheckOrigin(r *http.Request) bool {
 		}
 	}
 
-	// If no allowed origins configured and binding localhost only,
-	// only localhost origins are allowed (already checked above)
-	if len(oc.allowedOrigins) == 0 && oc.bindLocalhostOnly {
-		return false
-	}
-
-	// If no allowed origins configured and not binding localhost only,
-	// allow all origins (development mode)
-	if len(oc.allowedOrigins) == 0 {
-		return true
-	}
-
+	// No match and no allowed origin entry.
 	return false
 }
 

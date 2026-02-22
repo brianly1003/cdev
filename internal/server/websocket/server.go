@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -38,16 +41,6 @@ const (
 	heartbeatInterval = 30 * time.Second
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for now (POC)
-		// In production, validate origin
-		return true
-	},
-}
-
 // CommandHandler is a function that handles incoming commands.
 type CommandHandler func(clientID string, message []byte)
 
@@ -64,6 +57,7 @@ type Server struct {
 	commandHandler CommandHandler
 	hub            ports.EventHub
 	statusProvider StatusProvider
+	originChecker  *security.OriginChecker
 
 	mu      sync.RWMutex
 	clients map[string]*Client
@@ -107,6 +101,24 @@ func (s *Server) SetStatusProvider(provider StatusProvider) {
 	s.statusProvider = provider
 }
 
+// SetOriginChecker sets the origin checker for websocket handshake validation.
+func (s *Server) SetOriginChecker(checker *security.OriginChecker) {
+	s.originChecker = checker
+}
+
+func (s *Server) checkOrigin(r *http.Request) bool {
+	if s.originChecker != nil {
+		return s.originChecker.CheckOrigin(r)
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	return isLocalhostOrigin(origin)
+}
+
 // Start starts the WebSocket server.
 func (s *Server) Start() error {
 	log.Info().Str("addr", s.addr).Msg("WebSocket server starting")
@@ -143,6 +155,12 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // handleWebSocket handles WebSocket upgrade requests.
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     s.checkOrigin,
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to upgrade connection")
@@ -184,6 +202,18 @@ func (s *Server) removeClient(id string) {
 	delete(s.clients, id)
 	s.mu.Unlock()
 	log.Info().Str("client_id", id).Msg("client disconnected")
+}
+
+func isLocalhostOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := strings.TrimSpace(strings.ToLower(parsed.Hostname()))
+	return host == "localhost" ||
+		host == "127.0.0.1" ||
+		host == "::1" ||
+		strings.HasSuffix(host, ".localhost")
 }
 
 // Broadcast sends a message to all connected clients.

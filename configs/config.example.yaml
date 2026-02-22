@@ -59,6 +59,10 @@ security:
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
+  require_secure_transport: true # Require HTTPS/WSS for non-localhost access
+  tls_cert_file: ""             # Optional path to TLS certificate (PEM)
+  tls_key_file: ""              # Optional path to TLS private key (PEM)
+  trusted_proxies: []           # Optional proxy CIDRs (e.g., 203.0.113.10/32, 2001:db8::/64)
   # Example for remote access via tunnel:
   # allowed_origins:
   #   - "https://your-app.example.com"

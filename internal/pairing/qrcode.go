@@ -4,6 +4,7 @@ package pairing
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/skip2/go-qrcode"
@@ -26,6 +27,7 @@ type QRGenerator struct {
 	repoName    string
 	token       string
 	externalURL string // Optional: override base URL (for VS Code port forwarding)
+	secure      bool   // Use wss/https when true and host is not localhost
 }
 
 // NewQRGenerator creates a new QR code generator.
@@ -50,12 +52,24 @@ func (g *QRGenerator) SetToken(token string) {
 	g.token = token
 }
 
+// SetRequireSecureTransport controls whether generated URLs use secure schemes for non-localhost hosts.
+func (g *QRGenerator) SetRequireSecureTransport(secure bool) {
+	g.secure = secure
+}
+
 // GetPairingInfo returns the pairing information.
 // If external URL is set, it's used instead of local host:port URL.
 // WebSocket URL is derived from HTTP URL (scheme conversion + /ws path).
 func (g *QRGenerator) GetPairingInfo() *PairingInfo {
-	httpURL := fmt.Sprintf("http://%s:%d", g.host, g.port)
-	wsURL := fmt.Sprintf("ws://%s:%d/ws", g.host, g.port)
+	httpScheme := "http"
+	wsScheme := "ws"
+	if g.secure && !isLoopbackHost(g.host) {
+		httpScheme = "https"
+		wsScheme = "wss"
+	}
+
+	httpURL := fmt.Sprintf("%s://%s:%d", httpScheme, g.host, g.port)
+	wsURL := fmt.Sprintf("%s://%s:%d/ws", wsScheme, g.host, g.port)
 
 	// Use external URL if configured (for VS Code port forwarding, etc.)
 	if g.externalURL != "" {
@@ -77,6 +91,18 @@ func (g *QRGenerator) GetPairingInfo() *PairingInfo {
 		Token:     g.token,
 		RepoName:  g.repoName,
 	}
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
+		return true
+	}
+
+	parsed := net.ParseIP(host)
+	if parsed == nil {
+		return false
+	}
+	return parsed.IsLoopback()
 }
 
 // GenerateJSON returns the pairing info as JSON.

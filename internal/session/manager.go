@@ -28,6 +28,16 @@ import (
 
 const agentTypeClaude = "claude"
 
+type watchedSessionKey struct {
+	WorkspaceID string
+	SessionID   string
+}
+
+type watchedSessionStream struct {
+	streamer *sessioncache.SessionStreamer
+	watchers map[string]bool
+}
+
 // Manager orchestrates multiple Claude sessions across workspaces.
 type Manager struct {
 	sessions                map[string]*Session             // keyed by session ID
@@ -43,11 +53,9 @@ type Manager struct {
 	idleTimeout time.Duration
 
 	// Session streaming for live message updates
-	streamer            *sessioncache.SessionStreamer
-	streamerWorkspaceID string          // Workspace ID of currently watched session
-	streamerSessionID   string          // Session ID currently being watched
-	streamerWatchers    map[string]bool // Client IDs currently watching (for proper cleanup)
-	streamerMu          sync.Mutex
+	streamerSessions      map[watchedSessionKey]*watchedSessionStream // workspace/session -> active streamer
+	streamerClientSessions map[string]map[watchedSessionKey]bool    // clientID -> watched sessions
+	streamerMu            sync.Mutex
 
 	// LIVE session support (Claude running in user's terminal)
 	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
@@ -82,7 +90,8 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 		activeSessionWorkspaces: make(map[string]string),
 		gitWatchers:             make(map[string]context.CancelFunc),
 		gitWatcherCounts:        make(map[string]int),
-		streamerWatchers:        make(map[string]bool),
+		streamerSessions:        make(map[watchedSessionKey]*watchedSessionStream),
+		streamerClientSessions:  make(map[string]map[watchedSessionKey]bool),
 		sessionFileWatchers:     make(map[string]context.CancelFunc),
 		hub:                     hub,
 		cfg:                     cfg,
@@ -124,13 +133,16 @@ func (m *Manager) Start() error {
 func (m *Manager) Stop() error {
 	m.logger.Info("Stopping session manager")
 
-	// Close the session streamer first (has its own goroutine)
+	// Close all session streamers first (they have their own goroutines)
 	m.streamerMu.Lock()
-	if m.streamer != nil {
-		m.streamer.Close()
-		m.streamer = nil
-		m.logger.Debug("Session streamer closed")
+	for key, stream := range m.streamerSessions {
+		if stream.streamer != nil {
+			stream.streamer.Close()
+		}
+		delete(m.streamerSessions, key)
 	}
+	m.streamerClientSessions = make(map[string]map[watchedSessionKey]bool)
+	m.logger.Debug("Session streamers closed")
 	m.streamerMu.Unlock()
 
 	// Cancel all session file watchers (prevents goroutine leaks)
@@ -315,28 +327,48 @@ func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []str
 		m.StopGitWatcher(workspaceID)
 	}
 
-	// Remove client from session streamer watchers (only if they were watching)
+	// Remove client from session streamers it is watching
 	m.streamerMu.Lock()
-	if m.streamerWatchers[clientID] {
-		delete(m.streamerWatchers, clientID)
-		if len(m.streamerWatchers) == 0 && m.streamer != nil {
-			// Last watcher - close the streamer
-			m.streamer.Close()
-			m.streamer = nil
-			prevWorkspaceID := m.streamerWorkspaceID
-			prevSessionID := m.streamerSessionID
-			m.streamerWorkspaceID = ""
-			m.streamerSessionID = ""
-			m.logger.Info("Stopped session streamer (last watcher disconnected)",
-				"workspace_id", prevWorkspaceID,
-				"session_id", prevSessionID,
-			)
-		} else if len(m.streamerWatchers) > 0 {
-			m.logger.Debug("Removed client from session streamer watchers (others still watching)",
-				"client_id", clientID,
-				"remaining_watchers", len(m.streamerWatchers),
-			)
+	watchedKeys, ok := m.streamerClientSessions[clientID]
+	if !ok || len(watchedKeys) == 0 {
+		m.streamerMu.Unlock()
+		return
+	}
+
+	for watchedSession := range watchedKeys {
+		stream, exists := m.streamerSessions[watchedSession]
+		if !exists {
+			delete(watchedKeys, watchedSession)
+			continue
 		}
+
+		delete(stream.watchers, clientID)
+		delete(watchedKeys, watchedSession)
+
+		if len(stream.watchers) > 0 {
+			m.logger.Info("Removed client from session watchers (others still watching)",
+				"client_id", clientID,
+				"workspace_id", watchedSession.WorkspaceID,
+				"session_id", watchedSession.SessionID,
+				"remaining_watchers", len(stream.watchers),
+			)
+			continue
+		}
+
+		stream.streamer.Close()
+		delete(m.streamerSessions, watchedSession)
+		m.logger.Info("Stopped session streamer (last watcher disconnected)",
+			"workspace_id", watchedSession.WorkspaceID,
+			"session_id", watchedSession.SessionID,
+			"client_id", clientID,
+		)
+	}
+
+	if len(watchedKeys) == 0 {
+		delete(m.streamerClientSessions, clientID)
+	} else {
+		// Keep map to preserve any entries that couldn't be resolved to active streamers.
+		m.streamerClientSessions[clientID] = watchedKeys
 	}
 	m.streamerMu.Unlock()
 }
@@ -1072,10 +1104,13 @@ func (m *Manager) StopSession(sessionID string) error {
 	m.mu.Unlock() // Release m.mu before acquiring streamerMu to prevent deadlock
 
 	if workspaceID == "" {
-		// Check if we're currently streaming this session
+		// Check if we're currently streaming this session in any workspace
 		m.streamerMu.Lock()
-		if m.streamerSessionID == sessionID {
-			workspaceID = m.streamerWorkspaceID
+		for key := range m.streamerSessions {
+			if key.SessionID == sessionID {
+				workspaceID = key.WorkspaceID
+				break
+			}
 		}
 		m.streamerMu.Unlock()
 	}
@@ -1093,18 +1128,22 @@ func (m *Manager) StopSession(sessionID string) error {
 // stopWatchingLiveSession stops watching a LIVE session and clears its active status.
 // IMPORTANT: Acquires locks in order: streamerMu first, then m.mu (same as WatchWorkspaceSession)
 func (m *Manager) stopWatchingLiveSession(workspaceID, sessionID string) {
+	key := watchedSessionKey{WorkspaceID: workspaceID, SessionID: sessionID}
+
 	// Stop the streamer if it's watching this session
 	// Acquire streamerMu FIRST to match lock order in WatchWorkspaceSession
 	m.streamerMu.Lock()
-	if m.streamerSessionID == sessionID {
-		if m.streamer != nil {
-			m.streamer.UnwatchSession()
+	stream, exists := m.streamerSessions[key]
+	if !exists {
+		m.streamerMu.Unlock()
+	} else {
+		stream.streamer.UnwatchSession()
+		delete(m.streamerSessions, key)
+		for _, watchedKey := range m.streamerClientSessions {
+			delete(watchedKey, key)
 		}
-		m.streamerSessionID = ""
-		m.streamerWorkspaceID = ""
-		m.streamerWatchers = make(map[string]bool)
+		m.streamerMu.Unlock()
 	}
-	m.streamerMu.Unlock()
 
 	// Clear active session mapping (acquire m.mu AFTER streamerMu is released)
 	m.mu.Lock()
@@ -2450,15 +2489,24 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 		return nil, fmt.Errorf("failed to access session file: %w", err)
 	}
 
+	key := watchedSessionKey{
+		WorkspaceID: workspaceID,
+		SessionID:   sessionID,
+	}
+
 	// Check if already watching the same session
-	if m.streamer != nil && m.streamerWorkspaceID == workspaceID && m.streamerSessionID == sessionID {
-		// Same session - just add this client to watchers
-		m.streamerWatchers[clientID] = true
+	if stream, exists := m.streamerSessions[key]; exists {
+		stream.watchers[clientID] = true
+		if _, exists := m.streamerClientSessions[clientID]; !exists {
+			m.streamerClientSessions[clientID] = make(map[watchedSessionKey]bool)
+		}
+		m.streamerClientSessions[clientID][key] = true
+
 		m.logger.Info("Added watcher to existing session watch",
 			"client_id", clientID,
 			"workspace_id", workspaceID,
 			"session_id", sessionID,
-			"watcher_count", len(m.streamerWatchers),
+			"watcher_count", len(stream.watchers),
 		)
 		return &WatchInfo{
 			WorkspaceID: workspaceID,
@@ -2467,31 +2515,22 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 		}, nil
 	}
 
-	// Switching to a different session - close existing streamer
-	if m.streamer != nil {
-		m.streamer.Close()
-		m.streamer = nil
-		m.logger.Debug("Stopped previous session watch (switching sessions)",
-			"workspace_id", m.streamerWorkspaceID,
-			"session_id", m.streamerSessionID,
-			"prev_watcher_count", len(m.streamerWatchers),
-		)
-		// Clear all watchers since we're switching sessions
-		m.streamerWatchers = make(map[string]bool)
-	}
-
 	// Create new streamer for this workspace's sessions directory
-	m.streamer = sessioncache.NewSessionStreamer(sessionsDir, m.hub)
+	streamer := sessioncache.NewSessionStreamer(sessionsDir, m.hub)
 
 	// Start watching the session
-	if err := m.streamer.WatchSession(sessionID); err != nil {
-		m.streamer = nil
+	if err := streamer.WatchSession(sessionID); err != nil {
 		return nil, fmt.Errorf("failed to start session watch: %w", err)
 	}
 
-	m.streamerWorkspaceID = workspaceID
-	m.streamerSessionID = sessionID
-	m.streamerWatchers[clientID] = true // First watcher
+	m.streamerSessions[key] = &watchedSessionStream{
+		streamer: streamer,
+		watchers: map[string]bool{clientID: true},
+	}
+	if _, exists := m.streamerClientSessions[clientID]; !exists {
+		m.streamerClientSessions[clientID] = make(map[watchedSessionKey]bool)
+	}
+	m.streamerClientSessions[clientID][key] = true
 
 	// Auto-activate the watched session (uses separate mutex, no deadlock)
 	m.mu.Lock()
@@ -2503,7 +2542,7 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 		"workspace_id", workspaceID,
 		"session_id", sessionID,
 		"sessions_dir", sessionsDir,
-		"watcher_count", len(m.streamerWatchers),
+		"watcher_count", 1,
 	)
 
 	return &WatchInfo{
@@ -2520,58 +2559,81 @@ func (m *Manager) UnwatchWorkspaceSession(clientID string) *WatchInfo {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
-	if m.streamer == nil {
+	watchedSessions, ok := m.streamerClientSessions[clientID]
+	if !ok || len(watchedSessions) == 0 {
 		return &WatchInfo{
 			Watching: false,
 		}
 	}
 
-	prevWorkspaceID := m.streamerWorkspaceID
-	prevSessionID := m.streamerSessionID
-
-	// Remove this client from watchers (if they were watching)
-	if !m.streamerWatchers[clientID] {
-		// Client wasn't watching - nothing to do
-		return &WatchInfo{
-			WorkspaceID: prevWorkspaceID,
-			SessionID:   prevSessionID,
-			Watching:    len(m.streamerWatchers) > 0,
+	// Deterministically pick one watched session for removal
+	var target watchedSessionKey
+	found := false
+	for session := range watchedSessions {
+		if !found || session.WorkspaceID < target.WorkspaceID || (session.WorkspaceID == target.WorkspaceID && session.SessionID < target.SessionID) {
+			target = session
+			found = true
 		}
 	}
-	delete(m.streamerWatchers, clientID)
+	if !found {
+		delete(m.streamerClientSessions, clientID)
+		return &WatchInfo{
+			Watching: false,
+		}
+	}
 
-	if len(m.streamerWatchers) > 0 {
-		// Other clients still watching - keep the streamer running
+	stream, exists := m.streamerSessions[target]
+	if !exists {
+		delete(watchedSessions, target)
+		if len(watchedSessions) == 0 {
+			delete(m.streamerClientSessions, clientID)
+		} else {
+			m.streamerClientSessions[clientID] = watchedSessions
+		}
+		return &WatchInfo{
+			WorkspaceID: target.WorkspaceID,
+			SessionID:   target.SessionID,
+			Watching:    len(watchedSessions) > 0,
+		}
+	}
+
+	delete(stream.watchers, clientID)
+	delete(watchedSessions, target)
+	delete(m.streamerClientSessions, clientID)
+
+	result := &WatchInfo{
+		WorkspaceID: target.WorkspaceID,
+		SessionID:   target.SessionID,
+		Watching:    len(stream.watchers) > 0,
+	}
+
+	if len(stream.watchers) > 0 {
 		m.logger.Info("Removed watcher from session (others still watching)",
 			"client_id", clientID,
-			"workspace_id", prevWorkspaceID,
-			"session_id", prevSessionID,
-			"remaining_watchers", len(m.streamerWatchers),
+			"workspace_id", target.WorkspaceID,
+			"session_id", target.SessionID,
+			"remaining_watchers", len(stream.watchers),
 		)
-		return &WatchInfo{
-			WorkspaceID: prevWorkspaceID,
-			SessionID:   prevSessionID,
-			Watching:    true, // Streamer still active
+		if len(watchedSessions) > 0 {
+			m.streamerClientSessions[clientID] = watchedSessions
 		}
+		return result
 	}
 
-	// Last watcher - close the streamer
-	m.streamer.Close()
-	m.streamer = nil
-	m.streamerWorkspaceID = ""
-	m.streamerSessionID = ""
-
+	stream.streamer.Close()
+	delete(m.streamerSessions, target)
 	m.logger.Info("Stopped watching session (last watcher left)",
 		"client_id", clientID,
-		"workspace_id", prevWorkspaceID,
-		"session_id", prevSessionID,
+		"workspace_id", target.WorkspaceID,
+		"session_id", target.SessionID,
 	)
 
-	return &WatchInfo{
-		WorkspaceID: prevWorkspaceID,
-		SessionID:   prevSessionID,
-		Watching:    false,
+	if len(watchedSessions) > 0 {
+		m.streamerClientSessions[clientID] = watchedSessions
 	}
+
+	result.Watching = false
+	return result
 }
 
 // GetWatchedSession returns information about the currently watched session.
@@ -2579,15 +2641,26 @@ func (m *Manager) GetWatchedSession() *WatchInfo {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
-	if m.streamer == nil {
+	var (
+		first watchedSessionKey
+		found bool
+	)
+	for session := range m.streamerSessions {
+		if !found || session.WorkspaceID < first.WorkspaceID || (session.WorkspaceID == first.WorkspaceID && session.SessionID < first.SessionID) {
+			first = session
+			found = true
+		}
+	}
+
+	if !found {
 		return &WatchInfo{
 			Watching: false,
 		}
 	}
 
 	return &WatchInfo{
-		WorkspaceID: m.streamerWorkspaceID,
-		SessionID:   m.streamerSessionID,
+		WorkspaceID: first.WorkspaceID,
+		SessionID:   first.SessionID,
 		Watching:    true,
 	}
 }

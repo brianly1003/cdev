@@ -55,13 +55,13 @@ ssh -L 8766:localhost:8766 user@devmachine
 
 ## 3. Authentication (Required)
 
-All HTTP + WebSocket requests require a bearer token:
+HTTP + WebSocket requests require a bearer token by default, except for pairing/bootstrap endpoints:
 
 ```
 Authorization: Bearer <access-token>
 ```
 
-**Unauthenticated allowlist** (pairing + exchange only):
+**Unauthenticated allowlist** (pairing + auth bootstrap):
 - `/health`
 - `/pair`
 - `/api/pair/*`

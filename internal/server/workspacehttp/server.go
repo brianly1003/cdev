@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -17,17 +18,10 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/transport"
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/workspace"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins (configure for production)
-	},
-}
 
 // Server is the multi-workspace HTTP/WebSocket server.
 // This is the new simplified architecture that manages sessions in-process.
@@ -38,6 +32,7 @@ type Server struct {
 	rpcServer      *rpc.Server
 	hub            ports.EventHub
 	logger         *slog.Logger
+	originChecker  *security.OriginChecker
 
 	addr       string
 	httpServer *http.Server
@@ -108,7 +103,7 @@ func (s *Server) Start() error {
 	router.HandleFunc("/ws", s.handleWebSocket)
 
 	// Apply CORS middleware
-	handler := corsMiddleware(router)
+	handler := s.corsMiddleware(router)
 
 	// Create HTTP server
 	s.httpServer = &http.Server{
@@ -145,6 +140,24 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	return s.httpServer.Shutdown(ctx)
+}
+
+// SetOriginChecker sets the origin checker used by websocket/CORS flows.
+func (s *Server) SetOriginChecker(checker *security.OriginChecker) {
+	s.originChecker = checker
+}
+
+func (s *Server) checkOrigin(r *http.Request) bool {
+	if s.originChecker != nil {
+		return s.originChecker.CheckOrigin(r)
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	return isLocalhostOrigin(origin)
 }
 
 // handleHealth handles GET /health
@@ -511,6 +524,12 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 
 // handleWebSocket handles WebSocket connections for JSON-RPC
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     s.checkOrigin,
+	}
+
 	// Upgrade connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -558,19 +577,19 @@ func (s *Server) respondError(w http.ResponseWriter, status int, message string)
 	})
 }
 
-// corsMiddleware adds CORS headers
-func corsMiddleware(next http.Handler) http.Handler {
+// corsMiddleware adds CORS headers.
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" {
-			origin = "*"
-		}
-
-		// Allow local development origins
-		if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") {
+	if origin == "" {
+		// Non-browser clients or same-site requests with no Origin header.
+		// Keep response CORS behavior conservative by not injecting CORS headers.
+	} else if !s.allowOrigin(origin) {
+		http.Error(w, "Origin not allowed", http.StatusForbidden)
+		return
+	} else {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-		} else {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -584,4 +603,24 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) allowOrigin(origin string) bool {
+	if s.originChecker != nil {
+		return s.originChecker.CheckOrigin(&http.Request{Header: map[string][]string{"Origin": {origin}}})
+	}
+	return isLocalhostOrigin(origin)
+}
+
+func isLocalhostOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	host := strings.TrimSpace(strings.ToLower(parsed.Hostname()))
+	return host == "localhost" ||
+		host == "127.0.0.1" ||
+		host == "::1" ||
+		strings.HasSuffix(host, ".localhost")
 }

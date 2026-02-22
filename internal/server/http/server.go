@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -34,28 +36,33 @@ type WebSocketHandler func(http.ResponseWriter, *http.Request)
 
 // Server is the HTTP API server.
 type Server struct {
-	server              *http.Server
-	mux                 *http.ServeMux
-	addr                string
-	statusFn            func() map[string]interface{}
-	claudeManager       *claude.Manager
-	gitTracker          *git.Tracker
-	sessionCache        *sessioncache.Cache
-	messageCache        *sessioncache.MessageCache
-	eventHub            ports.EventHub
-	repoIndexer         *repository.SQLiteIndexer
-	maxFileSizeKB       int
-	maxDiffSizeKB       int
-	repoPath            string
-	wsHandler           WebSocketHandler
-	rpcRegistry         *handler.Registry
-	imageHandler        *ImageHandler
-	imageStorageManager *imagestorage.Manager
-	originChecker       *security.OriginChecker
-	rateLimiter         *middleware.RateLimiter
-	tokenManager        *security.TokenManager
-	requireAuth         bool
-	authAllowlist       []string
+	server                 *http.Server
+	mux                    *http.ServeMux
+	addr                   string
+	tlsCertFile            string
+	tlsKeyFile             string
+	statusFn               func() map[string]interface{}
+	claudeManager          *claude.Manager
+	gitTracker             *git.Tracker
+	sessionCache           *sessioncache.Cache
+	messageCache           *sessioncache.MessageCache
+	eventHub               ports.EventHub
+	repoIndexer            *repository.SQLiteIndexer
+	maxFileSizeKB          int
+	maxDiffSizeKB          int
+	repoPath               string
+	wsHandler              WebSocketHandler
+	rpcRegistry            *handler.Registry
+	imageHandler           *ImageHandler
+	imageStorageManager    *imagestorage.Manager
+	originChecker          *security.OriginChecker
+	rateLimiter            *middleware.RateLimiter
+	rateLimitKeyExtractor  middleware.KeyExtractor
+	trustedProxies         []*net.IPNet
+	tokenManager           *security.TokenManager
+	requireAuth            bool
+	authAllowlist          []string
+	requireSecureTransport bool
 }
 
 // New creates a new HTTP server.
@@ -225,6 +232,28 @@ func requestLoggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// secureTransportMiddleware enforces HTTPS/WSS usage for non-local traffic when enabled.
+func (s *Server) secureTransportMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.requireSecureTransport {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if isLocalRequest(r, s.trustedProxies) || isSecureRequest(r, s.trustedProxies) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		log.Warn().
+			Str("remote_addr", r.RemoteAddr).
+			Str("path", r.URL.Path).
+			Str("x_forwarded_proto", r.Header.Get("X-Forwarded-Proto")).
+			Msg("request rejected - secure transport required")
+		http.Error(w, "Upgrade to HTTPS/WSS is required", http.StatusUpgradeRequired)
+	})
+}
+
 // rootRedirectMiddleware redirects exact home path requests to /pair.
 func rootRedirectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -323,9 +352,36 @@ func (s *Server) SetOriginChecker(checker *security.OriginChecker) {
 	s.originChecker = checker
 }
 
+// SetTLS configures TLS for HTTPS/WSS serving.
+func (s *Server) SetTLS(certFile, keyFile string) {
+	if certFile == "" || keyFile == "" {
+		s.tlsCertFile = ""
+		s.tlsKeyFile = ""
+		return
+	}
+
+	s.tlsCertFile = certFile
+	s.tlsKeyFile = keyFile
+}
+
 // SetRateLimiter sets the rate limiter for request throttling.
 func (s *Server) SetRateLimiter(limiter *middleware.RateLimiter) {
 	s.rateLimiter = limiter
+}
+
+// SetRequireSecureTransport requires HTTPS/WSS for non-localhost requests.
+func (s *Server) SetRequireSecureTransport(require bool) {
+	s.requireSecureTransport = require
+}
+
+// SetRateLimitKeyExtractor sets a custom key extractor for rate limiting.
+func (s *Server) SetRateLimitKeyExtractor(extractor middleware.KeyExtractor) {
+	s.rateLimitKeyExtractor = extractor
+}
+
+// SetTrustedProxies sets trusted proxy CIDRs for request-aware URL/Ratelimit logic.
+func (s *Server) SetTrustedProxies(trustedProxies []*net.IPNet) {
+	s.trustedProxies = trustedProxies
 }
 
 // SetAuth configures HTTP authentication.
@@ -346,6 +402,7 @@ func defaultAuthAllowlist() []string {
 		"/api/pair/",
 		"/api/auth/exchange",
 		"/api/auth/refresh",
+		"/api/auth/revoke",
 	}
 }
 
@@ -356,6 +413,43 @@ func (s *Server) isAuthExempt(path string) bool {
 		}
 	}
 	return false
+}
+
+// isLocalRequest checks whether the request comes from a loopback address.
+func isLocalRequest(r *http.Request, trustedProxies []*net.IPNet) bool {
+	if r == nil {
+		return false
+	}
+
+	clientIP := strings.TrimSpace(security.RequestClientIP(r, trustedProxies))
+	if clientIP == "" {
+		return false
+	}
+
+	ip := net.ParseIP(clientIP)
+	return ip != nil && ip.IsLoopback()
+}
+
+// isSecureRequest checks whether request is encrypted or came through a trusted TLS proxy.
+func isSecureRequest(r *http.Request, trustedProxies []*net.IPNet) bool {
+	if r == nil {
+		return false
+	}
+
+	if r.TLS != nil {
+		return true
+	}
+
+	if !security.IsTrustedProxy(r.RemoteAddr, trustedProxies) {
+		return false
+	}
+
+	forwardedProto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")))
+	if forwardedProto == "" {
+		forwardedProto = strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Scheme")))
+	}
+
+	return forwardedProto == "https" || forwardedProto == "wss"
 }
 
 func extractBearerToken(authHeader string) string {
@@ -401,9 +495,16 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 // isLocalhostOrigin checks if an origin is from localhost.
 func isLocalhostOrigin(origin string) bool {
-	return strings.Contains(origin, "localhost") ||
-		strings.Contains(origin, "127.0.0.1") ||
-		strings.Contains(origin, "::1")
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	host := strings.TrimSpace(strings.ToLower(parsed.Hostname()))
+	return host == "localhost" ||
+		host == "127.0.0.1" ||
+		host == "::1" ||
+		strings.HasSuffix(host, ".localhost")
 }
 
 // corsMiddleware adds CORS headers with configurable origin checking.
@@ -494,8 +595,9 @@ func (s *Server) Start() error {
 	}
 
 	// Build middleware chain from inside out:
-	// request -> logging -> rate limit (optional) -> timeout -> cors -> root redirect -> auth -> mux
+	// request -> secure transport -> auth -> root redirect -> cors -> timeout -> rate limit (optional) -> logging -> mux
 	var handler http.Handler = s.mux
+	handler = s.secureTransportMiddleware(handler)
 	handler = s.authMiddleware(handler)
 	handler = rootRedirectMiddleware(handler)
 	handler = s.corsMiddleware(handler)
@@ -503,7 +605,16 @@ func (s *Server) Start() error {
 
 	// Add rate limiting if configured
 	if s.rateLimiter != nil {
-		handler = middleware.RateLimitMiddleware(s.rateLimiter, middleware.IPKeyExtractor)(handler)
+		keyExtractor := s.rateLimitKeyExtractor
+		if keyExtractor == nil {
+			if len(s.trustedProxies) > 0 {
+				keyExtractor = middleware.NewTrustedProxyIPKeyExtractor(s.trustedProxies)
+			} else {
+				keyExtractor = middleware.IPKeyExtractor
+			}
+		}
+
+		handler = middleware.RateLimitMiddleware(s.rateLimiter, keyExtractor)(handler)
 		log.Info().Msg("Rate limiting enabled for HTTP server")
 	}
 
@@ -515,10 +626,21 @@ func (s *Server) Start() error {
 		Handler: handler,
 	}
 
-	log.Info().Str("addr", s.addr).Msg("HTTP server starting")
+	startTLS := s.tlsCertFile != "" && s.tlsKeyFile != ""
+	if startTLS {
+		log.Info().Str("addr", s.addr).Str("tls_cert", s.tlsCertFile).Msg("HTTP server starting with TLS")
+	} else {
+		log.Info().Str("addr", s.addr).Msg("HTTP server starting")
+	}
 
 	go func() {
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		var err error
+		if startTLS {
+			err = s.server.ListenAndServeTLS(s.tlsCertFile, s.tlsKeyFile)
+		} else {
+			err = s.server.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Error().Err(err).Msg("HTTP server error")
 		}
 	}()

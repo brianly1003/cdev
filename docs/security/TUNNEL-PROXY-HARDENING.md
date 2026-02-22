@@ -10,10 +10,11 @@ Use this checklist before exposing cdev via a tunnel (VS Code, ngrok, Cloudflare
 - **Restrict origins**: set `security.allowed_origins` to your tunnel domain(s)
 
 ## Reverse Proxy Controls
-- **TLS termination**: terminate HTTPS at the proxy/tunnel (cdev has no TLS listener)
+- **TLS**: enable HTTPS/WSS for the public edge (either via proxy/tunnel termination or `security.tls_cert_file` + `security.tls_key_file`)
 - **Auth at the edge**: optional but recommended (defense in depth) via Basic/Auth/OIDC
 - **IP allowlist**: restrict to your devices or VPN egress if possible
 - **Header hygiene**: strip untrusted `X-Forwarded-*` headers unless your proxy sets them
+- **Trusted proxy control**: set `security.trusted_proxies` to the exact proxy CIDR(s) so forwarded headers are only accepted from trusted hops
 
 ## WebSocket Guidance
 - **Authorization header required** for tokens; query‑string tokens are not supported

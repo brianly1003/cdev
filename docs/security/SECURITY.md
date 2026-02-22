@@ -29,12 +29,12 @@ cdev is designed to run on a developer's local machine and provide remote access
 | Protection | Status | Notes |
 |------------|--------|-------|
 | Localhost binding | ✅ Active | Default `server.host = 127.0.0.1`; `security.bind_localhost_only = true` |
-| HTTP token auth | ✅ Active | Bearer token required for all HTTP endpoints (except pairing/auth/health allowlist) |
+| HTTP token auth | ✅ Active | Bearer token required for all HTTP endpoints except pairing/auth/health allowlist. `/api/auth/revoke` is intentionally unauthenticated and uses `refresh_token` in the request body |
 | WebSocket token auth | ✅ Active | Bearer token required when `require_auth = true`; no localhost bypass |
 | Origin/CORS enforcement | ✅ Active | Origin checker enforced; no `*` wildcard responses |
 | File read limits | ✅ Active | `limits.max_file_size_kb` enforced with streaming read + truncation |
 | Image upload hardening | ✅ Active | Size caps, magic‑byte validation, per‑IP rate limiting |
-| Rate limiting | ⚠️ Partial | Optional global HTTP limiter + fixed image upload limiter |
+| Rate limiting | ✅ Active | HTTP, image upload, and WebSocket message limits are enforced |
 | Log rotation | ✅ Active | Claude JSONL logs rotate via lumberjack config |
 | Path validation | ✅ Active | `GetFileContent` and `/api/files/list` use Rel + symlink resolution to block escapes |
 | Diff size cap | ✅ Active | `limits.max_diff_size_kb` enforced for HTTP/RPC/event diffs |
@@ -45,8 +45,8 @@ cdev is designed to run on a developer's local machine and provide remote access
 
 | Risk | Severity | Status | Notes |
 |------|----------|--------|-------|
-| WebSocket message rate limiting | Medium | Open | Message flood protection not implemented |
-| No built‑in TLS | Medium | Open | Requires tunnel/reverse proxy for TLS termination |
+| WebSocket message rate limiting | Medium | ✅ Active | Per-IP WebSocket message limiter is enforced; default 600 msgs/min |
+| TLS and transport hardening | Medium | ✅ Active | Non-local access can be required to use HTTPS/WSS via `security.require_secure_transport` |
 
 ---
 
@@ -64,6 +64,9 @@ security:
   token_expiry_secs: 3600
   bind_localhost_only: true
   allowed_origins: []
+  require_secure_transport: true
+  tls_cert_file: "" # Optional: /path/to/cert.pem
+  tls_key_file: "" # Optional: /path/to/key.pem
   rate_limit:
     enabled: true
     requests_per_minute: 100
@@ -114,7 +117,8 @@ export CDEV_SECURITY_RATE_LIMIT_ENABLED=true
 - Use VPN for mobile access
 - Enable TLS when remote access is needed
 
-Note: There is no built-in TLS listener; use a tunnel or reverse proxy to add TLS.
+Note: TLS can be configured with `security.tls_cert_file` and `security.tls_key_file`
+for HTTPS/WSS, or via a tunnel/reverse proxy termination.
 
 ```bash
 # Safe remote access via SSH tunnel
@@ -175,7 +179,7 @@ Claude CLI runs with the same permissions as the agent. Mitigations:
 Authorization: Bearer <token>
 ```
 
-**Note:** Query‑string tokens are no longer supported. All authenticated endpoints require the Authorization header.
+**Note:** Query‑string tokens are no longer supported. Authenticated endpoints require the Authorization header. `/api/auth/revoke` is intentionally unauthenticated and uses `refresh_token` in the request body.
 
 ### Unauthenticated Allowlist
 
@@ -213,7 +217,7 @@ func generateToken() (string, error) {
 |----------|-------|--------|
 | HTTP (global) | `security.rate_limit.requests_per_minute` | 1 minute |
 | Image upload | 10 uploads / IP | 1 minute |
-| WebSocket messages | Not rate‑limited (message size capped) | N/A |
+| WebSocket messages | 600 msgs / IP (default) | 1 minute |
 
 ---
 
@@ -228,8 +232,9 @@ func generateToken() (string, error) {
 
 ### Before Remote Access
 
-- [ ] Ensure `security.require_auth = true` (HTTP still needs auth hardening)
+- [ ] Ensure `security.require_auth = true` and verify allowlist scope is minimal for your deployment
 - [ ] Configure allowed origins
+- [ ] Ensure `security.require_secure_transport = true` for non-local remote access
 - [ ] Enable rate limiting
 - [ ] Disable debug/pprof
 - [ ] Review logging configuration for sensitive data
@@ -275,15 +280,15 @@ For security vulnerabilities, please:
 ## Security Roadmap
 
 ### Phase 1 (Immediate - P0)
-- [ ] Fix CORS configuration (partial: main server fixed; OpenRPC/legacy still wildcard)
-- [ ] Implement authentication (partial: WebSocket only; HTTP pending)
+- [x] Fix CORS configuration (main server and workspace HTTP now reject unknown origins without wildcard)
+- [x] Implement authentication for both HTTP and WebSocket; maintain explicit bootstrap allowlist
 - [x] Fix file reading (`cat` → `os.ReadFile`)
 - [x] Improve path validation (Rel + symlink resolution for file read/list)
 
 ### Phase 2 (Short-term - P1)
 - [x] Add rate limiting (configurable HTTP + image upload)
 - [x] Implement log rotation (Claude JSONL)
-- [ ] Add TLS support
+- [ ] Add TLS automation and certificate rotation
 - [ ] Security audit (ongoing; track findings in this document)
 
 ### Phase 3 (Medium-term - P2)
@@ -300,12 +305,12 @@ For security vulnerabilities, please:
 
 | Vulnerability | Status |
 |--------------|--------|
-| A01 Broken Access Control | ⚠️ HTTP auth missing |
-| A02 Cryptographic Failures | ⚠️ No TLS listener |
+| A01 Broken Access Control | ✅ Active |
+| A02 Cryptographic Failures | ⚠️ Optional unless TLS enabled (configure security.tls_* or proxy TLS) |
 | A03 Injection | ✅ Uses `exec.Command` (no shell) |
-| A05 Security Misconfiguration | ⚠️ OpenRPC CORS + debug config |
+| A05 Security Misconfiguration | ⚠️ Ensure deployment-specific settings (origins, debug/proxy, TLS) are correctly configured |
 | A06 Vulnerable Components | ⚠️ Not assessed here |
-| A07 Auth Failures | ⚠️ WebSocket only |
+| A07 Auth Failures | ✅ Active |
 | A09 Security Logging | ⚠️ No audit logs (rotation exists) |
 
 ---
@@ -321,5 +326,5 @@ For security vulnerabilities, please:
 
 ---
 
-*Document Version: 1.1.0*
+*Document Version: 1.2.0*
 *Updated: January 30, 2026*

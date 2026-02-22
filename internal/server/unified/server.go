@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc/transport"
 	"github.com/brianly1003/cdev/internal/security"
 	"github.com/brianly1003/cdev/internal/server/common"
+	httpMiddleware "github.com/brianly1003/cdev/internal/server/http/middleware"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -28,6 +30,10 @@ import (
 const (
 	wsReadBufferSize  = 1024
 	wsWriteBufferSize = 1024
+)
+
+const (
+	defaultWSMessagesPerMinute = 600
 )
 
 // SessionFocus represents which session a client is currently focused on.
@@ -79,9 +85,13 @@ type Server struct {
 	startTime     time.Time
 
 	// Security
-	tokenManager  *security.TokenManager
-	originChecker *security.OriginChecker
-	requireAuth   bool
+	tokenManager            *security.TokenManager
+	originChecker           *security.OriginChecker
+	requireAuth             bool
+	requireSecureTransport  bool
+	trustedProxies          []*net.IPNet
+	wsRateLimiter           *httpMiddleware.RateLimiter
+	wsRateLimitKeyExtractor httpMiddleware.KeyExtractor
 }
 
 // NewServer creates a new unified server.
@@ -96,6 +106,10 @@ func NewServer(host string, port int, dispatcher *handler.Dispatcher, eventHub p
 		sessionFocus:    make(map[string]*SessionFocus),
 		heartbeatDone:   make(chan struct{}),
 		startTime:       time.Now(),
+		wsRateLimiter: httpMiddleware.NewRateLimiter(
+			httpMiddleware.WithMaxRequests(defaultWSMessagesPerMinute),
+			httpMiddleware.WithWindow(time.Minute),
+		),
 	}
 
 	// Create RPC server
@@ -112,6 +126,22 @@ func (s *Server) SetStatusProvider(provider common.StatusProvider) {
 // SetDisconnectHandler sets the handler for client disconnect cleanup.
 func (s *Server) SetDisconnectHandler(handler ClientDisconnectHandler) {
 	s.disconnectHandler = handler
+}
+
+// SetTrustedProxies sets trusted reverse-proxy CIDRs.
+func (s *Server) SetTrustedProxies(trustedProxies []*net.IPNet) {
+	s.trustedProxies = trustedProxies
+}
+
+// SetRequireSecureTransport enforces WSS for non-local traffic.
+func (s *Server) SetRequireSecureTransport(require bool) {
+	s.requireSecureTransport = require
+}
+
+// SetWebSocketRateLimiter sets incoming WS message rate limiting for authenticated/unauthenticated sockets.
+func (s *Server) SetWebSocketRateLimiter(limiter *httpMiddleware.RateLimiter, keyExtractor httpMiddleware.KeyExtractor) {
+	s.wsRateLimiter = limiter
+	s.wsRateLimitKeyExtractor = keyExtractor
 }
 
 // SetSecurity configures security settings for the server.
@@ -194,6 +224,16 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Str("sec_websocket_key", r.Header.Get("Sec-WebSocket-Key")).
 		Msg("processing WebSocket upgrade")
 
+	if s.requireSecureTransport && !isLocalRequest(r, s.trustedProxies) && !isSecureWebSocketRequest(r, s.trustedProxies) {
+		log.Warn().
+			Str("remote_addr", r.RemoteAddr).
+			Str("path", r.URL.Path).
+			Str("x_forwarded_proto", r.Header.Get("X-Forwarded-Proto")).
+			Msg("WebSocket upgrade rejected - secure transport required")
+		http.Error(w, "Upgrade to WSS is required", http.StatusUpgradeRequired)
+		return
+	}
+
 	// Create upgrader with security checks
 	wsUpgrader := websocket.Upgrader{
 		ReadBufferSize:  wsReadBufferSize,
@@ -216,6 +256,19 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		authPayload = payload
 	}
 
+	rateLimitKey := ""
+	if s.wsRateLimiter != nil {
+		keyExtractor := s.wsRateLimitKeyExtractor
+		if keyExtractor == nil {
+			if len(s.trustedProxies) > 0 {
+				keyExtractor = httpMiddleware.NewTrustedProxyIPKeyExtractor(s.trustedProxies)
+			} else {
+				keyExtractor = httpMiddleware.IPKeyExtractor
+			}
+		}
+		rateLimitKey = keyExtractor(r)
+	}
+
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error().
@@ -227,7 +280,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := NewUnifiedClient(conn, s.dispatcher, func(id string) {
+	client := NewUnifiedClient(conn, s.dispatcher, s.wsRateLimiter, rateLimitKey, func(id string) {
 		if s.hub != nil {
 			s.hub.Unsubscribe(id)
 		}
@@ -529,6 +582,42 @@ func isLocalhostAddr(remoteAddr string) bool {
 	return host == "127.0.0.1" || host == "::1" || host == "localhost"
 }
 
+// isLocalRequest checks whether a request comes from a loopback address.
+func isLocalRequest(r *http.Request, trustedProxies []*net.IPNet) bool {
+	if r == nil {
+		return false
+	}
+
+	clientIP := strings.TrimSpace(security.RequestClientIP(r, trustedProxies))
+	if clientIP == "" {
+		return false
+	}
+
+	ip := net.ParseIP(clientIP)
+	return ip != nil && ip.IsLoopback()
+}
+
+// isSecureWebSocketRequest checks if the websocket request is TLS-encrypted or arrives via trusted TLS proxy headers.
+func isSecureWebSocketRequest(r *http.Request, trustedProxies []*net.IPNet) bool {
+	if r == nil {
+		return false
+	}
+
+	if r.TLS != nil {
+		return true
+	}
+
+	if !security.IsTrustedProxy(r.RemoteAddr, trustedProxies) {
+		return false
+	}
+
+	forwardedProto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")))
+	if forwardedProto == "" {
+		forwardedProto = strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Scheme")))
+	}
+	return forwardedProto == "https" || forwardedProto == "wss"
+}
+
 // isLocalhostOrigin checks if an origin is from localhost.
 func isLocalhostOrigin(origin string) bool {
 	// Common localhost origins
@@ -583,13 +672,15 @@ func (s *Server) validateTokenFromRequest(r *http.Request) (*security.TokenPaylo
 
 // UnifiedClient represents a JSON-RPC 2.0 WebSocket client.
 type UnifiedClient struct {
-	id          string
-	conn        *websocket.Conn
-	send        chan []byte
-	done        chan struct{}
-	dispatcher  *handler.Dispatcher
-	onClose     func(id string)
-	authPayload *security.TokenPayload
+	id           string
+	conn         *websocket.Conn
+	send         chan []byte
+	done         chan struct{}
+	dispatcher   *handler.Dispatcher
+	onClose      func(id string)
+	authPayload  *security.TokenPayload
+	rateLimiter  *httpMiddleware.RateLimiter
+	rateLimitKey string
 
 	mu     sync.Mutex
 	closed bool
@@ -599,15 +690,19 @@ type UnifiedClient struct {
 func NewUnifiedClient(
 	conn *websocket.Conn,
 	dispatcher *handler.Dispatcher,
+	rateLimiter *httpMiddleware.RateLimiter,
+	rateLimitKey string,
 	onClose func(id string),
 ) *UnifiedClient {
 	return &UnifiedClient{
-		id:         transport.GenerateID(),
-		conn:       conn,
-		send:       make(chan []byte, common.SendBufferSize),
-		done:       make(chan struct{}),
-		dispatcher: dispatcher,
-		onClose:    onClose,
+		id:           transport.GenerateID(),
+		conn:         conn,
+		send:         make(chan []byte, common.SendBufferSize),
+		done:         make(chan struct{}),
+		dispatcher:   dispatcher,
+		onClose:      onClose,
+		rateLimiter:  rateLimiter,
+		rateLimitKey: rateLimitKey,
 	}
 }
 
@@ -777,8 +872,26 @@ func (c *UnifiedClient) readPump() {
 			return
 		}
 
+		if c.isRateLimited() {
+			if closeErr := c.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "message rate limit exceeded")); closeErr != nil {
+				log.Warn().Err(closeErr).Str("client_id", c.id).Msg("failed to send websocket close code for rate limiting")
+			}
+			log.Warn().Str("client_id", c.id).Msg("websocket message rate limit exceeded")
+			return
+		}
+
 		c.handleMessage(data)
 	}
+}
+
+func (c *UnifiedClient) isRateLimited() bool {
+	if c == nil || c.rateLimiter == nil {
+		return false
+	}
+	if c.rateLimitKey == "" {
+		return false
+	}
+	return !c.rateLimiter.Allow(c.rateLimitKey)
 }
 
 // handleMessage handles incoming JSON-RPC messages.
