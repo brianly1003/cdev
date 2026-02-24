@@ -115,12 +115,13 @@ type ProjectSummary struct {
 
 // IndexCache provides cached access to Codex session indexes.
 type IndexCache struct {
-	mu           sync.RWMutex
-	codexHome    string
-	projectIndex map[string]*SessionIndex // keyed by encoded project path
-	allProjects  []ProjectSummary
-	lastScan     time.Time
-	scanInterval time.Duration
+	mu             sync.RWMutex
+	codexHome      string
+	projectIndex   map[string]*SessionIndex // keyed by encoded project path
+	allProjects    []ProjectSummary
+	lastScan       time.Time
+	scanInterval   time.Duration
+	fileEntryCache map[string]SessionIndexEntry // keyed by full path; enables incremental refresh
 }
 
 // NewIndexCache creates a new index cache.
@@ -129,9 +130,10 @@ func NewIndexCache(codexHome string) *IndexCache {
 		codexHome = DefaultCodexHome()
 	}
 	return &IndexCache{
-		codexHome:    codexHome,
-		projectIndex: make(map[string]*SessionIndex),
-		scanInterval: 30 * time.Second, // Refresh every 30 seconds at most
+		codexHome:      codexHome,
+		projectIndex:   make(map[string]*SessionIndex),
+		fileEntryCache: make(map[string]SessionIndexEntry),
+		scanInterval:   30 * time.Second, // Refresh every 30 seconds at most
 	}
 }
 
@@ -267,6 +269,78 @@ func (c *IndexCache) Refresh() error {
 	return c.doRefresh()
 }
 
+// InvalidateByPath removes a single session from the in-memory cache by its file path.
+// Use this after deleting a session file to keep the cache consistent without a
+// full directory rescan.
+func (c *IndexCache) InvalidateByPath(path string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.fileEntryCache[path]
+	if !ok {
+		return nil // not cached; nothing to do
+	}
+
+	delete(c.fileEntryCache, path)
+
+	if entry.ProjectPath == "" {
+		return nil
+	}
+
+	encoded := encodeProjectPath(entry.ProjectPath)
+	if idx, ok := c.projectIndex[encoded]; ok {
+		filtered := make([]SessionIndexEntry, 0, len(idx.Entries))
+		for _, e := range idx.Entries {
+			if e.FullPath != path {
+				filtered = append(filtered, e)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(c.projectIndex, encoded)
+		} else {
+			idx.Entries = filtered
+		}
+	}
+
+	c.rebuildProjectSummaries()
+	return nil
+}
+
+// rebuildProjectSummaries regenerates allProjects from the current projectIndex.
+// Must be called with c.mu held.
+func (c *IndexCache) rebuildProjectSummaries() {
+	newProjects := make([]ProjectSummary, 0, len(c.projectIndex))
+	for encoded, idx := range c.projectIndex {
+		originalPath := decodeProjectPath(encoded)
+		var totalSize int64
+		var lastActivity time.Time
+		var gitRepo, gitBranch string
+		for i, e := range idx.Entries {
+			totalSize += e.FileSize
+			if e.Modified.After(lastActivity) {
+				lastActivity = e.Modified
+			}
+			if i == 0 {
+				gitRepo = e.GitRepo
+				gitBranch = e.GitBranch
+			}
+		}
+		newProjects = append(newProjects, ProjectSummary{
+			ProjectPath:  originalPath,
+			EncodedPath:  encoded,
+			SessionCount: len(idx.Entries),
+			TotalSize:    totalSize,
+			LastActivity: lastActivity,
+			GitRepo:      gitRepo,
+			GitBranch:    gitBranch,
+		})
+	}
+	sort.Slice(newProjects, func(i, j int) bool {
+		return newProjects[i].LastActivity.After(newProjects[j].LastActivity)
+	})
+	c.allProjects = newProjects
+}
+
 func (c *IndexCache) refreshIfNeeded() error {
 	if time.Since(c.lastScan) < c.scanInterval {
 		return nil
@@ -281,6 +355,7 @@ func (c *IndexCache) doRefresh() error {
 	if _, err := os.Stat(sessionsRoot); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			c.projectIndex = make(map[string]*SessionIndex)
+			c.fileEntryCache = make(map[string]SessionIndexEntry)
 			c.allProjects = nil
 			c.lastScan = time.Now()
 			return nil
@@ -288,8 +363,10 @@ func (c *IndexCache) doRefresh() error {
 		return err
 	}
 
-	// Collect all session files grouped by project (cwd)
+	// Collect all session files grouped by project (cwd).
+	// seenPaths tracks every rollout-*.jsonl visited so we can evict stale cache entries.
 	projectSessions := make(map[string][]SessionIndexEntry)
+	seenPaths := make(map[string]struct{})
 
 	err := filepath.WalkDir(sessionsRoot, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -306,6 +383,18 @@ func (c *IndexCache) doRefresh() error {
 			return nil
 		}
 
+		seenPaths[path] = struct{}{}
+
+		// Reuse the cached entry when the file's mtime is unchanged — avoids re-parsing.
+		if info, infoErr := d.Info(); infoErr == nil {
+			mtimeMs := info.ModTime().UnixMilli()
+			if cached, ok := c.fileEntryCache[path]; ok && cached.FileMtime == mtimeMs && cached.ProjectPath != "" {
+				encoded := encodeProjectPath(cached.ProjectPath)
+				projectSessions[encoded] = append(projectSessions[encoded], cached)
+				return nil
+			}
+		}
+
 		entry, err := parseSessionFileForIndex(path)
 		if err != nil {
 			log.Debug().Err(err).Str("path", path).Msg("failed to parse session file for index")
@@ -315,6 +404,9 @@ func (c *IndexCache) doRefresh() error {
 			return nil
 		}
 
+		// Update the per-file cache for future refreshes.
+		c.fileEntryCache[path] = *entry
+
 		encoded := encodeProjectPath(entry.ProjectPath)
 		projectSessions[encoded] = append(projectSessions[encoded], *entry)
 		return nil
@@ -322,6 +414,13 @@ func (c *IndexCache) doRefresh() error {
 
 	if err != nil {
 		return err
+	}
+
+	// Evict cache entries for session files that no longer exist on disk.
+	for path := range c.fileEntryCache {
+		if _, seen := seenPaths[path]; !seen {
+			delete(c.fileEntryCache, path)
+		}
 	}
 
 	// Build indexes for each project

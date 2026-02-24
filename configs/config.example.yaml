@@ -56,6 +56,7 @@ git:
 # IMPORTANT: For production/remote access, keep require_auth: true
 security:
   require_auth: true            # Require token authentication for WebSocket and HTTP
+  require_pairing_approval: false # Require local approve/reject before exchanging pairing token
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
@@ -96,7 +97,7 @@ limits:
 
 # Mobile pairing settings
 pairing:
-  show_qr_in_terminal: true   # Display QR code in terminal on startup
+  show_qr_in_terminal: false  # Display QR code in terminal on startup
 
 # Repository indexer settings
 # The indexer creates a SQLite index for fast file search via /api/repository/* endpoints

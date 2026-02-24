@@ -641,6 +641,14 @@ func (a *App) Start(ctx context.Context) error {
 	// Create auth handler for token exchange and refresh
 	if a.tokenManager != nil {
 		authHandler := httpserver.NewAuthHandler(a.tokenManager, a.authRegistry, a.cleanupOrphanedWorkspaces)
+		if a.cfg.Security.RequirePairingApproval {
+			parsedTrustedProxies, err := security.ParseTrustedProxies(a.cfg.Security.TrustedProxies)
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to parse trusted proxies for pairing approval")
+			}
+			authHandler.SetPairingApproval(security.NewPairingApprovalManager(), parsedTrustedProxies)
+			log.Info().Msg("pairing approval enabled - device exchange requires local approve/reject")
+		}
 		a.httpServer.SetAuthHandler(authHandler)
 	}
 

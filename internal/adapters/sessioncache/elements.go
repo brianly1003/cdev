@@ -206,6 +206,9 @@ func parseUserMessage(content json.RawMessage, uuid, timestamp string, counter *
 	if err := json.Unmarshal(content, &textContent); err == nil && textContent != "" {
 		*counter++
 		elem := createUserInputElement(fmt.Sprintf("elem_%05d", *counter), timestamp, textContent)
+		if interruptedMsg, ok := extractTurnAbortedMessage(textContent); ok {
+			elem = createInterruptedElement(fmt.Sprintf("elem_%05d", *counter), timestamp, interruptedMsg)
+		}
 		elements = append(elements, elem)
 		return elements
 	}
@@ -226,6 +229,9 @@ func parseUserMessage(content json.RawMessage, uuid, timestamp string, counter *
 				if block.Text != "" {
 					*counter++
 					elem := createUserInputElement(fmt.Sprintf("elem_%05d", *counter), timestamp, block.Text)
+					if interruptedMsg, ok := extractTurnAbortedMessage(block.Text); ok {
+						elem = createInterruptedElement(fmt.Sprintf("elem_%05d", *counter), timestamp, interruptedMsg)
+					}
 					elements = append(elements, elem)
 				}
 			case "tool_result":
@@ -404,6 +410,19 @@ func createUserInputElement(id, timestamp, text string) Element {
 	return Element{
 		ID:        id,
 		Type:      ElementTypeUserInput,
+		Timestamp: timestamp,
+		Content:   contentJSON,
+	}
+}
+
+func createInterruptedElement(id, timestamp, message string) Element {
+	content := InterruptedContent{
+		Message: message,
+	}
+	contentJSON, _ := json.Marshal(content)
+	return Element{
+		ID:        id,
+		Type:      ElementTypeInterrupted,
 		Timestamp: timestamp,
 		Content:   contentJSON,
 	}
@@ -605,6 +624,28 @@ func createDiffElementFromResponse(id, timestamp, toolCallID string, params map[
 		Timestamp: timestamp,
 		Content:   contentJSON,
 	}
+}
+
+func extractTurnAbortedMessage(text string) (string, bool) {
+	const (
+		openTag                    = "<turn_aborted>"
+		closeTag                   = "</turn_aborted>"
+		fallbackInterruptedMessage = "The previous turn was interrupted."
+	)
+
+	trimmed := strings.TrimSpace(text)
+	if !strings.HasPrefix(trimmed, openTag) || !strings.HasSuffix(trimmed, closeTag) {
+		return "", false
+	}
+
+	body := strings.TrimPrefix(trimmed, openTag)
+	body = strings.TrimSuffix(body, closeTag)
+	body = strings.TrimSpace(body)
+	if body == "" {
+		body = fallbackInterruptedMessage
+	}
+
+	return body, true
 }
 
 func formatToolDisplay(toolName string, params map[string]interface{}) string {

@@ -456,7 +456,12 @@ limits:
 # Mobile pairing settings
 pairing:
   token_expiry_secs: 3600
-  show_qr_in_terminal: true
+  show_qr_in_terminal: false
+
+# Security settings
+security:
+  require_auth: true
+  require_pairing_approval: false
 `
 
 	return os.WriteFile(path, []byte(content), 0644)

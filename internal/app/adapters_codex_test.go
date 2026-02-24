@@ -436,6 +436,108 @@ func TestCodexSessionAdapter_GetSessionElements_IncludesContextCompacted(t *test
 	}
 }
 
+func TestCodexSessionAdapter_TurnAbortedFormatsAsInterrupted(t *testing.T) {
+	codexHome := t.TempDir()
+	sessionsRoot := filepath.Join(codexHome, "sessions")
+	if err := os.MkdirAll(sessionsRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	sessionID := "test-turn-aborted-codex"
+	sessionPath := filepath.Join(sessionsRoot, "rollout-turn-aborted.jsonl")
+
+	ts := "2026-02-17T15:05:38.531Z"
+	lines := []map[string]interface{}{
+		{
+			"timestamp": ts,
+			"type":      "session_meta",
+			"payload": map[string]interface{}{
+				"id":             sessionID,
+				"cwd":            "/tmp/project",
+				"model_provider": "openai",
+				"cli_version":    "0.0.0",
+			},
+		},
+		{
+			"timestamp": ts,
+			"type":      "response_item",
+			"payload": map[string]interface{}{
+				"type":    "message",
+				"role":    "user",
+				"content": "<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>",
+			},
+		},
+	}
+
+	f, err := os.Create(sessionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range lines {
+		b, _ := json.Marshal(line)
+		if _, err := f.Write(append(b, '\n')); err != nil {
+			_ = f.Close()
+			t.Fatal(err)
+		}
+	}
+	_ = f.Close()
+
+	adapter := NewCodexSessionAdapter("/repo")
+	adapter.indexCache = codex.NewIndexCache(codexHome)
+
+	msgs, total, err := adapter.GetSessionMessages(context.Background(), sessionID, 50, 0, "asc")
+	if err != nil {
+		t.Fatalf("GetSessionMessages error: %v", err)
+	}
+	if total != 1 || len(msgs) != 1 {
+		t.Fatalf("expected one message, got total=%d len=%d", total, len(msgs))
+	}
+
+	var msgBody struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(msgs[0].Message, &msgBody); err != nil {
+		t.Fatalf("unmarshal message: %v", err)
+	}
+	if len(msgBody.Content) != 1 {
+		t.Fatalf("expected one content block, got %+v", msgBody.Content)
+	}
+	if strings.Contains(msgBody.Content[0].Text, "<turn_aborted>") {
+		t.Fatalf("expected normalized interruption text, got %q", msgBody.Content[0].Text)
+	}
+
+	elements, total, err := adapter.GetSessionElements(context.Background(), sessionID, 50, "", "")
+	if err != nil {
+		t.Fatalf("GetSessionElements error: %v", err)
+	}
+	if total != 1 || len(elements) != 1 {
+		t.Fatalf("expected one element, got total=%d len=%d", total, len(elements))
+	}
+	if elements[0].Type != "interrupted" {
+		t.Fatalf("type=%q, want interrupted", elements[0].Type)
+	}
+
+	contentBytes, err := json.Marshal(elements[0].Content)
+	if err != nil {
+		t.Fatalf("marshal content: %v", err)
+	}
+	var elemContent struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(contentBytes, &elemContent); err != nil {
+		t.Fatalf("unmarshal content: %v", err)
+	}
+	if strings.TrimSpace(elemContent.Message) == "" {
+		t.Fatal("expected non-empty interrupted message")
+	}
+	if strings.Contains(elemContent.Message, "<turn_aborted>") {
+		t.Fatalf("unexpected raw tag in interrupted message: %q", elemContent.Message)
+	}
+}
+
 func TestFormatCodexToolDisplay_ExecCommand(t *testing.T) {
 	display := formatCodexToolDisplay("exec_command", map[string]interface{}{
 		"cmd": "ls -la",

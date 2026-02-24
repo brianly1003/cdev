@@ -31,6 +31,9 @@ type ConversationItem struct {
 	// IsContextCompaction marks synthetic compaction boundary/summary messages.
 	IsContextCompaction bool
 
+	// IsTurnAborted marks synthetic interruption boundary messages.
+	IsTurnAborted bool
+
 	// Content are Claude-like content blocks (text/thinking/tool_use/tool_result).
 	Content []events.ClaudeMessageContent
 }
@@ -127,13 +130,18 @@ func parseResponseItem(timestamp string, raw json.RawMessage) (*ConversationItem
 		if len(contentBlocks) == 0 {
 			return nil, nil
 		}
+		isTurnAborted := false
 		if msg.Role == "user" && shouldHideCodexUserMessage(contentBlocks) {
 			return nil, nil
 		}
+		if msg.Role == "user" {
+			contentBlocks, isTurnAborted = normalizeCodexUserMessage(contentBlocks)
+		}
 		return &ConversationItem{
-			Timestamp: timestamp,
-			Role:      msg.Role,
-			Content:   contentBlocks,
+			Timestamp:     timestamp,
+			Role:          msg.Role,
+			IsTurnAborted: isTurnAborted,
+			Content:       contentBlocks,
 		}, nil
 
 	case "function_call":
@@ -287,6 +295,11 @@ func parseEventMsg(timestamp string, raw json.RawMessage) (*ConversationItem, er
 	case "agent_reasoning":
 		// Ignore raw `event_msg.agent_reasoning` lines so mobile clients only receive
 		// normalized assistant content from `response_item` records.
+		return nil, nil
+	case "turn_aborted":
+		// Codex also emits a matching response_item user message that includes the
+		// interruption text body. We normalize that message and skip this event to
+		// avoid duplicate timeline rows.
 		return nil, nil
 	case "context_compacted":
 		// Codex emits context compaction as a standalone event with no text body.
@@ -557,4 +570,46 @@ func shouldHideCodexBootstrapText(text string) bool {
 	}
 
 	return false
+}
+
+func normalizeCodexUserMessage(blocks []events.ClaudeMessageContent) ([]events.ClaudeMessageContent, bool) {
+	if len(blocks) == 0 {
+		return blocks, false
+	}
+
+	isTurnAborted := false
+	out := make([]events.ClaudeMessageContent, 0, len(blocks))
+	for _, block := range blocks {
+		if block.Type != "text" {
+			out = append(out, block)
+			continue
+		}
+		if message, ok := extractTurnAbortedMessage(block.Text); ok {
+			block.Text = message
+			isTurnAborted = true
+		}
+		out = append(out, block)
+	}
+	return out, isTurnAborted
+}
+
+func extractTurnAbortedMessage(text string) (string, bool) {
+	const (
+		openTag                    = "<turn_aborted>"
+		closeTag                   = "</turn_aborted>"
+		fallbackInterruptedMessage = "The previous turn was interrupted."
+	)
+
+	trimmed := strings.TrimSpace(text)
+	if !strings.HasPrefix(trimmed, openTag) || !strings.HasSuffix(trimmed, closeTag) {
+		return "", false
+	}
+
+	body := strings.TrimPrefix(trimmed, openTag)
+	body = strings.TrimSuffix(body, closeTag)
+	body = strings.TrimSpace(body)
+	if body == "" {
+		body = fallbackInterruptedMessage
+	}
+	return body, true
 }

@@ -276,7 +276,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 
 	registry.RegisterWithMeta("workspace/session/watch", s.WatchSession, handler.MethodMeta{
 		Summary:     "Start watching a session for real-time updates",
-		Description: "Starts watching a session file for new messages for the selected runtime. Only one session can be watched per client/runtime.",
+		Description: "Starts watching a session file for new messages for the selected runtime. A client may watch multiple sessions concurrently.",
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "session_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
@@ -289,10 +289,11 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	})
 
 	registry.RegisterWithMeta("workspace/session/unwatch", s.UnwatchSession, handler.MethodMeta{
-		Summary:     "Stop watching the current session",
-		Description: "Stops watching the currently watched session for the selected runtime.",
+		Summary:     "Stop watching a session",
+		Description: "Stops watching a session for the selected runtime. If session_id is omitted, legacy behavior removes one watched session deterministically.",
 		Params: []handler.OpenRPCParam{
 			{Name: "agent_type", Required: true, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}}},
+			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional session ID to unwatch."}},
 		},
 		Result: &handler.OpenRPCResult{
 			Name:   "unwatch_info",
@@ -1911,11 +1912,12 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 	}
 }
 
-// UnwatchSession stops watching the current session.
+// UnwatchSession stops watching a session.
 // Returns the previous watch info.
 func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
 		AgentType string `json:"agent_type"`
+		SessionID string `json:"session_id,omitempty"`
 	}
 	if len(params) > 0 {
 		if err := json.Unmarshal(params, &p); err != nil {
@@ -1934,26 +1936,43 @@ func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.
 
 	// Get client ID for tracking watchers
 	clientID, _ := ctx.Value(handler.ClientIDKey).(string)
+	targetSessionID := strings.TrimSpace(p.SessionID)
 
 	if agentType == sessionManagerAgentCodex {
-		if rpcErr := s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex); rpcErr != nil {
-			return nil, rpcErr
-		}
-
 		info := session.WatchInfo{Watching: false}
+		remainingWatchers := 0
+		removedWatcher := false
+		stillWatching := false
+
 		if clientID != "" {
 			s.codexMu.Lock()
 			if watchedInfo, ok := s.codexWatchers[clientID]; ok {
 				info.WorkspaceID = watchedInfo.WorkspaceID
 				info.SessionID = watchedInfo.SessionID
+				stillWatching = true
+				if targetSessionID == "" || watchedInfo.SessionID == targetSessionID {
+					delete(s.codexWatchers, clientID)
+					removedWatcher = true
+					stillWatching = false
+				}
 			}
-			delete(s.codexWatchers, clientID)
+			remainingWatchers = len(s.codexWatchers)
 			s.codexMu.Unlock()
+		} else {
+			s.codexMu.Lock()
+			remainingWatchers = len(s.codexWatchers)
+			s.codexMu.Unlock()
+		}
+
+		if removedWatcher && remainingWatchers == 0 {
+			if rpcErr := s.unwatchRuntimeSession(ctx, sessionManagerAgentCodex); rpcErr != nil {
+				return nil, rpcErr
+			}
 		}
 
 		return map[string]interface{}{
 			"status":       "unwatched",
-			"watching":     false,
+			"watching":     stillWatching,
 			"workspace_id": info.WorkspaceID,
 			"session_id":   info.SessionID,
 		}, nil
@@ -1963,7 +1982,7 @@ func (s *SessionManagerService) UnwatchSession(ctx context.Context, params json.
 		return nil, rpcErr
 	}
 
-	info := s.manager.UnwatchWorkspaceSession(clientID)
+	info := s.manager.UnwatchWorkspaceSession(clientID, targetSessionID)
 
 	return map[string]interface{}{
 		"status":       "unwatched",
@@ -2512,7 +2531,6 @@ func (s *SessionManagerService) startCodexSession(ctx context.Context, workspace
 		}, nil
 	}
 
-	_ = codex.GetGlobalIndexCache().Refresh()
 	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
 	if err != nil && !errors.Is(err, codex.ErrProjectNotFound) {
 		return nil, message.NewError(message.InternalError, "failed to load Codex history: "+err.Error())
@@ -2592,7 +2610,6 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 	}
 
 	if sessionID != "" {
-		_ = codex.GetGlobalIndexCache().Refresh()
 		entry, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID)
 		switch {
 		case err != nil || entry == nil:
@@ -2619,7 +2636,6 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 		if workspacePath == "" {
 			return nil, message.NewError(message.InvalidParams, "workspace_id is required when mode is continue and session_id is empty")
 		}
-		_ = codex.GetGlobalIndexCache().Refresh()
 		entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(workspacePath)
 		if err != nil || len(entries) == 0 {
 			return nil, message.NewError(message.SessionNotFound, "no Codex session found to continue")
@@ -3074,7 +3090,6 @@ func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) 
 		return nil, err
 	}
 
-	_ = codex.GetGlobalIndexCache().Refresh()
 	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
 	if err != nil {
 		if errors.Is(err, codex.ErrProjectNotFound) {
@@ -3120,7 +3135,6 @@ func (s *SessionManagerService) resolveCodexSessionForWorkspace(workspaceID, ses
 		return nil, err
 	}
 
-	_ = codex.GetGlobalIndexCache().Refresh()
 	entry, err := codex.GetGlobalIndexCache().FindSessionByID(sessionID)
 	if err != nil || entry == nil {
 		return nil, fmt.Errorf("session not found: %s", sessionID)
@@ -3210,7 +3224,7 @@ func (s *SessionManagerService) deleteCodexWorkspaceSession(workspaceID, session
 		return fmt.Errorf("failed to delete session file: %w", err)
 	}
 
-	_ = codex.GetGlobalIndexCache().Refresh()
+	_ = codex.GetGlobalIndexCache().InvalidateByPath(entry.FullPath)
 	return nil
 }
 

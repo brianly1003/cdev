@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
 )
@@ -400,6 +401,77 @@ func TestSessionManagerUnwatchSession_AgentTypeValidation(t *testing.T) {
 				t.Fatalf("error message = %q, want to contain %q", err.Message, tt.wantErrMsg)
 			}
 		})
+	}
+}
+
+func TestSessionManagerUnwatchSession_Codex_KeepsSharedStreamAliveForRemainingWatchers(t *testing.T) {
+	codexStreamer := &mockSessionStreamer{}
+	sessionService := NewSessionService(nil)
+	sessionService.RegisterStreamer(sessionManagerAgentCodex, codexStreamer)
+
+	service := &SessionManagerService{
+		sessionService: sessionService,
+		codexWatchers: map[string]session.WatchInfo{
+			"client-a": {
+				WorkspaceID: "ws-1",
+				SessionID:   "sess-1",
+				Watching:    true,
+			},
+			"client-b": {
+				WorkspaceID: "ws-1",
+				SessionID:   "sess-1",
+				Watching:    true,
+			},
+		},
+	}
+
+	ctx := context.WithValue(context.Background(), handler.ClientIDKey, "client-a")
+	_, err := service.UnwatchSession(ctx, []byte(`{"agent_type":"codex"}`))
+	if err != nil {
+		t.Fatalf("UnwatchSession returned error: %v", err)
+	}
+
+	if codexStreamer.unwatchCalled {
+		t.Fatal("runtime unwatch should not be called while codex watchers remain")
+	}
+
+	if len(service.codexWatchers) != 1 {
+		t.Fatalf("expected 1 remaining codex watcher, got %d", len(service.codexWatchers))
+	}
+
+	if _, ok := service.codexWatchers["client-a"]; ok {
+		t.Fatal("client-a should be removed from codexWatchers")
+	}
+}
+
+func TestSessionManagerUnwatchSession_Codex_LastWatcherStopsRuntimeStream(t *testing.T) {
+	codexStreamer := &mockSessionStreamer{}
+	sessionService := NewSessionService(nil)
+	sessionService.RegisterStreamer(sessionManagerAgentCodex, codexStreamer)
+
+	service := &SessionManagerService{
+		sessionService: sessionService,
+		codexWatchers: map[string]session.WatchInfo{
+			"client-a": {
+				WorkspaceID: "ws-1",
+				SessionID:   "sess-1",
+				Watching:    true,
+			},
+		},
+	}
+
+	ctx := context.WithValue(context.Background(), handler.ClientIDKey, "client-a")
+	_, err := service.UnwatchSession(ctx, []byte(`{"agent_type":"codex"}`))
+	if err != nil {
+		t.Fatalf("UnwatchSession returned error: %v", err)
+	}
+
+	if !codexStreamer.unwatchCalled {
+		t.Fatal("runtime unwatch should be called when last codex watcher stops")
+	}
+
+	if len(service.codexWatchers) != 0 {
+		t.Fatalf("expected codexWatchers to be empty, got %d", len(service.codexWatchers))
 	}
 }
 

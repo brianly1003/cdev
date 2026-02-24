@@ -898,6 +898,22 @@ func (a *CodexSessionAdapter) GetSessionElements(ctx context.Context, sessionID 
 			continue
 		}
 
+		if it.IsTurnAborted {
+			message := strings.TrimSpace(joinCodexText(it.Content))
+			if message == "" {
+				message = "The previous turn was interrupted."
+			}
+			elements = append(elements, methods.SessionElement{
+				ID:        fmt.Sprintf("%s:%06d:interrupted", sessionID, it.Line),
+				Type:      string(sessioncache.ElementTypeInterrupted),
+				Timestamp: it.Timestamp,
+				Content: mustJSON(sessioncache.InterruptedContent{
+					Message: message,
+				}),
+			})
+			continue
+		}
+
 		// Most items are single-type (text/thinking/tool_use/tool_result). For "message"
 		// items, we can join all text blocks into a single element.
 		if it.Role == "user" {

@@ -254,3 +254,68 @@ Do this as an incremental refactor:
 1. Keep old single-window flow untouched behind `multiTerminalEnabled == false`.
 2. Release multi-window path as hidden/internal toggle for one cycle.
 3. Enable progressively after backend concurrency behavior is verified.
+
+## Progress Update (February 23, 2026)
+
+### Completed (backend validation + compatibility)
+- Added backend multi-watch tests in `internal/session/manager_multiwatch_test.go`:
+  - concurrent watches from one client across multiple sessions
+  - isolated unwatch behavior (removing one session watch does not tear down others)
+  - unknown `session_id` unwatch is a safe no-op
+- Updated backend unwatch behavior to support targeted unwatch:
+  - `workspace/session/unwatch` now accepts optional `session_id`
+  - backward compatibility retained when `session_id` is omitted (deterministic legacy behavior)
+- Updated OpenRPC metadata in `internal/rpc/handler/methods/session_manager.go`:
+  - `workspace/session/watch` description now reflects concurrent watches
+  - `workspace/session/unwatch` documents optional `session_id`
+- Added contract assertion for the new unwatch parameter in `internal/rpc/handler/methods/session_manager_contract_test.go`.
+
+### Completed (stability fix discovered during validation)
+- Fixed a race in `internal/adapters/sessioncache/streamer.go` where watcher channels could be dereferenced after unwatch; watcher channels are now captured once at loop start.
+
+### Completed (iOS foundation - phase start)
+- Added terminal window domain/state model in `cdev-ios/cdev/App/AppState.swift`:
+  - `TerminalWindow` model
+  - `terminalWindows` + `activeTerminalWindowId`
+  - window lifecycle APIs (`openTerminalWindow`, `activateTerminalWindow`, `closeTerminalWindow`, `setTerminalWindowSession`, `setTerminalWindowRuntime`)
+- Updated iOS watch/unwatch protocol and transport plumbing:
+  - `cdev-ios/cdev/Domain/Interfaces/AgentConnectionProtocol.swift` now supports session-targeted unwatch (`sessionId`, `ownerId`) with compatibility overloads.
+  - `cdev-ios/cdev/Data/Services/JSONRPC/JSONRPCMethods.swift` unwatch request params now include optional `session_id`.
+  - `cdev-ios/cdev/Data/Services/WebSocket/WebSocketService.swift` now tracks watch ownership per owner -> session target, enabling multi-window-safe watch ownership and session-targeted unwatch dispatch.
+- Wired Dashboard runtime/session watch flow to active window ownership:
+  - `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift` now derives watch owner IDs from active `TerminalWindow` and syncs window session/runtime context.
+  - `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardRuntimeCoordinator.swift` now requests watch owner ID dynamically during runtime switches.
+
+### Completed (iOS multi-window step: 1 -> 2 -> 3)
+- Added terminal window controls in `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardView.swift`:
+  - horizontal window strip
+  - create/select/close controls
+  - workspace-change window bootstrap
+- Added session-id based event routing buffer in `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift`:
+  - session-scoped buffering for inactive windows
+  - replay on window activation
+  - active-window-aware session filtering for `claude_message` and `pty_output`
+- Added close-window targeted cleanup in `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift`:
+  - immediate `unwatchSession(sessionId:ownerId:)` for the closed window owner
+  - buffered session cleanup for the closed window
+  - active-window handoff after close
+- Verified with local iOS build:
+  - `xcodebuild -project /Users/brianly/Projects/cdev-ios/cdev.xcodeproj -scheme cdev -destination 'generic/platform=iOS Simulator' build`
+  - result: `BUILD SUCCEEDED`
+
+### Completed (iOS multi-window step: per-window in-memory independence)
+- Added per-window in-memory state snapshots in `cdev-ios/cdev/Presentation/Screens/Dashboard/DashboardViewModel.swift`:
+  - window-specific chat/log/message pagination state cache keyed by `windowId`
+  - snapshot persist on switch + session/watch state transitions
+  - snapshot restore on window activation
+- Window activation now prefers in-memory restore path before history API reload:
+  - session windows restore immediately and continue streaming/watch flow
+  - no-session windows restore/initialize independent empty state
+- Close-window cleanup now also removes cached in-memory state for that window.
+
+### Next
+- iOS-side architecture refactor from single focused session to per-window session contexts:
+  - window model/state in app layer
+  - one watch task per window
+  - event routing by `session_id`
+  - per-window unwatch on close

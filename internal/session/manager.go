@@ -768,6 +768,7 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 							"real_id", sessionID,
 						)
 						m.updateSessionID(workspaceID, temporaryID, sessionID)
+						m.ensureInternalPTYSessionWatch(workspaceID, sessionID)
 						evt := events.NewSessionIDResolvedEvent(
 							temporaryID,
 							sessionID,
@@ -813,6 +814,7 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 
 					// Update internal state to use real session ID
 					m.updateSessionID(workspaceID, temporaryID, realSessionID)
+					m.ensureInternalPTYSessionWatch(workspaceID, realSessionID)
 
 					// Emit the session_id_resolved event
 					evt := events.NewSessionIDResolvedEvent(
@@ -842,6 +844,29 @@ func (m *Manager) cleanupSessionFileWatcher(workspaceID string) {
 	m.sessionFileWatchersMu.Lock()
 	defer m.sessionFileWatchersMu.Unlock()
 	delete(m.sessionFileWatchers, workspaceID)
+}
+
+// ensureInternalPTYSessionWatch ensures JSONL streaming is active for a resolved PTY session.
+// This emits structured claude_message events in addition to raw pty_output/pty_spinner events.
+func (m *Manager) ensureInternalPTYSessionWatch(workspaceID, sessionID string) {
+	const internalPTYWatcherClientID = "internal:pty-session"
+	if workspaceID == "" || sessionID == "" {
+		return
+	}
+
+	if _, err := m.WatchWorkspaceSession(internalPTYWatcherClientID, workspaceID, sessionID); err != nil {
+		m.logger.Warn("failed to start JSONL watch for resolved PTY session",
+			"workspace_id", workspaceID,
+			"session_id", sessionID,
+			"error", err,
+		)
+		return
+	}
+
+	m.logger.Info("started JSONL watch for resolved PTY session",
+		"workspace_id", workspaceID,
+		"session_id", sessionID,
+	)
 }
 
 // CancelSessionFileWatcher cancels an active session file watcher for a workspace.
@@ -2552,10 +2577,10 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 	}, nil
 }
 
-// UnwatchWorkspaceSession stops watching the current session for one client.
+// UnwatchWorkspaceSession stops watching a session for one client.
 // The streamer continues running until all clients have stopped watching.
-// The clientID parameter identifies the client making this request.
-func (m *Manager) UnwatchWorkspaceSession(clientID string) *WatchInfo {
+// If sessionID is empty, one watched session is removed deterministically for backward compatibility.
+func (m *Manager) UnwatchWorkspaceSession(clientID string, sessionID string) *WatchInfo {
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
@@ -2566,19 +2591,26 @@ func (m *Manager) UnwatchWorkspaceSession(clientID string) *WatchInfo {
 		}
 	}
 
-	// Deterministically pick one watched session for removal
+	sessionID = strings.TrimSpace(sessionID)
+
+	// Select a watched session to remove.
+	// - If sessionID is provided, remove that specific session (workspace chosen deterministically if duplicated).
+	// - If sessionID is empty, remove one watched session deterministically (legacy behavior).
 	var target watchedSessionKey
 	found := false
 	for session := range watchedSessions {
+		if sessionID != "" && session.SessionID != sessionID {
+			continue
+		}
 		if !found || session.WorkspaceID < target.WorkspaceID || (session.WorkspaceID == target.WorkspaceID && session.SessionID < target.SessionID) {
 			target = session
 			found = true
 		}
 	}
 	if !found {
-		delete(m.streamerClientSessions, clientID)
 		return &WatchInfo{
-			Watching: false,
+			SessionID: sessionID,
+			Watching:  len(watchedSessions) > 0,
 		}
 	}
 

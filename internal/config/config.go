@@ -70,11 +70,11 @@ type LoggingConfig struct {
 
 // LogRotationConfig holds log rotation configuration.
 type LogRotationConfig struct {
-	Enabled    bool `mapstructure:"enabled"`     // Enable log rotation for Claude JSONL logs
-	MaxSizeMB  int  `mapstructure:"max_size_mb"` // Max size in MB before rotation
-	MaxBackups int  `mapstructure:"max_backups"` // Number of old logs to keep
+	Enabled    bool `mapstructure:"enabled"`      // Enable log rotation for Claude JSONL logs
+	MaxSizeMB  int  `mapstructure:"max_size_mb"`  // Max size in MB before rotation
+	MaxBackups int  `mapstructure:"max_backups"`  // Number of old logs to keep
 	MaxAgeDays int  `mapstructure:"max_age_days"` // Days to keep old logs (0 = no limit)
-	Compress   bool `mapstructure:"compress"`    // Compress rotated logs with gzip
+	Compress   bool `mapstructure:"compress"`     // Compress rotated logs with gzip
 }
 
 // LimitsConfig holds various limits.
@@ -99,15 +99,16 @@ type IndexerConfig struct {
 
 // SecurityConfig holds security-related configuration.
 type SecurityConfig struct {
-	RequireAuth       bool            `mapstructure:"require_auth"`        // If true, require token for WebSocket connections
-	TokenExpirySecs   int             `mapstructure:"token_expiry_secs"`   // Pairing token expiry in seconds
-	AllowedOrigins    []string        `mapstructure:"allowed_origins"`     // Allowed origins for CORS/WebSocket (empty = localhost only)
-	BindLocalhostOnly bool            `mapstructure:"bind_localhost_only"` // If true, only bind to localhost
-	RequireSecureTransport bool       `mapstructure:"require_secure_transport"` // If true, require TLS/WSS for non-localhost use
-	TLSCertFile      string          `mapstructure:"tls_cert_file"`      // Optional TLS certificate file path
-	TLSKeyFile       string          `mapstructure:"tls_key_file"`       // Optional TLS key file path
-	TrustedProxies   []string        `mapstructure:"trusted_proxies"`    // Optional trusted reverse-proxy CIDRs
-	RateLimit         RateLimitConfig `mapstructure:"rate_limit"`          // Rate limiting configuration
+	RequireAuth            bool            `mapstructure:"require_auth"`             // If true, require token for WebSocket connections
+	RequirePairingApproval bool            `mapstructure:"require_pairing_approval"` // If true, pairing exchange requires local approve/reject
+	TokenExpirySecs        int             `mapstructure:"token_expiry_secs"`        // Pairing token expiry in seconds
+	AllowedOrigins         []string        `mapstructure:"allowed_origins"`          // Allowed origins for CORS/WebSocket (empty = localhost only)
+	BindLocalhostOnly      bool            `mapstructure:"bind_localhost_only"`      // If true, only bind to localhost
+	RequireSecureTransport bool            `mapstructure:"require_secure_transport"` // If true, require TLS/WSS for non-localhost use
+	TLSCertFile            string          `mapstructure:"tls_cert_file"`            // Optional TLS certificate file path
+	TLSKeyFile             string          `mapstructure:"tls_key_file"`             // Optional TLS key file path
+	TrustedProxies         []string        `mapstructure:"trusted_proxies"`          // Optional trusted reverse-proxy CIDRs
+	RateLimit              RateLimitConfig `mapstructure:"rate_limit"`               // Rate limiting configuration
 }
 
 // RateLimitConfig holds rate limiting configuration.
@@ -263,14 +264,15 @@ func setDefaults(v *viper.Viper) {
 
 	// Pairing defaults
 	v.SetDefault("pairing.token_expiry_secs", 3600)
-	v.SetDefault("pairing.show_qr_in_terminal", true)
+	v.SetDefault("pairing.show_qr_in_terminal", false)
 
 	// Indexer defaults - uses centralized patterns from defaults.go
 	v.SetDefault("indexer.enabled", true)
 	v.SetDefault("indexer.skip_directories", DefaultSkipDirectories)
 
 	// Security defaults
-	v.SetDefault("security.require_auth", true)      // Auth required by default
+	v.SetDefault("security.require_auth", true) // Auth required by default
+	v.SetDefault("security.require_pairing_approval", true)
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default

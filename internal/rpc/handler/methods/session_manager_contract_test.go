@@ -51,6 +51,14 @@ func TestSessionManagerProtocolContract_MethodMetadata(t *testing.T) {
 	assertSchemaDefault(t, watchAgent, "claude")
 	assertSchemaEnumContains(t, watchAgent, "claude", "codex")
 
+	unwatchMeta := registry.GetMeta("workspace/session/unwatch")
+	if unwatchMeta.Summary == "" {
+		t.Fatal("workspace/session/unwatch summary should not be empty")
+	}
+	unwatchAgent := assertParamContract(t, unwatchMeta, "agent_type", true)
+	assertSchemaEnumContains(t, unwatchAgent, "claude", "codex")
+	assertParamContract(t, unwatchMeta, "session_id", false)
+
 	messagesMeta := registry.GetMeta("workspace/session/messages")
 	if messagesMeta.Summary == "" {
 		t.Fatal("workspace/session/messages summary should not be empty")

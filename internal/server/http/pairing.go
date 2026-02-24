@@ -262,6 +262,18 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	pairingApprovalBlock := ""
+	if h.requireAuth && h.tokenManager != nil {
+		pairingApprovalBlock = `<div class="pairing-approval" id="pairingApprovalPanel">
+                <div class="pairing-approval-header">
+                    <span>Pending Pairing Approvals</span>
+                    <span class="pairing-approval-status" id="pairingApprovalStatus">Loading...</span>
+                </div>
+                <div class="pairing-approval-list" id="pairingApprovalList"></div>
+                <div class="pairing-approval-hint" id="pairingApprovalHint"></div>
+            </div>`
+	}
+
 	// Simple HTML page with embedded QR code
 	html := `<!DOCTYPE html>
 <html>
@@ -295,18 +307,19 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
-            height: 100%;
-            overflow: hidden;
+            min-height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
-            height: 100%;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             color: var(--text-primary);
-            padding: 16px;
+            padding: 24px 16px;
         }
         .container {
             background: var(--bg-elevated);
@@ -316,8 +329,9 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             border: 1px solid var(--bg-highlight);
             max-width: min(92vw, calc(var(--qr-size) + 140px));
             width: min(92vw, calc(var(--qr-size) + 96px));
-            max-height: calc(100vh - 32px);
+            max-height: none;
             box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+            overflow: visible;
         }
         h1 {
             font-size: 22px;
@@ -387,6 +401,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             border-radius: 10px;
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
             font-size: 11px;
+            margin-top: 10px;
             margin-bottom: 16px;
         }
         .info-row {
@@ -413,6 +428,10 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             align-items: center;
             justify-content: center;
             gap: 12px;
+            margin-bottom: 12px;
+        }
+        .main-stack {
+            min-width: 0;
         }
         .btn {
             background: var(--success);
@@ -464,6 +483,87 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             position: relative;
             display: inline-block;
         }
+        .pairing-approval {
+            margin-top: 10px;
+            background: var(--bg-highlight);
+            border: 1px solid var(--bg-selected);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: left;
+        }
+        .pairing-approval-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .pairing-approval-status {
+            color: var(--primary);
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 600;
+        }
+        .pairing-approval-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 170px;
+            overflow: auto;
+            padding-right: 2px;
+        }
+        .pairing-empty {
+            color: var(--text-tertiary);
+            font-size: 11px;
+        }
+        .pairing-item {
+            border: 1px solid var(--bg-selected);
+            border-radius: 8px;
+            padding: 8px;
+            background: var(--bg-elevated);
+        }
+        .pairing-item-id {
+            color: var(--text-primary);
+            font-size: 11px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            margin-bottom: 4px;
+        }
+        .pairing-item-meta {
+            color: var(--text-secondary);
+            font-size: 10px;
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+        .pairing-item-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .pairing-action-btn {
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .pairing-approve-btn {
+            background: var(--success);
+            color: var(--bg-primary);
+        }
+        .pairing-reject-btn {
+            background: var(--error);
+            color: var(--bg-primary);
+        }
+        .pairing-approval-hint {
+            margin-top: 8px;
+            font-size: 10px;
+            color: var(--text-tertiary);
+            min-height: 12px;
+        }
 
         /* iPhone SE, small phones */
         @media (max-height: 600px) {
@@ -491,7 +591,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* iPhone Pro Max, iPad */
         @media (min-height: 751px) {
             :root {
-                --qr-size: clamp(260px, 45vmin, 380px);
+                --qr-size: clamp(240px, 42vmin, 340px);
                 --container-padding: 28px;
             }
             h1 { font-size: 24px; }
@@ -501,7 +601,7 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         /* iPad landscape / Desktop */
         @media (min-width: 768px) and (min-height: 600px) {
             :root {
-                --qr-size: clamp(300px, 48vmin, 420px);
+                --qr-size: clamp(260px, 42vmin, 360px);
                 --container-padding: 32px;
             }
             .container {
@@ -510,6 +610,26 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             h1 { font-size: 26px; }
             .info { font-size: 12px; }
             .info-row { gap: 4px; }
+        }
+
+        /* Desktop: move pending approvals to right column, keep mobile unchanged */
+        @media (min-width: 1180px) and (min-height: 640px) {
+            .container {
+                max-width: min(96vw, 1160px);
+                width: min(96vw, 1160px);
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+                align-items: start;
+                gap: 18px;
+            }
+            .pairing-approval {
+                margin-top: 0;
+                position: sticky;
+                top: 16px;
+            }
+            .pairing-approval-list {
+                max-height: min(62vh, 560px);
+            }
         }
 
         /* Landscape mode - horizontal layout */
@@ -541,49 +661,53 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
 </head>
 <body>
     <div class="container">
-        <div class="qr-section">
-            <h1>Cdev Pairing</h1>
-            <p class="subtitle">Scan with cdev mobile app to connect</p>
+        <div class="main-stack">
+            <div class="qr-section">
+                <h1>Cdev Pairing</h1>
+                <p class="subtitle">Scan with cdev mobile app to connect</p>
 
-            <div class="qr-wrapper">
-                <div class="qr-container" id="qrContainer">
-                    <img src="/api/pair/qr?size=512" alt="QR Code" id="qrImage">
+                <div class="qr-wrapper">
+                    <div class="qr-container" id="qrContainer">
+                        <img src="/api/pair/qr?size=512" alt="QR Code" id="qrImage">
+                    </div>
+                    <div class="expired-overlay" id="expiredOverlay">Expired</div>
                 </div>
-                <div class="expired-overlay" id="expiredOverlay">Expired</div>
+                <div class="timer">Refreshes in <span id="countdown">60</span>s</div>
+                ` + pairingCodeBlock + `
             </div>
-            <div class="timer">Refreshes in <span id="countdown">60</span>s</div>
-            ` + pairingCodeBlock + `
+
+            <div class="content-section">
+                <div class="info">
+                    <div class="info-row">
+                        <span class="info-label">WebSocket:</span>
+                        <span class="info-value">` + info.WebSocket + `</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">HTTP:</span>
+                        <span class="info-value">` + info.HTTP + `</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Session:</span>
+                        <span class="info-value">` + info.SessionID + `</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Repo:</span>
+                        <span class="info-value">` + info.RepoName + `</span>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn" onclick="refreshQR()">Refresh</button>
+                    <span class="auth-badge ` + authBadgeClass(h.requireAuth) + `">` + authBadgeText(h.requireAuth) + `</span>
+                </div>
+            </div>
         </div>
-
-        <div class="content-section">
-            <div class="info">
-                <div class="info-row">
-                    <span class="info-label">WebSocket:</span>
-                    <span class="info-value">` + info.WebSocket + `</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">HTTP:</span>
-                    <span class="info-value">` + info.HTTP + `</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Session:</span>
-                    <span class="info-value">` + info.SessionID + `</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Repo:</span>
-                    <span class="info-value">` + info.RepoName + `</span>
-                </div>
-            </div>
-
-            <div class="actions">
-                <button class="btn" onclick="refreshQR()">Refresh</button>
-                <span class="auth-badge ` + authBadgeClass(h.requireAuth) + `">` + authBadgeText(h.requireAuth) + `</span>
-            </div>
-        </div>
+        ` + pairingApprovalBlock + `
     </div>
 
     <script>
         const REFRESH_INTERVAL = 60;
+        const PAIRING_APPROVAL_POLL_MS = 3000;
         let countdown = REFRESH_INTERVAL;
         let expired = false;
 
@@ -609,7 +733,135 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
             document.getElementById('countdown').textContent = countdown;
         }
 
+        function setPairingApprovalHint(text) {
+            const hint = document.getElementById('pairingApprovalHint');
+            if (!hint) return;
+            hint.textContent = text || '';
+        }
+
+        function setPairingApprovalStatus(text) {
+            const status = document.getElementById('pairingApprovalStatus');
+            if (!status) return;
+            status.textContent = text || '';
+        }
+
+        function renderPairingPendingList(items) {
+            const list = document.getElementById('pairingApprovalList');
+            if (!list) return;
+
+            list.innerHTML = '';
+            if (!Array.isArray(items) || items.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'pairing-empty';
+                empty.textContent = 'No pending pairing requests';
+                list.appendChild(empty);
+                return;
+            }
+
+            for (const item of items) {
+                const row = document.createElement('div');
+                row.className = 'pairing-item';
+
+                const id = document.createElement('div');
+                id.className = 'pairing-item-id';
+                id.textContent = item.request_id || 'unknown-request';
+                row.appendChild(id);
+
+                const meta = document.createElement('div');
+                meta.className = 'pairing-item-meta';
+                const remote = item.remote_addr || 'unknown-addr';
+                const ua = item.user_agent || 'unknown-agent';
+                meta.textContent = remote + ' • ' + ua;
+                row.appendChild(meta);
+
+                const actions = document.createElement('div');
+                actions.className = 'pairing-item-actions';
+
+                const approveBtn = document.createElement('button');
+                approveBtn.className = 'pairing-action-btn pairing-approve-btn';
+                approveBtn.textContent = 'Approve';
+                approveBtn.onclick = () => submitPairingDecision('approve', item.request_id);
+                actions.appendChild(approveBtn);
+
+                const rejectBtn = document.createElement('button');
+                rejectBtn.className = 'pairing-action-btn pairing-reject-btn';
+                rejectBtn.textContent = 'Reject';
+                rejectBtn.onclick = () => submitPairingDecision('reject', item.request_id);
+                actions.appendChild(rejectBtn);
+
+                row.appendChild(actions);
+                list.appendChild(row);
+            }
+        }
+
+        async function fetchPairingPending() {
+            const panel = document.getElementById('pairingApprovalPanel');
+            if (!panel) return;
+
+            try {
+                const response = await fetch('/api/auth/pairing/pending?t=' + Date.now(), {
+                    cache: 'no-store'
+                });
+
+                if (response.status === 404) {
+                    panel.style.display = 'none';
+                    return;
+                }
+
+                if (response.status === 403) {
+                    setPairingApprovalStatus('Unavailable');
+                    renderPairingPendingList([]);
+                    setPairingApprovalHint('Approve/reject endpoints are local-only.');
+                    return;
+                }
+
+                if (!response.ok) {
+                    setPairingApprovalStatus('Error');
+                    setPairingApprovalHint('Failed to load pending requests.');
+                    return;
+                }
+
+                const payload = await response.json();
+                const pending = Array.isArray(payload.pending) ? payload.pending : [];
+                setPairingApprovalStatus(pending.length + ' pending');
+                renderPairingPendingList(pending);
+                setPairingApprovalHint('');
+            } catch (error) {
+                setPairingApprovalStatus('Error');
+                setPairingApprovalHint('Failed to load pending requests.');
+            }
+        }
+
+        async function submitPairingDecision(action, requestID) {
+            if (!requestID) return;
+
+            const endpoint = action === 'approve'
+                ? '/api/auth/pairing/approve'
+                : '/api/auth/pairing/reject';
+
+            setPairingApprovalHint((action === 'approve' ? 'Approving ' : 'Rejecting ') + requestID + '...');
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ request_id: requestID })
+                });
+
+                if (!response.ok) {
+                    setPairingApprovalHint('Failed to ' + action + ' request.');
+                    return;
+                }
+
+                setPairingApprovalHint('Request ' + requestID + ' ' + (action === 'approve' ? 'approved.' : 'rejected.'));
+                await fetchPairingPending();
+            } catch (error) {
+                setPairingApprovalHint('Failed to ' + action + ' request.');
+            }
+        }
+
         setInterval(updateCountdown, 1000);
+        fetchPairingPending();
+        setInterval(fetchPairingPending, PAIRING_APPROVAL_POLL_MS);
     </script>
 </body>
 </html>`
@@ -785,6 +1037,16 @@ func (h *PairingHandler) pairingInfoForRequest(r *http.Request) *pairing.Pairing
 	}
 
 	baseURL, ok := security.RequestBaseURL(r, h.trustedProxies)
+	if (!ok || isLocalBaseURL(baseURL)) && isLoopbackRemoteAddr(r.RemoteAddr) {
+		// Tunnel/reverse-proxy processes running on loopback often rewrite Host to
+		// localhost while preserving X-Forwarded-* headers with the public domain.
+		// In that case, trust forwarded host/proto from loopback only so /pair can
+		// auto-generate externally reachable QR URLs.
+		if forwardedBaseURL, forwardedOK := forwardedBaseURLFromHeaders(r); forwardedOK {
+			baseURL = forwardedBaseURL
+			ok = true
+		}
+	}
 	if !ok {
 		return info
 	}
@@ -825,4 +1087,123 @@ func hostFromURL(raw string) string {
 		return ""
 	}
 	return parsed.Hostname()
+}
+
+func isLocalBaseURL(raw string) bool {
+	return isLocalHost(hostFromURL(raw))
+}
+
+func isLocalHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return ip.IsLoopback() || ip.IsUnspecified()
+	}
+	switch strings.ToLower(host) {
+	case "localhost", "0.0.0.0":
+		return true
+	default:
+		return false
+	}
+}
+
+func isLoopbackRemoteAddr(remoteAddr string) bool {
+	trimmed := strings.TrimSpace(remoteAddr)
+	if trimmed == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(trimmed)
+	if err != nil {
+		host = strings.Trim(trimmed, "[]")
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func forwardedBaseURLFromHeaders(r *http.Request) (string, bool) {
+	if r == nil {
+		return "", false
+	}
+
+	forwardedHost := firstHeaderValue(r.Header.Get("X-Forwarded-Host"))
+	forwardedProto := strings.ToLower(firstHeaderValue(r.Header.Get("X-Forwarded-Proto")))
+	if forwardedProto == "" {
+		forwardedProto = strings.ToLower(firstHeaderValue(r.Header.Get("X-Forwarded-Scheme")))
+	}
+
+	if forwardedHeader := firstHeaderValue(r.Header.Get("Forwarded")); forwardedHeader != "" {
+		hostFromForwarded, protoFromForwarded := parseForwardedHeader(forwardedHeader)
+		if forwardedHost == "" {
+			forwardedHost = hostFromForwarded
+		}
+		if forwardedProto == "" {
+			forwardedProto = strings.ToLower(protoFromForwarded)
+		}
+	}
+
+	if forwardedHost == "" {
+		return "", false
+	}
+
+	if forwardedProto != "http" && forwardedProto != "https" {
+		if r.TLS != nil {
+			forwardedProto = "https"
+		} else {
+			forwardedProto = "http"
+		}
+	}
+
+	if forwardedPort := firstHeaderValue(r.Header.Get("X-Forwarded-Port")); forwardedPort != "" && !strings.Contains(forwardedHost, ":") {
+		if (forwardedProto == "http" && forwardedPort != "80") || (forwardedProto == "https" && forwardedPort != "443") {
+			forwardedHost = forwardedHost + ":" + forwardedPort
+		}
+	}
+
+	base := forwardedProto + "://" + forwardedHost
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Host == "" {
+		return "", false
+	}
+
+	return base, true
+}
+
+func firstHeaderValue(value string) string {
+	if value == "" {
+		return ""
+	}
+	parts := strings.Split(value, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(parts[0])
+}
+
+func parseForwardedHeader(raw string) (host, proto string) {
+	if raw == "" {
+		return "", ""
+	}
+	first := strings.TrimSpace(strings.Split(raw, ",")[0])
+	segments := strings.Split(first, ";")
+	for _, segment := range segments {
+		kv := strings.SplitN(strings.TrimSpace(segment), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(kv[0]))
+		value := strings.Trim(strings.TrimSpace(kv[1]), "\"")
+		switch key {
+		case "host":
+			if host == "" {
+				host = value
+			}
+		case "proto":
+			if proto == "" {
+				proto = value
+			}
+		}
+	}
+	return host, proto
 }

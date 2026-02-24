@@ -179,8 +179,11 @@ func (s *Server) SetAuthHandler(handler *AuthHandler) {
 	s.mux.HandleFunc("/api/auth/exchange", handler.HandleExchange)
 	s.mux.HandleFunc("/api/auth/refresh", handler.HandleRefresh)
 	s.mux.HandleFunc("/api/auth/revoke", handler.HandleRevoke)
+	s.mux.HandleFunc("/api/auth/pairing/pending", handler.HandlePairingPending)
+	s.mux.HandleFunc("/api/auth/pairing/approve", handler.HandlePairingApprove)
+	s.mux.HandleFunc("/api/auth/pairing/reject", handler.HandlePairingReject)
 
-	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh, /api/auth/revoke")
+	log.Info().Msg("auth routes registered: /api/auth/exchange, /api/auth/refresh, /api/auth/revoke, /api/auth/pairing/*")
 }
 
 // SetDebugHandler sets up debug and profiling endpoints.
@@ -403,6 +406,7 @@ func defaultAuthAllowlist() []string {
 		"/api/auth/exchange",
 		"/api/auth/refresh",
 		"/api/auth/revoke",
+		"/api/auth/pairing/",
 	}
 }
 

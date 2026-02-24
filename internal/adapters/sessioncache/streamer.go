@@ -148,6 +148,13 @@ func (s *SessionStreamer) GetWatchedSession() string {
 
 // watchLoop monitors the session file for changes.
 func (s *SessionStreamer) watchLoop() {
+	watcher := s.watcher
+	if watcher == nil {
+		return
+	}
+	eventsCh := watcher.Events
+	errorsCh := watcher.Errors
+
 	// Debounce: wait for writes to settle before reading
 	// This prevents reading while Claude is mid-write
 	var lastEvent time.Time
@@ -167,7 +174,7 @@ func (s *SessionStreamer) watchLoop() {
 			debounceTimer.Stop()
 			return
 
-		case event, ok := <-s.watcher.Events:
+		case event, ok := <-eventsCh:
 			if !ok {
 				return
 			}
@@ -192,7 +199,7 @@ func (s *SessionStreamer) watchLoop() {
 			// Complete timer fired - emit the event
 			s.emitStreamReadComplete(info)
 
-		case err, ok := <-s.watcher.Errors:
+		case err, ok := <-errorsCh:
 			if !ok {
 				return
 			}

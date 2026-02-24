@@ -182,6 +182,30 @@ func TestParseConversationLine_IgnoresCodexBootstrapUserMessages(t *testing.T) {
 	}
 }
 
+func TestParseConversationLine_NormalizesTurnAbortedMessage(t *testing.T) {
+	line := `{"timestamp":"2026-01-31T12:00:10Z","type":"response_item","payload":{"type":"message","role":"user","content":"<turn_aborted>\nThe user interrupted the previous turn on purpose.\n</turn_aborted>"}}`
+
+	item, err := ParseConversationLine(line)
+	if err != nil {
+		t.Fatalf("ParseConversationLine error: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected non-nil item")
+	}
+	if item.Role != "user" {
+		t.Fatalf("role=%q, want user", item.Role)
+	}
+	if !item.IsTurnAborted {
+		t.Fatal("expected IsTurnAborted=true")
+	}
+	if len(item.Content) != 1 || item.Content[0].Type != "text" {
+		t.Fatalf("unexpected content: %+v", item.Content)
+	}
+	if got := item.Content[0].Text; got != "The user interrupted the previous turn on purpose." {
+		t.Fatalf("content text=%q", got)
+	}
+}
+
 func TestReadConversationItems_SetsLineNumbers(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "rollout-test.jsonl")

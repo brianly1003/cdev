@@ -176,10 +176,6 @@ func (s *WorkspaceConfigService) List(ctx context.Context, params json.RawMessag
 		gitStatuses = s.fetchGitStatusParallel(ctx, workspaces, p.GitLimit)
 	}
 
-	// Enrich with session status
-	if idx := codex.GetGlobalIndexCache(); idx != nil {
-		_ = idx.Refresh()
-	}
 	result := make([]map[string]interface{}, 0, len(workspaces))
 	for _, ws := range workspaces {
 		info := map[string]interface{}{
@@ -329,10 +325,6 @@ func (s *WorkspaceConfigService) Get(ctx context.Context, params json.RawMessage
 		"auto_start": ws.Definition.AutoStart,
 		"created_at": ws.Definition.CreatedAt,
 	}
-	if idx := codex.GetGlobalIndexCache(); idx != nil {
-		_ = idx.Refresh()
-	}
-
 	// Get session viewers for this workspace (if provider is available)
 	var sessionViewers map[string][]string
 	if s.viewerProvider != nil {

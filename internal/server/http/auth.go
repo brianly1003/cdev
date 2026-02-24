@@ -3,6 +3,7 @@ package http
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"time"
 
@@ -12,9 +13,11 @@ import (
 
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
-	tokenManager *security.TokenManager
-	registry     *security.AuthRegistry
-	onOrphaned   func([]string, string)
+	tokenManager    *security.TokenManager
+	registry        *security.AuthRegistry
+	onOrphaned      func([]string, string)
+	pairingApproval *security.PairingApprovalManager
+	trustedProxies  []*net.IPNet
 }
 
 // NewAuthHandler creates a new auth handler.
@@ -24,6 +27,12 @@ func NewAuthHandler(tm *security.TokenManager, registry *security.AuthRegistry, 
 		registry:     registry,
 		onOrphaned:   onOrphaned,
 	}
+}
+
+// SetPairingApproval enables manual approve/reject flow for pairing exchange.
+func (h *AuthHandler) SetPairingApproval(manager *security.PairingApprovalManager, trustedProxies []*net.IPNet) {
+	h.pairingApproval = manager
+	h.trustedProxies = trustedProxies
 }
 
 // TokenExchangeRequest is the request body for token exchange.
@@ -41,6 +50,11 @@ type TokenRevokeRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// PairingDecisionRequest is the request body for pairing approval decisions.
+type PairingDecisionRequest struct {
+	RequestID string `json:"request_id"`
+}
+
 // TokenPairResponse is the response containing access and refresh tokens.
 type TokenPairResponse struct {
 	AccessToken        string `json:"access_token"`
@@ -49,6 +63,13 @@ type TokenPairResponse struct {
 	RefreshTokenExpiry string `json:"refresh_token_expires_at"`
 	TokenType          string `json:"token_type"`
 	ExpiresIn          int    `json:"expires_in"` // seconds until access token expires
+}
+
+// PairingExchangePendingResponse is returned when exchange requires approval.
+type PairingExchangePendingResponse struct {
+	Status    string `json:"status"`
+	RequestID string `json:"request_id"`
+	ExpiresAt string `json:"expires_at"`
 }
 
 // HandleExchange exchanges a pairing token for an access/refresh token pair.
@@ -79,11 +100,63 @@ func (h *AuthHandler) HandleExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var payload *security.TokenPayload
+	if h.pairingApproval != nil {
+		validatedPayload, err := h.tokenManager.ValidateToken(req.PairingToken)
+		if err != nil {
+			log.Warn().Err(err).Msg("Token exchange failed")
+			writeJSONError(w, "Invalid or expired pairing token", http.StatusUnauthorized)
+			return
+		}
+		if validatedPayload.Type != security.TokenTypePairing {
+			writeJSONError(w, "Invalid or expired pairing token", http.StatusUnauthorized)
+			return
+		}
+		payload = validatedPayload
+
+		switch h.pairingApproval.Status(payload.Nonce) {
+		case security.PairingApprovalStatusApproved:
+			// proceed to exchange
+		case security.PairingApprovalStatusRejected:
+			writeJSONError(w, "Pairing request rejected", http.StatusForbidden)
+			return
+		default:
+			pending, err := h.pairingApproval.EnsurePending(
+				payload.Nonce,
+				r.RemoteAddr,
+				r.UserAgent(),
+				time.Unix(payload.ExpiresAt, 0),
+			)
+			if err != nil {
+				writeJSONError(w, "Failed to create pairing approval request", http.StatusInternalServerError)
+				return
+			}
+
+			log.Info().
+				Str("request_id", pending.RequestID).
+				Str("remote_addr", pending.RemoteAddr).
+				Str("user_agent", pending.UserAgent).
+				Time("expires_at", pending.ExpiresAt).
+				Msg("pairing request pending approval")
+
+			writeJSON(w, http.StatusAccepted, PairingExchangePendingResponse{
+				Status:    "pending_approval",
+				RequestID: pending.RequestID,
+				ExpiresAt: pending.ExpiresAt.Format(time.RFC3339),
+			})
+			return
+		}
+	}
+
 	pair, err := h.tokenManager.ExchangePairingToken(req.PairingToken)
 	if err != nil {
 		log.Warn().Err(err).Msg("Token exchange failed")
 		writeJSONError(w, "Invalid or expired pairing token", http.StatusUnauthorized)
 		return
+	}
+
+	if h.pairingApproval != nil && payload != nil {
+		h.pairingApproval.ClearTokenDecision(payload.Nonce)
 	}
 
 	if h.registry != nil {
@@ -221,6 +294,110 @@ func (h *AuthHandler) HandleRevoke(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":             true,
 		"orphaned_workspaces": orphaned,
+	})
+}
+
+// HandlePairingPending lists pending pairing approval requests.
+func (h *AuthHandler) HandlePairingPending(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.pairingApproval == nil {
+		writeJSONError(w, "Pairing approval not enabled", http.StatusNotFound)
+		return
+	}
+
+	if !isLocalRequest(r, h.trustedProxies) {
+		writeJSONError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	pending := h.pairingApproval.ListPending()
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"pending": pending,
+		"count":   len(pending),
+	})
+}
+
+// HandlePairingApprove approves a pending pairing request.
+func (h *AuthHandler) HandlePairingApprove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.pairingApproval == nil {
+		writeJSONError(w, "Pairing approval not enabled", http.StatusNotFound)
+		return
+	}
+
+	if !isLocalRequest(r, h.trustedProxies) {
+		writeJSONError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req PairingDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.RequestID == "" {
+		writeJSONError(w, "request_id is required", http.StatusBadRequest)
+		return
+	}
+
+	approved, err := h.pairingApproval.Approve(req.RequestID)
+	if err != nil {
+		writeJSONError(w, "Pending request not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":    true,
+		"status":     "approved",
+		"request_id": approved.RequestID,
+	})
+}
+
+// HandlePairingReject rejects a pending pairing request.
+func (h *AuthHandler) HandlePairingReject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.pairingApproval == nil {
+		writeJSONError(w, "Pairing approval not enabled", http.StatusNotFound)
+		return
+	}
+
+	if !isLocalRequest(r, h.trustedProxies) {
+		writeJSONError(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req PairingDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.RequestID == "" {
+		writeJSONError(w, "request_id is required", http.StatusBadRequest)
+		return
+	}
+
+	rejected, err := h.pairingApproval.Reject(req.RequestID)
+	if err != nil {
+		writeJSONError(w, "Pending request not found", http.StatusNotFound)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":    true,
+		"status":     "rejected",
+		"request_id": rejected.RequestID,
 	})
 }
 

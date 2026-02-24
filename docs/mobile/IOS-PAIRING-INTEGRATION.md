@@ -117,6 +117,11 @@ These endpoints are always accessible without authentication:
 | `/api/auth/exchange` | POST | Exchange pairing token for access + refresh tokens |
 | `/api/auth/refresh` | POST | Refresh access token using refresh token |
 | `/api/auth/revoke` | POST | Revoke refresh token (explicit disconnect) |
+| `/api/auth/pairing/pending` | GET | List pending pairing requests (**local operator only**) |
+| `/api/auth/pairing/approve` | POST | Approve pending pairing request (**local operator only**) |
+| `/api/auth/pairing/reject` | POST | Reject pending pairing request (**local operator only**) |
+
+If `security.require_pairing_approval = true`, `/api/auth/exchange` may return `202 Accepted` until a local operator approves the request.
 
 ### Response: `/api/pair/info`
 
@@ -190,7 +195,18 @@ struct TokenPairResponse: Codable {
     let expires_in: Int
 }
 
-func exchangePairingToken(baseURL: String, pairingToken: String) async throws -> TokenPairResponse {
+struct PairingPendingResponse: Codable {
+    let status: String      // "pending_approval"
+    let request_id: String
+    let expires_at: String
+}
+
+enum TokenExchangeResult {
+    case tokens(TokenPairResponse)
+    case pending(PairingPendingResponse)
+}
+
+func exchangePairingToken(baseURL: String, pairingToken: String) async throws -> TokenExchangeResult {
     let url = URL(string: "\(baseURL)/api/auth/exchange")!
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -200,15 +216,26 @@ func exchangePairingToken(baseURL: String, pairingToken: String) async throws ->
     request.httpBody = try JSONEncoder().encode(body)
 
     let (data, response) = try await URLSession.shared.data(for: request)
-
-    guard let httpResponse = response as? HTTPURLResponse,
-          httpResponse.statusCode == 200 else {
+    guard let httpResponse = response as? HTTPURLResponse else {
         throw AuthError.exchangeFailed
     }
 
-    return try JSONDecoder().decode(TokenPairResponse.self, from: data)
+    switch httpResponse.statusCode {
+    case 200:
+        return .tokens(try JSONDecoder().decode(TokenPairResponse.self, from: data))
+    case 202:
+        return .pending(try JSONDecoder().decode(PairingPendingResponse.self, from: data))
+    case 403:
+        throw AuthError.exchangeRejected
+    default:
+        throw AuthError.exchangeFailed
+    }
 }
 ```
+
+When `.pending` is returned:
+- Show a waiting state in iOS (`"Waiting for approval on cdev host"`).
+- Retry `POST /api/auth/exchange` until either `200` (approved) or `403` (rejected).
 
 ### Step 2: Use Access Token for API/WS Calls
 
@@ -433,7 +460,8 @@ Display parsed pairing info:
 
 ```bash
 ./bin/cdev start
-# QR code WILL contain pairing token
+# Pairing payload (/pair or /api/pair/qr) contains pairing token
+# Terminal QR visibility depends on pairing.show_qr_in_terminal (default: false)
 ```
 
 ### Test with Auth Disabled

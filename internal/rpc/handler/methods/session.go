@@ -127,7 +127,7 @@ type SessionElement struct {
 	// ID is the element identifier.
 	ID string `json:"id"`
 
-	// Type is the element type (user_input, assistant_text, tool_call, tool_result, diff, thinking).
+	// Type is the element type (user_input, assistant_text, tool_call, tool_result, diff, thinking, context_compaction, interrupted).
 	Type string `json:"type"`
 
 	// Timestamp is when the element was created.

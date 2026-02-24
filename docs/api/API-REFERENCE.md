@@ -37,13 +37,20 @@ Authorization: Bearer <access-token>
 - `/api/auth/exchange`
 - `/api/auth/refresh`
 - `/api/auth/revoke`
+- `/api/auth/pairing/*` (local-only pairing approval endpoints)
 
 **Token flow (summary):**
 1. Pairing token is displayed in `/pair` or `/api/pair/info` (QR includes token).
 2. Exchange pairing token via `POST /api/auth/exchange`.
-3. Use returned access token for HTTP + WebSocket requests.
-4. Refresh via `POST /api/auth/refresh`.
-5. Revoke a refresh token via `POST /api/auth/revoke`.
+3. If `security.require_pairing_approval = false` (default), exchange returns access + refresh tokens immediately (`200`).
+4. If `security.require_pairing_approval = true`, first exchange returns `202` with `{"status":"pending_approval","request_id":"..."}`.
+5. Local operator approves/rejects via:
+   - `GET /api/auth/pairing/pending`
+   - `POST /api/auth/pairing/approve`
+   - `POST /api/auth/pairing/reject`
+6. Client retries `POST /api/auth/exchange` after approval, then uses returned access token for HTTP + WebSocket requests.
+7. Refresh via `POST /api/auth/refresh`.
+8. Revoke a refresh token via `POST /api/auth/revoke`.
 
 **Note:** Query‑string tokens are not supported.
 

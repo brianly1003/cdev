@@ -40,3 +40,4 @@
 
 ## Agent-Specific Instructions
 - Do not create commits unless explicitly asked by the user.
+- Always run `make build` before saying work is done.

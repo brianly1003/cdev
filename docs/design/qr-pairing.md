@@ -9,10 +9,10 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ cdev start                                                  │
-│   └── Auto-generates QR in terminal                         │
+│   └── Optionally prints QR in terminal (default: off)       │
 │       └── Contains: ws_url, http_url, session_id, repo_name │
 │                                                             │
-│ Config: pairing.show_qr_in_terminal: true/false             │
+│ Config: pairing.show_qr_in_terminal: false (default)        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -242,7 +242,7 @@ Simple HTML page that displays:
 ```yaml
 pairing:
   token_expiry_secs: 3600      # Token validity period
-  show_qr_in_terminal: true    # Show QR on cdev start
+  show_qr_in_terminal: false   # Show QR on cdev start
 ```
 
 ### Recommended Config
@@ -250,11 +250,14 @@ pairing:
 ```yaml
 pairing:
   # Display settings
-  show_qr_in_terminal: true    # Show QR on cdev start
+  show_qr_in_terminal: false   # Show QR on cdev start
 
   # Token settings
   token_expiry_secs: 3600      # Token validity (seconds)
   token_enabled: false         # Require token for connections (future)
+
+security:
+  require_pairing_approval: false  # Optional manual approve/reject gate on /api/auth/exchange
 
   # Web pairing page
   web_pair_enabled: true       # Enable /pair endpoint
@@ -322,6 +325,24 @@ $ cdev start --external-url https://my-tunnel.devtunnels.ms
 # https://my-tunnel.devtunnels.ms/pair
 # Scan QR code displayed on web page
 ```
+
+## Maintainer Guardrails (Do Not Remove)
+
+### Tunnel host auto-derivation for `/pair` and `/api/pair/qr`
+
+When `server.external_url` is not set, pairing URLs are derived from the incoming request in `internal/server/http/pairing.go` (`pairingInfoForRequest`).
+
+Important behavior that must be preserved:
+
+1. If base pairing info points to localhost/loopback, cdev attempts request-based URL derivation.
+2. If request comes via a loopback reverse proxy/tunnel process, cdev accepts forwarded host/proto headers for pairing URL generation.
+3. This fallback exists because some local tunnel agents forward requests to cdev with `Host: localhost:8766` while carrying public domain in forwarded headers.
+
+Without this behavior, `/pair` can render QR payloads containing `localhost`, which breaks mobile pairing over tunnels.
+
+### Security intent
+
+The forwarded-header fallback is restricted to loopback proxy hops for pairing URL derivation, so users get correct external QR URLs without globally relaxing proxy trust behavior.
 
 ### Use Case 3: Headless/CI Environment
 
