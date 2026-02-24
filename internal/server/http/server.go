@@ -3,6 +3,7 @@ package http
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -60,6 +61,7 @@ type Server struct {
 	rateLimitKeyExtractor  middleware.KeyExtractor
 	trustedProxies         []*net.IPNet
 	tokenManager           *security.TokenManager
+	pairAccessToken        string
 	requireAuth            bool
 	authAllowlist          []string
 	requireSecureTransport bool
@@ -82,6 +84,7 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 		repoPath:      repoPath,
 		mux:           http.NewServeMux(),
 		authAllowlist: defaultAuthAllowlist(),
+		pairAccessToken: strings.TrimSpace(os.Getenv("CDEV_TOKEN")),
 	}
 
 	s.mux.HandleFunc("/health", s.handleHealth)
@@ -261,11 +264,77 @@ func (s *Server) secureTransportMiddleware(next http.Handler) http.Handler {
 func rootRedirectMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
-			http.Redirect(w, r, "/pair", http.StatusFound)
+			target := "/pair"
+			if rawQuery := strings.TrimSpace(r.URL.RawQuery); rawQuery != "" {
+				target += "?" + rawQuery
+			}
+			http.Redirect(w, r, target, http.StatusFound)
 			return
 		}
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) isPairingPath(path string) bool {
+	if path == "/pair" {
+		return true
+	}
+	return strings.HasPrefix(path, "/api/pair/") || strings.HasPrefix(path, "/api/auth/pairing/")
+}
+
+func secureTokenMatch(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+// pairAccessTokenMiddleware enforces optional CDEV_TOKEN access control for pairing routes.
+// If CDEV_TOKEN is set, requests to /pair, /api/pair/*, and /api/auth/pairing/* must provide
+// a matching token via query (?token=...), X-Cdev-Token header, or established cookie.
+func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requiredToken := strings.TrimSpace(s.pairAccessToken)
+		if requiredToken == "" || !s.isPairingPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		queryToken := strings.TrimSpace(r.URL.Query().Get("token"))
+		headerToken := strings.TrimSpace(r.Header.Get("X-Cdev-Token"))
+
+		// If a token was explicitly provided in query/header, validate it first.
+		providedToken := queryToken
+		if providedToken == "" {
+			providedToken = headerToken
+		}
+		if providedToken != "" {
+			if !secureTokenMatch(providedToken, requiredToken) {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     "cdev_pair_token",
+				Value:    providedToken,
+				Path:     "/",
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+				Secure:   isSecureRequest(r, s.trustedProxies),
+			})
+
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		cookie, err := r.Cookie("cdev_pair_token")
+		if err == nil && secureTokenMatch(strings.TrimSpace(cookie.Value), requiredToken) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	})
 }
 
@@ -557,7 +626,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Cdev-Token")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
@@ -599,11 +668,12 @@ func (s *Server) Start() error {
 	}
 
 	// Build middleware chain from inside out:
-	// request -> secure transport -> auth -> root redirect -> cors -> timeout -> rate limit (optional) -> logging -> mux
+	// request -> secure transport -> auth -> root redirect -> pair token -> cors -> timeout -> rate limit (optional) -> logging -> mux
 	var handler http.Handler = s.mux
 	handler = s.secureTransportMiddleware(handler)
 	handler = s.authMiddleware(handler)
 	handler = rootRedirectMiddleware(handler)
+	handler = s.pairAccessTokenMiddleware(handler)
 	handler = s.corsMiddleware(handler)
 	handler = timeoutMiddleware(10*time.Second, handler)
 

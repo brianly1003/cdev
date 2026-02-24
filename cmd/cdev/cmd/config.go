@@ -459,6 +459,9 @@ pairing:
   show_qr_in_terminal: false
 
 # Security settings
+# Optional pairing-route guard for tunnel/worker exposure:
+#   export CDEV_TOKEN="$(openssl rand -hex 32)"
+#   open https://your-worker.workers.dev?token=$CDEV_TOKEN
 security:
   require_auth: true
   require_pairing_approval: false

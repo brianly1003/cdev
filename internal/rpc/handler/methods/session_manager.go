@@ -3,6 +3,7 @@ package methods
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -2304,13 +2305,35 @@ func (s *SessionManagerService) FileGet(ctx context.Context, params json.RawMess
 	}
 	content = content[:n]
 
+	// Base64-encode binary files (images, PDFs, fonts, etc.) so they survive JSON marshaling.
+	encoding := "utf-8"
+	contentStr := string(content)
+	if isBinaryFileExtension(filepath.Ext(p.Path)) {
+		encoding = "base64"
+		contentStr = base64.StdEncoding.EncodeToString(content)
+	}
+
 	return map[string]interface{}{
 		"path":      p.Path,
-		"content":   string(content),
-		"encoding":  "utf-8",
+		"content":   contentStr,
+		"encoding":  encoding,
 		"truncated": truncated,
 		"size":      len(content),
 	}, nil
+}
+
+// isBinaryFileExtension returns true for file extensions that indicate binary content
+// which must be base64-encoded in the JSON-RPC response to survive marshaling.
+func isBinaryFileExtension(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".ico", ".tiff",
+		".pdf",
+		".zip", ".tar", ".gz", ".rar", ".7z",
+		".exe", ".dll", ".so", ".dylib",
+		".ttf", ".otf", ".woff", ".woff2":
+		return true
+	}
+	return false
 }
 
 // DirStats holds directory statistics.

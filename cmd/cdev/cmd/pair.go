@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,7 @@ func init() {
 
 	pairCmd.Flags().BoolVar(&pairJSON, "json", false, "output pairing info as JSON")
 	pairCmd.Flags().BoolVar(&pairURL, "url", false, "output connection URL only")
-	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (/pair)")
+	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (root entrypoint)")
 	pairCmd.Flags().BoolVar(&pairRefresh, "refresh", false, "generate new session ID (ignore running server)")
 	pairCmd.Flags().StringVar(&pairExternalURL, "external-url", "", "override external URL for pairing output")
 }
@@ -192,7 +193,11 @@ func outputURL(info *pairing.PairingInfo) error {
 
 func outputPairPage(info *pairing.PairingInfo) error {
 	base := strings.TrimRight(info.HTTP, "/")
-	fmt.Printf("%s/pair\n", base)
+	if token := strings.TrimSpace(os.Getenv("CDEV_TOKEN")); token != "" {
+		fmt.Printf("%s?token=%s\n", base, neturl.QueryEscape(token))
+		return nil
+	}
+	fmt.Printf("%s\n", base)
 	return nil
 }
 
