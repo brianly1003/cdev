@@ -344,10 +344,10 @@ func TestPairAccessTokenMiddleware_RequiresTokenForPairRoutes(t *testing.T) {
 			wantNext:   false,
 		},
 		{
-			name:       "query token accepted",
+			name:       "query token redirects to strip token from URL",
 			url:        "/pair?token=secret-token",
-			wantStatus: http.StatusNoContent,
-			wantNext:   true,
+			wantStatus: http.StatusFound,
+			wantNext:   false,
 		},
 		{
 			name:       "header token accepted",
@@ -387,6 +387,96 @@ func TestPairAccessTokenMiddleware_RequiresTokenForPairRoutes(t *testing.T) {
 	}
 }
 
+func TestPairAccessTokenMiddleware_QueryRedirectStripsToken(t *testing.T) {
+	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server.SetPairAccessToken("secret-token")
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	wrapped := server.pairAccessTokenMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodGet, "/pair?token=secret-token&other=keep", nil)
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusFound)
+	}
+
+	location := resp.Header.Get("Location")
+	if strings.Contains(location, "token=") {
+		t.Fatalf("redirect URL still contains token param: %s", location)
+	}
+	if !strings.Contains(location, "other=keep") {
+		t.Fatalf("redirect URL lost non-token params: %s", location)
+	}
+}
+
+func TestPairAccessTokenMiddleware_CookieIsHashed(t *testing.T) {
+	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server.SetPairAccessToken("secret-token")
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	wrapped := server.pairAccessTokenMiddleware(next)
+
+	// Use header token (no redirect) to inspect cookie value.
+	req := httptest.NewRequest(http.MethodGet, "/pair", nil)
+	req.Header.Set("X-Cdev-Token", "secret-token")
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	var pairCookie *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == "cdev_pair_token" {
+			pairCookie = c
+			break
+		}
+	}
+	if pairCookie == nil {
+		t.Fatal("expected cdev_pair_token cookie to be set")
+	}
+	// Cookie must NOT contain the raw token.
+	if pairCookie.Value == "secret-token" {
+		t.Fatal("cookie contains raw token — expected HMAC hash")
+	}
+	// Cookie must have MaxAge set.
+	if pairCookie.MaxAge != 86400 {
+		t.Fatalf("cookie MaxAge = %d, want 86400", pairCookie.MaxAge)
+	}
+}
+
+func TestPairAccessTokenMiddleware_ReferrerPolicySet(t *testing.T) {
+	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server.SetPairAccessToken("secret-token")
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	wrapped := server.pairAccessTokenMiddleware(next)
+
+	// Even rejected requests on pairing routes should get the header.
+	req := httptest.NewRequest(http.MethodGet, "/pair", nil)
+	w := httptest.NewRecorder()
+	wrapped.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	rp := resp.Header.Get("Referrer-Policy")
+	if rp != "no-referrer" {
+		t.Fatalf("Referrer-Policy = %q, want %q", rp, "no-referrer")
+	}
+}
+
 func TestPairAccessTokenMiddleware_AllowsCookieAfterInitialToken(t *testing.T) {
 	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
@@ -396,14 +486,14 @@ func TestPairAccessTokenMiddleware_AllowsCookieAfterInitialToken(t *testing.T) {
 	})
 	wrapped := server.pairAccessTokenMiddleware(next)
 
-	// First request with token should set cookie.
+	// First request with query token redirects and sets cookie.
 	firstReq := httptest.NewRequest(http.MethodGet, "/pair?token=secret-token", nil)
 	firstW := httptest.NewRecorder()
 	wrapped.ServeHTTP(firstW, firstReq)
 	firstResp := firstW.Result()
 	defer func() { _ = firstResp.Body.Close() }()
-	if firstResp.StatusCode != http.StatusNoContent {
-		t.Fatalf("first request status = %d, want %d", firstResp.StatusCode, http.StatusNoContent)
+	if firstResp.StatusCode != http.StatusFound {
+		t.Fatalf("first request status = %d, want %d", firstResp.StatusCode, http.StatusFound)
 	}
 	cookies := firstResp.Cookies()
 	if len(cookies) == 0 {
@@ -421,7 +511,7 @@ func TestPairAccessTokenMiddleware_AllowsCookieAfterInitialToken(t *testing.T) {
 		t.Fatal("expected cdev_pair_token cookie to be set")
 	}
 
-	// Second request without query/header should pass via cookie.
+	// Second request without query/header should pass via hashed cookie.
 	secondReq := httptest.NewRequest(http.MethodGet, "/pair", nil)
 	secondReq.AddCookie(pairCookie)
 	secondW := httptest.NewRecorder()

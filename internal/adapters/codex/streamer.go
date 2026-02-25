@@ -789,25 +789,6 @@ func trimToolToken(token string) string {
 	return token
 }
 
-func summarizeApplyPatchTool(input string) string {
-	for _, prefix := range []string{"*** Update File: ", "*** Add File: ", "*** Delete File: "} {
-		if idx := strings.Index(input, prefix); idx >= 0 {
-			rest := input[idx+len(prefix):]
-			line := rest
-			if nl := strings.IndexByte(rest, '\n'); nl >= 0 {
-				line = rest[:nl]
-			}
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			action := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(prefix, "*** "), ": "))
-			return action + " " + line
-		}
-	}
-	return ""
-}
-
 func formatExploredText(entries []string) string {
 	if len(entries) == 0 {
 		return ""

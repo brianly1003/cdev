@@ -100,7 +100,11 @@ func TestLiveInjection_FullRPCRoundTrip(t *testing.T) {
 	if err := h.Start(); err != nil {
 		t.Fatalf("failed to start hub: %v", err)
 	}
-	defer h.Stop()
+	defer func() {
+		if err := h.Stop(); err != nil {
+			t.Errorf("failed to stop hub: %v", err)
+		}
+	}()
 
 	// 3. Minimal config.
 	cfg := &config.Config{}
@@ -126,7 +130,11 @@ func TestLiveInjection_FullRPCRoundTrip(t *testing.T) {
 	if err := mgr.Start(); err != nil {
 		t.Fatalf("failed to start session manager: %v", err)
 	}
-	defer mgr.Stop()
+	defer func() {
+		if err := mgr.Stop(); err != nil {
+			t.Errorf("failed to stop session manager: %v", err)
+		}
+	}()
 
 	// 8. Verify detector can see Claude processes before calling Send().
 	detector := live.NewDetector(repoRoot)

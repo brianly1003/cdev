@@ -3,7 +3,10 @@ package http
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -290,9 +293,27 @@ func secureTokenMatch(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
+// cookieHMACPurpose is the fixed message used when hashing tokens for cookie storage.
+const cookieHMACPurpose = "cdev_pair_cookie_v1"
+
+// hashTokenForCookie returns a hex-encoded HMAC-SHA256 of a fixed purpose string
+// keyed by the token. This avoids storing the raw CDEV_TOKEN in the cookie.
+func hashTokenForCookie(token string) string {
+	mac := hmac.New(sha256.New, []byte(token))
+	mac.Write([]byte(cookieHMACPurpose))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 // pairAccessTokenMiddleware enforces optional CDEV_TOKEN access control for pairing routes.
 // If CDEV_TOKEN is set, requests to /pair, /api/pair/*, and /api/auth/pairing/* must provide
 // a matching token via query (?token=...), X-Cdev-Token header, or established cookie.
+//
+// Security hardening:
+//   - Query tokens trigger a redirect to strip ?token= from the URL (prevents leakage via
+//     browser history, server logs, and Referer headers).
+//   - Cookie stores an HMAC hash of the token, never the raw secret.
+//   - Cookie has a 24-hour MaxAge expiry.
+//   - Referrer-Policy: no-referrer is set on all pairing responses.
 func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requiredToken := strings.TrimSpace(s.pairAccessToken)
@@ -300,6 +321,9 @@ func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		// Fix 4: Prevent token leakage via Referer header on all pairing responses.
+		w.Header().Set("Referrer-Policy", "no-referrer")
 
 		queryToken := strings.TrimSpace(r.URL.Query().Get("token"))
 		headerToken := strings.TrimSpace(r.Header.Get("X-Cdev-Token"))
@@ -315,21 +339,37 @@ func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
 				return
 			}
 
+			// Fix 2: Store HMAC hash instead of raw token.
+			// Fix 3: Cookie expires after 24 hours.
 			http.SetCookie(w, &http.Cookie{
 				Name:     "cdev_pair_token",
-				Value:    providedToken,
+				Value:    hashTokenForCookie(providedToken),
 				Path:     "/",
 				HttpOnly: true,
 				SameSite: http.SameSiteLaxMode,
 				Secure:   isSecureRequest(r, s.trustedProxies),
+				MaxAge:   86400, // 24 hours
 			})
+
+			// Fix 1: If token arrived via URL query, redirect to strip it.
+			// This prevents the token from persisting in browser history,
+			// server access logs, and Referer headers.
+			if queryToken != "" {
+				cleanURL := *r.URL
+				q := cleanURL.Query()
+				q.Del("token")
+				cleanURL.RawQuery = q.Encode()
+				http.Redirect(w, r, cleanURL.String(), http.StatusFound)
+				return
+			}
 
 			next.ServeHTTP(w, r)
 			return
 		}
 
+		// Validate cookie: compare stored HMAC hash against expected hash.
 		cookie, err := r.Cookie("cdev_pair_token")
-		if err == nil && secureTokenMatch(strings.TrimSpace(cookie.Value), requiredToken) {
+		if err == nil && secureTokenMatch(strings.TrimSpace(cookie.Value), hashTokenForCookie(requiredToken)) {
 			next.ServeHTTP(w, r)
 			return
 		}
