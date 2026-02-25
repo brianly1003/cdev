@@ -1628,11 +1628,8 @@ func TestIsLocalhostOrigin(t *testing.T) {
 		{"http://127.0.0.1", true},
 		{"http://[::1]:3000", true},
 		{"http://example.com", false},
-		// Note: current implementation uses strings.Contains which may have edge cases.
-		// The primary security is in OriginChecker which properly parses URLs.
-		// These tests document current behavior:
-		{"https://evil.localhost.com", true}, // Contains "localhost" - matches current behavior
-		{"http://notlocalhost:3000", true},   // Contains "localhost" - matches current behavior
+		{"https://evil.localhost.com", false},
+		{"http://notlocalhost:3000", false},
 	}
 
 	for _, tt := range tests {

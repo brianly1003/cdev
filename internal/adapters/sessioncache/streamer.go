@@ -148,8 +148,12 @@ func (s *SessionStreamer) GetWatchedSession() string {
 
 // watchLoop monitors the session file for changes.
 func (s *SessionStreamer) watchLoop() {
+	s.mu.RLock()
 	watcher := s.watcher
-	if watcher == nil {
+	doneCh := s.done
+	s.mu.RUnlock()
+
+	if watcher == nil || doneCh == nil {
 		return
 	}
 	eventsCh := watcher.Events
@@ -170,7 +174,7 @@ func (s *SessionStreamer) watchLoop() {
 
 	for {
 		select {
-		case <-s.done:
+		case <-doneCh:
 			debounceTimer.Stop()
 			return
 
