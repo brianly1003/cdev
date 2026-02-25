@@ -465,6 +465,7 @@ pairing:
 security:
   require_auth: true
   require_pairing_approval: false
+  pair_access_token: ""
 `
 
 	return os.WriteFile(path, []byte(content), 0644)

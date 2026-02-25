@@ -12,9 +12,8 @@
 This document summarizes the comprehensive analysis of Auto-Claude (autonomous multi-agent coding framework) and provides actionable recommendations for enhancing cdev/cdev-ios with inspired features.
 
 **Related Documents:**
-- `MULTI-AGENT-IMPLEMENTATION-SPEC.md` - Complete technical specification (200+ pages)
-- `ARCHITECTURE-DIAGRAMS.md` - System architecture diagrams
-- `QUICK-START-GUIDE.md` - Developer quick reference
+- `MULTI-AGENT-IMPLEMENTATION-SPEC.md` - Complete technical specification
+- `AI-AGENT-RUNTIME-ROADMAP.md` - Phased transformation plan
 
 ---
 
@@ -705,8 +704,7 @@ Access              │    - Mobile supervision         │
 |----------|---------|----------|
 | This Summary | Executive overview | `docs/planning/AUTO-CLAUDE-COMPARISON-SUMMARY.md` |
 | Implementation Spec | Complete technical design | `docs/planning/MULTI-AGENT-IMPLEMENTATION-SPEC.md` |
-| Architecture Diagrams | System architecture | `docs/planning/ARCHITECTURE-DIAGRAMS.md` |
-| Quick Start Guide | Developer reference | `docs/planning/QUICK-START-GUIDE.md` |
+| AI Agent Roadmap | Phased transformation plan | `docs/planning/AI-AGENT-RUNTIME-ROADMAP.md` |
 
 ---
 

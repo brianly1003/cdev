@@ -61,6 +61,7 @@ security:
   require_auth: true            # Require token authentication for WebSocket and HTTP
   require_pairing_approval: false # Require local approve/reject before exchanging pairing token
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
+  pair_access_token: ""         # Optional token gate for /pair and /api/pair/* (URL: ?token=...)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
   require_secure_transport: true # Require HTTPS/WSS for non-localhost access

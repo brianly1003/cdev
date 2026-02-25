@@ -169,14 +169,16 @@ func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspac
 								Selected:    opt.Selected,
 							}
 						}
-						s.manager.PublishEvent(events.NewPTYPermissionEventWithSession(
+						evt := events.NewPTYPermissionEventWithSession(
 							string(pendingPerm.Type),
 							pendingPerm.Target,
 							pendingPerm.Description,
 							pendingPerm.Preview,
 							activeSessionID,
 							options,
-						))
+						)
+						evt.SetAgentType(sessionManagerAgentClaude)
+						s.manager.PublishEvent(evt)
 					}
 				}
 

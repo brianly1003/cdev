@@ -44,8 +44,6 @@ docs/
 ├── architecture/              # Architecture & Design docs
 │   ├── ARCHITECTURE.md        # Technical architecture
 │   ├── DESIGN-SPEC.md         # Design specification with status
-│   ├── REPOSITORY-INDEXER.md  # File search/browsing API
-│   ├── DESKTOP-APP-DESIGN.md  # Desktop app design spec
 │   ├── ACQUISITION-READY-ARCHITECTURE.md  # Acquisition strategy
 │   ├── VSCODE-INTEGRATION-STRATEGY.md     # VS Code integration guide
 │   ├── TRANSPORT-ARCHITECTURE-ANALYSIS.md # WebSocket vs HTTP analysis
@@ -58,11 +56,14 @@ docs/
 ├── mobile/                    # Mobile Integration docs
 │   ├── IOS-INTEGRATION-GUIDE.md       # iOS integration reference
 │   ├── IOS-WORKSPACE-INTEGRATION.md   # Multi-workspace iOS guide
-│   └── LIVE-SESSION-INTEGRATION.md    # LIVE session support for terminal sessions
+│   ├── INTERACTIVE-PTY-MODE.md        # Interactive PTY mode specification
+│   ├── LIVE-SESSION-INTEGRATION.md    # LIVE session detection & injection
+│   ├── SESSION-AWARENESS.md           # Multi-device session awareness
+│   ├── IOS-HOOKS-INTEGRATION.md       # Hook-based permission bridge
+│   └── DISCONNECT-FLOW.md            # Disconnect flow design
 ├── guides/                    # Guides & Testing docs
 │   ├── WORKSPACE-MANAGER-SETUP.md  # Workspace manager setup with VS Code tunnels
 │   ├── SAFE-REMOTE-ACCESS.md  # Safe remote access (tunnels + auth)
-│   ├── POC-TESTING-GUIDE.md   # POC testing guide
 │   ├── CLAUDE-CLI.md          # Claude CLI reference
 │   └── TROUBLESHOOTING.md     # Common issues and solutions
 └── planning/                  # Project Management docs
@@ -117,8 +118,6 @@ docs/
 |----------|-------------|
 | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) | Technical architecture and component design |
 | [architecture/DESIGN-SPEC.md](./architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
-| [architecture/REPOSITORY-INDEXER.md](./architecture/REPOSITORY-INDEXER.md) | File search and browsing API with iOS examples |
-| [architecture/DESKTOP-APP-DESIGN.md](./architecture/DESKTOP-APP-DESIGN.md) | Desktop app design specification |
 | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) | **Strategy** - Making cdev acquisition-ready for VS Code/Microsoft |
 | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) | **Strategy** - Detailed VS Code integration and JSON-RPC 2.0 migration |
 | [architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md](./architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md) | **Analysis** - WebSocket vs HTTP dual-protocol evaluation |
@@ -161,14 +160,19 @@ docs/
 |----------|-------------|
 | [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) | Complete iOS integration reference |
 | [mobile/IOS-WORKSPACE-INTEGRATION.md](./mobile/IOS-WORKSPACE-INTEGRATION.md) | Multi-workspace support for iOS |
-| [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) | **LIVE session support** - Watch and interact with terminal sessions |
+| [mobile/INTERACTIVE-PTY-MODE.md](./mobile/INTERACTIVE-PTY-MODE.md) | Interactive PTY mode with permission parsing |
+| [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) | **LIVE session** detection, injection, and known limitations |
+| [mobile/SESSION-AWARENESS.md](./mobile/SESSION-AWARENESS.md) | Multi-device session awareness |
+| [mobile/IOS-HOOKS-INTEGRATION.md](./mobile/IOS-HOOKS-INTEGRATION.md) | Hook-based permission bridge for external sessions |
 
 **Key Topics:**
 - JSON-RPC 2.0 WebSocket integration
 - Session types: managed, live, historical
+- Interactive PTY mode with permission parsing and state tracking
 - Real-time session watching
 - Permission handling UI
-- TTY injection for LIVE sessions
+- LIVE session detection and keystroke injection (with known limitations)
+- Multi-device session focus tracking
 
 ---
 
@@ -179,7 +183,6 @@ docs/
 |----------|-------------|
 | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) | **Step-by-step workspace manager setup with VS Code tunnels** |
 | [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) | Safe remote access with tunnels + auth |
-| [guides/POC-TESTING-GUIDE.md](./guides/POC-TESTING-GUIDE.md) | POC testing guide with examples |
 | [guides/CLAUDE-CLI.md](./guides/CLAUDE-CLI.md) | Claude CLI reference and flags |
 | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) | Common issues and solutions |
 
@@ -226,8 +229,6 @@ docs/
 | WEBSOCKET-STABILITY.md | api | 1.0 | Current |
 | ARCHITECTURE.md | architecture | 1.0 | Current |
 | DESIGN-SPEC.md | architecture | 1.0 | Current |
-| REPOSITORY-INDEXER.md | architecture | 1.0 | Current |
-| DESKTOP-APP-DESIGN.md | architecture | 1.0 | Current |
 | ACQUISITION-READY-ARCHITECTURE.md | architecture | 1.0 | Active |
 | VSCODE-INTEGRATION-STRATEGY.md | architecture | 1.0 | Active |
 | TRANSPORT-ARCHITECTURE-ANALYSIS.md | architecture | 1.0 | Active |
@@ -236,8 +237,13 @@ docs/
 | TOKEN-ARCHITECTURE.md | security | 1.0 | Current |
 | IMAGE-UPLOAD-SECURITY-ANALYSIS.md | security | 1.0 | Current |
 | TUNNEL-PROXY-HARDENING.md | security | 1.0 | Current |
+| IOS-INTEGRATION-GUIDE.md | mobile | 1.0 | Current |
+| IOS-WORKSPACE-INTEGRATION.md | mobile | 1.0 | Current |
+| INTERACTIVE-PTY-MODE.md | mobile | 2.0 | Current |
+| LIVE-SESSION-INTEGRATION.md | mobile | 2.0 | Current |
+| SESSION-AWARENESS.md | mobile | 1.0 | Current |
+| IOS-HOOKS-INTEGRATION.md | mobile | 1.0 | Current |
 | WORKSPACE-MANAGER-SETUP.md | guides | 1.0 | Current |
-| POC-TESTING-GUIDE.md | guides | 1.0 | Current |
 | CLAUDE-CLI.md | guides | 1.0 | Current |
 | TROUBLESHOOTING.md | guides | 1.1 | Current |
 | BACKLOG.md | planning | 1.0 | Active |

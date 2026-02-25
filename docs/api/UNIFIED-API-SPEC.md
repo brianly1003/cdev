@@ -1084,6 +1084,15 @@ Current behavior:
 `session/start` may return status values: `attached`, `started`, `existing`, `not_found`.
 For Codex, `started` can return a temporary session ID (`codex-temp-...`) until the first session file is created, after which the server emits `session_id_resolved` (with `agent_type`) to map the real ID.
 
+**LIVE session behavior for `session/send` (Claude):**
+When `session_id` refers to a session not managed by cdev, the server attempts LIVE session detection:
+1. Searches `~/.claude/projects/` for the session file to identify the workspace
+2. Falls back to detecting running Claude processes via `ps` + `lsof`
+3. If a LIVE Claude process is found in the workspace, injects the prompt via platform-specific keystroke injection (AppleScript on macOS)
+4. If no LIVE session exists, auto-starts a new managed session
+
+See [LIVE Session Integration](../mobile/LIVE-SESSION-INTEGRATION.md) for full details and known limitations.
+
 ---
 
 ### Workspace Methods

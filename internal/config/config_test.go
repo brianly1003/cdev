@@ -148,6 +148,19 @@ func TestLoad_EnvOverrides_ServerHttpPort_LegacyAlias(t *testing.T) {
 	}
 }
 
+func TestLoad_EnvOverrides_SecurityPairAccessToken(t *testing.T) {
+	t.Setenv("CDEV_SECURITY_PAIR_ACCESS_TOKEN", "pair-token-abc")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Security.PairAccessToken != "pair-token-abc" {
+		t.Fatalf("Security.PairAccessToken = %q, want %q", cfg.Security.PairAccessToken, "pair-token-abc")
+	}
+}
+
 func TestLoad_EnvOverrides_ServerPortTakesPrecedenceOverLegacyHttpPort(t *testing.T) {
 	t.Setenv("CDEV_SERVER_PORT", "9001")
 	t.Setenv("CDEV_SERVER_HTTP_PORT", "9002")

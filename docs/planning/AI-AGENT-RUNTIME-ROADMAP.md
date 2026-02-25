@@ -181,7 +181,6 @@ Exit criteria:
 
 ## Related docs
 
-- [Planning index](./INDEX.md)
 - [Backlog](./BACKLOG.md)
 - [Readiness roadmap source of truth](./READINESS-ROADMAP-SOURCE-OF-TRUTH.md)
 - [Architecture](../architecture/ARCHITECTURE.md)

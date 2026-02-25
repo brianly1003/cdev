@@ -102,6 +102,7 @@ type SecurityConfig struct {
 	RequireAuth            bool            `mapstructure:"require_auth"`             // If true, require token for WebSocket connections
 	RequirePairingApproval bool            `mapstructure:"require_pairing_approval"` // If true, pairing exchange requires local approve/reject
 	TokenExpirySecs        int             `mapstructure:"token_expiry_secs"`        // Pairing token expiry in seconds
+	PairAccessToken        string          `mapstructure:"pair_access_token"`        // Optional token gate for /pair and /api/pair/* routes
 	AllowedOrigins         []string        `mapstructure:"allowed_origins"`          // Allowed origins for CORS/WebSocket (empty = localhost only)
 	BindLocalhostOnly      bool            `mapstructure:"bind_localhost_only"`      // If true, only bind to localhost
 	RequireSecureTransport bool            `mapstructure:"require_secure_transport"` // If true, require TLS/WSS for non-localhost use
@@ -274,6 +275,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.require_auth", true) // Auth required by default
 	v.SetDefault("security.require_pairing_approval", true)
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
+	v.SetDefault("security.pair_access_token", "")
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
 	v.SetDefault("security.require_secure_transport", true)

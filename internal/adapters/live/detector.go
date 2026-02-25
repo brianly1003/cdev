@@ -27,8 +27,8 @@ type LiveSession struct {
 
 // Detector finds and tracks running Claude processes not managed by cdev.
 type Detector struct {
-	workspacePath string              // Filter to only detect sessions for this workspace
-	managedPIDs   map[int]bool        // PIDs managed by cdev (exclude from detection)
+	workspacePath string                  // Filter to only detect sessions for this workspace
+	managedPIDs   map[int]bool            // PIDs managed by cdev (exclude from detection)
 	cache         map[string]*LiveSession // session_id -> LiveSession cache
 	cacheTTL      time.Duration
 	lastScan      time.Time
@@ -61,14 +61,20 @@ func (d *Detector) UnregisterManagedPID(pid int) {
 	log.Debug().Int("pid", pid).Msg("unregistered managed PID")
 }
 
-// GetLiveSession returns a LIVE session by session ID if it exists.
-// For the POC, we verify the session file exists in .claude/projects and
-// find any Claude process running in the workspace to send keystrokes to.
+// GetLiveSession returns a LIVE session for the workspace.
+//
+// If sessionID resolves to an on-disk Claude session file, we keep that ID.
+// If it does not resolve (e.g. stale/foreign session id from remote client),
+// we still return a detected LIVE Claude process in the workspace as best effort.
+// This preserves inbound prompt delivery to an already-running terminal session.
 func (d *Detector) GetLiveSession(sessionID string) *LiveSession {
-	// First, verify the session file exists in .claude/projects
-	if !d.sessionFileExists(sessionID) {
-		log.Debug().Str("session_id", sessionID).Msg("session file not found in .claude/projects")
-		return nil
+	resolvedSessionID := sessionID
+	if sessionID != "" && !d.sessionFileExists(sessionID) {
+		log.Debug().
+			Str("session_id", sessionID).
+			Msg("session file not found in .claude/projects, falling back to workspace LIVE session")
+		// Use the detected LIVE session id from process discovery.
+		resolvedSessionID = ""
 	}
 
 	// Refresh cache to find Claude processes
@@ -77,20 +83,26 @@ func (d *Detector) GetLiveSession(sessionID string) *LiveSession {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// Return the first Claude process found in this workspace
-	// For POC, we don't need exact session_id matching - just need a Claude process
+	// Return the first Claude process found in this workspace.
+	// For POC, we don't need exact session_id matching - just need a Claude process.
 	for _, session := range d.cache {
+		effectiveSessionID := resolvedSessionID
+		if effectiveSessionID == "" {
+			effectiveSessionID = session.SessionID
+		}
+
 		log.Debug().
 			Str("requested_session_id", sessionID).
 			Str("found_session_id", session.SessionID).
+			Str("effective_session_id", effectiveSessionID).
 			Str("terminal_app", session.TerminalApp).
 			Msg("found LIVE Claude process for workspace")
-		// Return with the requested session_id but the found process info
+		// Return with the effective session id and found process info.
 		return &LiveSession{
 			PID:         session.PID,
 			TTY:         session.TTY,
 			WorkDir:     session.WorkDir,
-			SessionID:   sessionID, // Use the requested session_id
+			SessionID:   effectiveSessionID,
 			TerminalApp: session.TerminalApp,
 			StartTime:   session.StartTime,
 		}
@@ -253,7 +265,7 @@ func (d *Detector) findTerminalApp(claudePID int, tty string) string {
 		"Terminal":  "Terminal",
 		"iTerm2":    "iTerm2",
 		"iTerm.app": "iTerm2",
-		"Code":      "Code",           // VS Code
+		"Code":      "Code", // VS Code
 		"Cursor":    "Cursor",
 		"Warp":      "Warp",
 		"Alacritty": "Alacritty",

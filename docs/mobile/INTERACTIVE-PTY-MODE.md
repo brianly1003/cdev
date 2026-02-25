@@ -928,6 +928,9 @@ Emitted for Claude's structured messages (headless mode and JSONL watching).
 | Input injection | ✅ Direct PTY write | ✅ AppleScript keystroke |
 | Permission detection | ✅ PTY parser | ⚠️ Native terminals only |
 | IDE terminal support | ✅ Full support | ⚠️ Input only, no perm detection |
+| PID → session mapping | ✅ Exact (cdev spawned it) | ⚠️ Heuristic (most recent JSONL file) |
+
+> **Note:** When multiple Claude instances share the same workspace directory, the detector cannot reliably map a PID to its session file. See [LIVE Session Integration - Known Limitations](./LIVE-SESSION-INTEGRATION.md#known-limitations) for details.
 
 ---
 

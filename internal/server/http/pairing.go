@@ -613,14 +613,14 @@ func (h *PairingHandler) HandlePairPage(w http.ResponseWriter, r *http.Request) 
         }
 
         /* Desktop: move pending approvals to right column, keep mobile unchanged */
-        @media (min-width: 1180px) and (min-height: 640px) {
-            .container {
-                max-width: min(96vw, 1160px);
-                width: min(96vw, 1160px);
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
-                align-items: start;
-                gap: 18px;
+	        @media (min-width: 1180px) and (min-height: 640px) {
+	            .container {
+	                max-width: min(96vw, 992px);
+	                width: min(96vw, 992px);
+	                display: grid;
+	                grid-template-columns: minmax(0, 1fr) minmax(310px, 360px);
+	                align-items: start;
+	                gap: 18px;
             }
             .pairing-approval {
                 margin-top: 0;

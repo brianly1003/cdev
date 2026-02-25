@@ -49,7 +49,7 @@ func init() {
 
 	pairCmd.Flags().BoolVar(&pairJSON, "json", false, "output pairing info as JSON")
 	pairCmd.Flags().BoolVar(&pairURL, "url", false, "output connection URL only")
-	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (root entrypoint)")
+	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (/pair entrypoint)")
 	pairCmd.Flags().BoolVar(&pairRefresh, "refresh", false, "generate new session ID (ignore running server)")
 	pairCmd.Flags().StringVar(&pairExternalURL, "external-url", "", "override external URL for pairing output")
 }
@@ -69,12 +69,13 @@ func runPair(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+	pairAccessToken := resolvePairAccessToken(cfg)
 
 	var info *pairing.PairingInfo
 
 	// Try to get pairing info from running server (unless --refresh)
 	if !pairRefresh {
-		serverInfo, err := getPairingFromServer(cfg)
+		serverInfo, err := getPairingFromServer(cfg, pairAccessToken)
 		if err == nil && serverInfo != nil {
 			info = &pairing.PairingInfo{
 				WebSocket: serverInfo.WebSocket,
@@ -108,7 +109,7 @@ func runPair(cmd *cobra.Command, args []string) error {
 	}
 
 	if pairPage {
-		return outputPairPage(info)
+		return outputPairPage(info, pairAccessToken)
 	}
 
 	if pairURL {
@@ -118,14 +119,22 @@ func runPair(cmd *cobra.Command, args []string) error {
 	return outputQR(info)
 }
 
-func getPairingFromServer(cfg *config.Config) (*serverPairingInfo, error) {
+func getPairingFromServer(cfg *config.Config, pairAccessToken string) (*serverPairingInfo, error) {
 	url := fmt.Sprintf("http://%s:%d/api/pair/info", cfg.Server.Host, cfg.Server.Port)
 
 	client := &http.Client{
 		Timeout: 2 * time.Second,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if pairAccessToken != "" {
+		req.Header.Set("X-Cdev-Token", pairAccessToken)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -191,14 +200,26 @@ func outputURL(info *pairing.PairingInfo) error {
 	return nil
 }
 
-func outputPairPage(info *pairing.PairingInfo) error {
-	base := strings.TrimRight(info.HTTP, "/")
-	if token := strings.TrimSpace(os.Getenv("CDEV_TOKEN")); token != "" {
-		fmt.Printf("%s?token=%s\n", base, neturl.QueryEscape(token))
-		return nil
-	}
-	fmt.Printf("%s\n", base)
+func outputPairPage(info *pairing.PairingInfo, pairAccessToken string) error {
+	fmt.Printf("%s\n", pairPageURL(info, pairAccessToken))
 	return nil
+}
+
+func resolvePairAccessToken(cfg *config.Config) string {
+	if cfg != nil {
+		if token := strings.TrimSpace(cfg.Security.PairAccessToken); token != "" {
+			return token
+		}
+	}
+	return strings.TrimSpace(os.Getenv("CDEV_TOKEN"))
+}
+
+func pairPageURL(info *pairing.PairingInfo, pairAccessToken string) string {
+	pageURL := strings.TrimRight(info.HTTP, "/") + "/pair"
+	if pairAccessToken == "" {
+		return pageURL
+	}
+	return pageURL + "?token=" + neturl.QueryEscape(pairAccessToken)
 }
 
 func outputQR(info *pairing.PairingInfo) error {

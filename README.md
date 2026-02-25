@@ -28,8 +28,12 @@
 ## Features
 
 - **AI Agent Management**: Spawn, monitor, and control AI coding agents (Claude Code, Codex, Gemini CLI)
+- **LIVE Session Support**: Detect Claude running in your terminal and send messages from mobile via keystroke injection
 - **Multi-Workspace Support**: Manage multiple repositories simultaneously with workspace manager
+- **Multi-Runtime Support**: Claude, Codex via `agent_type` routing with runtime-specific dispatch
+- **Interactive PTY Mode**: Full terminal experience with parsed permission prompts and state tracking
 - **Real-time Streaming**: Stream stdout/stderr output in real-time via WebSocket
+- **Session Management**: Multi-session orchestration with managed, live, and historical session types
 - **File Watching**: Monitor repository for file changes with debouncing
 - **Git Integration**: Generate and stream git diffs automatically
 - **Process Monitoring**: Auto-restart crashed workspaces with exponential backoff
@@ -398,10 +402,14 @@ cdev/
 │   │   ├── commands/        # Command definitions
 │   │   └── ports/           # Interface definitions
 │   ├── adapters/            # External system adapters
-│   │   ├── claude/          # Claude CLI adapter
+│   │   ├── claude/          # Claude CLI adapter (process mgmt, PTY, streaming)
+│   │   ├── live/            # LIVE session detection & keystroke injection
 │   │   ├── watcher/         # File system watcher
 │   │   ├── git/             # Git tracker
+│   │   ├── codex/           # Codex CLI adapter
 │   │   └── sessioncache/    # Session message cache (SQLite)
+│   ├── session/             # Session manager (multi-session orchestration)
+│   ├── workspace/           # Workspace management
 │   ├── hub/                 # Event hub
 │   ├── rpc/                 # JSON-RPC 2.0 layer
 │   │   ├── transport/       # WebSocket & stdio transports
@@ -434,6 +442,10 @@ cdev/
 | **JSON-RPC 2.0** | ✅ Done | Unified protocol with agent-agnostic methods |
 | **Unified Server** | ✅ Done | Single port (8766) serving HTTP + WebSocket |
 | **OpenRPC Discovery** | ✅ Done | Auto-generated API spec at `/api/rpc/discover` |
+| **Session Manager** | ✅ Done | Multi-session orchestration across workspaces |
+| **LIVE Sessions** | ✅ Done | Detect and inject into Claude running in user's terminal |
+| **Multi-Runtime** | ✅ Done | Claude, Codex support via `agent_type` routing |
+| **PTY Mode** | ✅ Done | Interactive terminal mode with permission parsing |
 
 ## Documentation
 
@@ -445,17 +457,20 @@ cdev/
 | [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Detailed architecture and technical specification |
 | [docs/architecture/DESIGN-SPEC.md](./docs/architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
 | [docs/security/TECHNICAL-REVIEW.md](./docs/security/TECHNICAL-REVIEW.md) | Security & performance analysis with roadmap |
+| [docs/mobile/LIVE-SESSION-INTEGRATION.md](./docs/mobile/LIVE-SESSION-INTEGRATION.md) | LIVE session detection, injection, and limitations |
+| [docs/mobile/INTERACTIVE-PTY-MODE.md](./docs/mobile/INTERACTIVE-PTY-MODE.md) | Interactive PTY mode specification |
 | [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) | Product backlog with prioritized work items |
 | [docs/security/SECURITY.md](./docs/security/SECURITY.md) | Security guidelines and best practices |
 
 ## Security Notice
 
-**Important:** This is currently a POC with known security limitations:
-- HTTP API auth pending (WebSocket auth exists; do not expose HTTP port)
-- CORS restrictions incomplete on some endpoints
-- Binds to localhost only (intentional security measure)
+**Important:** Security measures implemented:
+- Bearer token authentication for HTTP and WebSocket connections
+- CORS restrictions with origin validation
+- Binds to localhost only by default (intentional security measure)
+- LIVE session injection requires same-user process ownership
 
-See [docs/security/SECURITY.md](./docs/security/SECURITY.md) for details and [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) for planned fixes.
+See [docs/security/SECURITY.md](./docs/security/SECURITY.md) for details.
 
 ## License
 

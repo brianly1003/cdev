@@ -174,8 +174,8 @@ Sessions now include a `source` field indicating their origin:
 │     {"method":"session/send","params":{"prompt":"Also check...","agent_type":"claude"}}│
 │                          │                                       │
 │                          ▼                                       │
-│  6. CDEV INJECTS INTO TTY                                        │
-│     echo "Also check tests" > /dev/ttys002                      │
+│  6. CDEV INJECTS VIA APPLESCRIPT (macOS)                          │
+│     Injector.SendWithEnterToApp("Also check tests", "Code")    │
 │                          │                                       │
 │                          ▼                                       │
 │  7. MESSAGE APPEARS IN TERMINAL                                  │
@@ -616,284 +616,118 @@ func respondToPermission(toolUseId: String, approved: Bool) {
 
 ## Backend Implementation
 
-### Live Session Detector
+### Components
 
-```go
-// internal/adapters/live/detector.go
+All LIVE session code lives in `internal/adapters/live/`:
 
-package live
+| File | Purpose |
+|------|---------|
+| `detector.go` | Finds running Claude processes via `ps` + `lsof` |
+| `injector.go` | Sends keystrokes via platform-specific mechanisms |
+| `terminal_reader.go` | Polls terminal content (macOS only) |
+| `terminal_reader_darwin.go` | AppleScript-based terminal content reading |
+| `terminal_reader_linux.go` | Stub (not supported) |
+| `terminal_reader_windows.go` | Stub (not supported) |
+| `live_injection_test.go` | Unit + integration tests for the full RPC round-trip |
 
-import (
-    "os"
-    "os/exec"
-    "path/filepath"
-    "regexp"
-    "strconv"
-    "strings"
-)
+### Detector (`live.NewDetector(workspacePath)`)
 
-// Session represents a detected Claude process
-type Session struct {
-    PID       int
-    TTY       string
-    WorkDir   string
-    SessionID string
-    StartTime time.Time
-}
+Creates a detector scoped to a workspace path. Filters Claude processes by their working directory (resolved via `lsof`).
 
-// Detector finds running Claude processes
-type Detector struct {
-    managedPIDs map[int]bool
-}
+**Key methods:**
 
-// NewDetector creates a live session detector
-func NewDetector() *Detector {
-    return &Detector{
-        managedPIDs: make(map[int]bool),
-    }
-}
+| Method | Description |
+|--------|-------------|
+| `GetLiveSession(sessionID)` | Returns `*LiveSession` for the given session (or any session in the workspace if the session file doesn't exist). Returns `nil` if no Claude process found. |
+| `DetectAll()` | Returns all detected LIVE Claude sessions in the workspace. |
+| `RegisterManagedPID(pid)` | Excludes a cdev-managed PID from detection. |
+| `UnregisterManagedPID(pid)` | Re-includes a previously excluded PID. |
 
-// RegisterManagedPID marks a PID as managed by cdev
-func (d *Detector) RegisterManagedPID(pid int) {
-    d.managedPIDs[pid] = true
-}
+**Detection flow:**
+1. Runs `ps -eo pid,tty,command` to find `claude` processes
+2. Skips helper processes (`claude-*`), managed PIDs, and processes without a TTY
+3. Uses `lsof -d cwd` to resolve each process's working directory
+4. Filters by workspace path
+5. Finds session ID from most recently modified `.jsonl` file in `~/.claude/projects/{project}/`
+6. Walks the process tree to identify the terminal app (Terminal, iTerm2, VS Code, Cursor, etc.)
 
-// UnregisterManagedPID removes a PID from managed list
-func (d *Detector) UnregisterManagedPID(pid int) {
-    delete(d.managedPIDs, pid)
-}
+**Caching:** Results are cached with a short TTL to avoid repeated `ps`/`lsof` calls within the same request.
 
-// DetectSessions finds Claude processes not managed by cdev
-func (d *Detector) DetectSessions() ([]Session, error) {
-    // Get all processes with 'claude' in command
-    out, err := exec.Command("ps", "-eo", "pid,tty,lstart,command").Output()
-    if err != nil {
-        return nil, err
-    }
+### Injector (`live.NewInjector()`)
 
-    var sessions []Session
-    lines := strings.Split(string(out), "\n")
+Creates a platform-specific keystroke injector. Automatically selects the right backend for `runtime.GOOS`.
 
-    // Regex to parse ps output
-    // PID TTY LSTART COMMAND
-    re := regexp.MustCompile(`^\s*(\d+)\s+(\S+)\s+(.+claude.*)$`)
+**Platform support:**
 
-    for _, line := range lines {
-        // Skip if not a claude process
-        if !strings.Contains(line, "claude") {
-            continue
-        }
+| Platform | Backend | Status |
+|----------|---------|--------|
+| macOS | AppleScript (`System Events` keystroke) | Supported |
+| Windows | PowerShell `SendKeys` | Supported |
+| Linux | — | Not supported |
 
-        // Skip helper processes
-        if strings.Contains(line, "claude-") {
-            continue
-        }
+**Key methods:**
 
-        matches := re.FindStringSubmatch(line)
-        if matches == nil {
-            continue
-        }
+| Method | Description |
+|--------|-------------|
+| `SendWithEnterToApp(text, terminalApp)` | Sends text + Enter key to the specified terminal app |
+| `SendToApp(text, terminalApp)` | Sends text without Enter |
+| `SendKeyToApp(key, terminalApp)` | Sends a named key (e.g., "escape", "tab") |
+| `Send(tty, text)` | Sends text to a TTY device path directly |
+| `SendWithEnter(tty, text)` | Sends text + Enter to a TTY |
 
-        pid, _ := strconv.Atoi(matches[1])
-        tty := matches[2]
+**Rate limiting:** Minimum 500ms between injections to prevent overwhelming the terminal.
 
-        // Skip managed PIDs
-        if d.managedPIDs[pid] {
-            continue
-        }
+### SendPrompt Flow (session manager → LIVE injection)
 
-        // Get working directory
-        workDir := d.getWorkDir(pid)
+When `session/send` is called with a session ID that isn't a managed session:
 
-        // Get session ID from recent JSONL files
-        sessionID := d.findSessionID(workDir, pid)
-
-        if tty != "?" && tty != "" {
-            sessions = append(sessions, Session{
-                PID:       pid,
-                TTY:       "/dev/" + tty,
-                WorkDir:   workDir,
-                SessionID: sessionID,
-            })
-        }
-    }
-
-    return sessions, nil
-}
-
-// getWorkDir gets the working directory of a process
-func (d *Detector) getWorkDir(pid int) string {
-    // macOS: use lsof
-    out, err := exec.Command("lsof", "-p", strconv.Itoa(pid), "-Fn").Output()
-    if err != nil {
-        return ""
-    }
-
-    // Parse cwd from lsof output
-    lines := strings.Split(string(out), "\n")
-    for _, line := range lines {
-        if strings.HasPrefix(line, "n") && strings.HasPrefix(line[1:], "/") {
-            // Check if it's the cwd
-            path := line[1:]
-            if info, err := os.Stat(path); err == nil && info.IsDir() {
-                return path
-            }
-        }
-    }
-
-    return ""
-}
-
-// findSessionID finds the most recent session file for this process
-func (d *Detector) findSessionID(workDir string, pid int) string {
-    if workDir == "" {
-        return ""
-    }
-
-    // Convert workDir to Claude's project path format
-    // /Users/brian/Projects/cdev -> -Users-brian-Projects-cdev
-    projectPath := strings.ReplaceAll(workDir, "/", "-")
-    if !strings.HasPrefix(projectPath, "-") {
-        projectPath = "-" + projectPath
-    }
-
-    homeDir, _ := os.UserHomeDir()
-    sessionsDir := filepath.Join(homeDir, ".claude", "projects", projectPath)
-
-    // Find most recently modified JSONL file
-    var newestFile string
-    var newestTime time.Time
-
-    filepath.Walk(sessionsDir, func(path string, info os.FileInfo, err error) error {
-        if err != nil || info.IsDir() {
-            return nil
-        }
-
-        if strings.HasSuffix(path, ".jsonl") {
-            if info.ModTime().After(newestTime) {
-                newestTime = info.ModTime()
-                newestFile = filepath.Base(path)
-            }
-        }
-        return nil
-    })
-
-    // Return session ID (filename without .jsonl)
-    return strings.TrimSuffix(newestFile, ".jsonl")
-}
 ```
-
-### TTY Injector
-
-```go
-// internal/adapters/live/injector.go
-
-package live
-
-import (
-    "fmt"
-    "os"
-)
-
-// Injector sends input to a TTY
-type Injector struct{}
-
-// NewInjector creates a TTY injector
-func NewInjector() *Injector {
-    return &Injector{}
-}
-
-// Send writes text to a TTY device
-func (i *Injector) Send(tty string, text string) error {
-    // Open TTY for writing
-    f, err := os.OpenFile(tty, os.O_WRONLY, 0)
-    if err != nil {
-        return fmt.Errorf("failed to open TTY %s: %w", tty, err)
-    }
-    defer f.Close()
-
-    // Write text with newline
-    _, err = f.WriteString(text + "\n")
-    if err != nil {
-        return fmt.Errorf("failed to write to TTY: %w", err)
-    }
-
-    return nil
-}
-
-// SendResponse sends a formatted response for permission/question
-func (i *Injector) SendResponse(tty string, response string) error {
-    // For interactive prompts, just send the response
-    return i.Send(tty, response)
-}
-```
-
-### Enhanced Session Manager
-
-```go
-// Modify internal/rpc/handler/methods/session_manager.go
-
-// Add to History method
-func (s *SessionManagerService) History(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-    // ... existing code ...
-
-    // Get historical sessions from files
-    historicalSessions := s.getHistoricalSessions(workspaceID)
-
-    // Detect live sessions
-    liveSessions := s.detectLiveSessions(workspace.Path)
-
-    // Merge and deduplicate
-    allSessions := s.mergeSessions(historicalSessions, liveSessions, managedSessions)
-
-    // Sort by last_updated
-    sort.Slice(allSessions, func(i, j int) bool {
-        return allSessions[i].LastUpdated.After(allSessions[j].LastUpdated)
-    })
-
-    return SessionHistoryResult{
-        Sessions: allSessions,
-        Total:    len(allSessions),
-    }, nil
-}
-
-// Add to Send method
-func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
-    // ... parse params ...
-
-    // Get session info
-    session := s.getSession(sessionID)
-
-    switch session.Source {
-    case "managed":
-        // Use existing stdin method
-        return s.sendViaStdin(session, prompt)
-
-    case "live":
-        // Use TTY injection
-        return s.sendViaTTY(session, prompt)
-
-    case "historical":
-        return nil, message.NewError(-32001, "Cannot send to historical session")
-    }
-}
-
-func (s *SessionManagerService) sendViaTTY(session *Session, prompt string) (interface{}, *message.Error) {
-    injector := live.NewInjector()
-
-    if err := injector.Send(session.TTY, prompt); err != nil {
-        return nil, message.ErrInternalError(err.Error())
-    }
-
-    return map[string]interface{}{
-        "status": "sent",
-        "method": "tty_injection",
-        "tty":    session.TTY,
-    }, nil
-}
+SessionManagerService.Send()
+  → sendClaudePrompt(ctx, workspaceID, sessionID, prompt, mode, permissionMode)
+    → Manager.SendPrompt(sessionID, prompt, mode, permissionMode)
+      → GetSession(sessionID)                    // not found in managed sessions
+      → findWorkspaceForSession(sessionID)        // searches .claude/projects/ and LIVE detection
+      → live.NewDetector(workspace.Path)
+      → detector.GetLiveSession(sessionID)
+        → if found: injector.SendWithEnterToApp(prompt, liveSession.TerminalApp)
+        → if not found: falls through to auto-start managed session
 ```
 
 ---
+
+## Known Limitations
+
+### PID → Session ID Mapping
+
+**The detector cannot reliably map a specific Claude process (PID) to a specific session file when multiple Claude instances run in the same workspace.**
+
+Current behavior: `findSessionID()` picks the most recently modified `.jsonl` file in `~/.claude/projects/{project}/`. If two Claude processes share the same workspace directory, they both get assigned whichever session file was modified last.
+
+**Why an exact mapping is not possible externally:**
+
+| Approach Investigated | Result |
+|----------------------|--------|
+| `lsof -p <pid>` for `.jsonl` files | Claude opens/writes/closes — files are never held open |
+| Child process file descriptors | Same — no JSONL files held open |
+| Command-line args (`ps -o args`) | Just `claude` — no session ID in args |
+| Environment variables | Not exposed by Claude CLI |
+| Process start time vs file birth time | Claude creates new session files on resume, so timestamps don't correlate with process start |
+
+**Practical impact:** Low. Each Claude instance typically runs in a separate workspace (separate project directory), and workspace-path filtering handles the mapping correctly. The limitation only matters if a user runs two Claude instances in the exact same directory, which is unusual.
+
+**Possible future fix:** Claude CLI would need to expose its session ID externally — via an environment variable, a PID file, or in its command-line arguments.
+
+### Platform Support
+
+| Feature | macOS | Windows | Linux |
+|---------|-------|---------|-------|
+| Process detection | `ps` + `lsof` | `ps` + `lsof` | `ps` + `lsof` |
+| Keystroke injection | AppleScript | PowerShell SendKeys | Not supported |
+| Terminal content reading | AppleScript (Terminal, iTerm2 only) | Not supported | Not supported |
+
+### Terminal App Detection
+
+The detector walks the process tree to identify the terminal app. Known terminal apps: Terminal, iTerm2, VS Code (`Code`), Cursor. Other terminals may not be detected and will show as `"Unknown"`.
 
 ## Security Considerations
 
@@ -901,13 +735,13 @@ func (s *SessionManagerService) sendViaTTY(session *Session, prompt string) (int
 
 1. **Same User Only**: TTY injection only works for processes owned by the same user
 2. **No Elevation**: cdev cannot inject into root-owned terminals
-3. **Audit Trail**: All injected messages are logged
+3. **Audit Trail**: All injected messages are logged with session ID, PID, TTY, and terminal app
 
 ### Permissions
 
-On macOS, TTY access may require:
-- Terminal app to have "Full Disk Access" or
-- User to explicitly allow cdev to access TTY devices
+On macOS, keystroke injection via AppleScript requires:
+- **Accessibility permissions** for the cdev process (System Settings → Privacy & Security → Accessibility)
+- The target terminal app must be running and have a window
 
 ### Recommendations
 
@@ -950,8 +784,33 @@ On macOS, TTY access may require:
 
 ---
 
+## Testing
+
+### Unit Tests (no Claude needed)
+
+```bash
+go test -v -run "TestDetector_Creation|TestInjector_PlatformInit|TestDetector_GetLiveSession_NoProcess" \
+  ./internal/adapters/live/
+```
+
+### Full RPC Round-Trip (requires Claude running in a terminal)
+
+```bash
+# 1. Open a separate terminal, cd to this project, run: claude
+# 2. Then run:
+CDEV_LIVE_POC=1 go test -v -run TestLiveInjection_FullRPCRoundTrip \
+  ./internal/adapters/live/ -timeout 30s
+```
+
+Expected: `[cdev-ios POC] hello from mobile!` appears in the Claude terminal.
+
+The test exercises the full chain: `Send() → sendClaudePrompt() → Manager.SendPrompt() → Detector.GetLiveSession() → Injector.SendWithEnterToApp()`.
+
+---
+
 ## Version History
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-25 | 2.0 | Updated to match current implementation: AppleScript injection, platform abstraction, rate limiting, workspace-scoped detection, caching, terminal app identification. Added known limitations section and testing guide. |
 | 2024-12-25 | 1.0 | Initial LIVE session integration design |

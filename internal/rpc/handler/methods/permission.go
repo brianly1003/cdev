@@ -296,6 +296,7 @@ func (s *PermissionService) createPermissionEvent(req *permission.Request) *even
 	// the mobile app to filter by session if needed.
 	event := events.NewEvent(events.EventTypePTYPermission, payload)
 	event.SessionID = req.SessionID
+	event.SetAgentType("claude") // Permission hooks are Claude-specific
 
 	return event
 }

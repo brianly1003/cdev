@@ -1887,14 +1887,16 @@ func (s *SessionManagerService) WatchSession(ctx context.Context, params json.Ra
 							Selected:    opt.Selected,
 						}
 					}
-					s.manager.PublishEvent(events.NewPTYPermissionEventWithSession(
+					evt := events.NewPTYPermissionEventWithSession(
 						string(pendingPerm.Type),
 						pendingPerm.Target,
 						pendingPerm.Description,
 						pendingPerm.Preview,
 						info.SessionID,
 						options,
-					))
+					)
+					evt.SetAgentType(agentType) // Always tag with runtime for tab isolation
+					s.manager.PublishEvent(evt)
 
 					log.Info().
 						Str("type", string(pendingPerm.Type)).

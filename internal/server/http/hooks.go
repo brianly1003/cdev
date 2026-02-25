@@ -347,6 +347,7 @@ func (h *HooksHandler) createPermissionEvent(req *permission.Request, payload Cl
 
 	event := events.NewEvent(events.EventTypePTYPermission, eventPayload)
 	event.SessionID = req.SessionID
+	event.SetAgentType("claude") // Permission hooks are Claude-specific
 
 	return event
 }

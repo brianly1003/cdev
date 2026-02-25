@@ -72,18 +72,18 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 	addr := fmt.Sprintf("%s:%d", host, port)
 
 	s := &Server{
-		addr:          addr,
-		statusFn:      statusFn,
-		claudeManager: claudeManager,
-		gitTracker:    gitTracker,
-		sessionCache:  sessionCache,
-		messageCache:  messageCache,
-		eventHub:      eventHub,
-		maxFileSizeKB: maxFileSizeKB,
-		maxDiffSizeKB: maxDiffSizeKB,
-		repoPath:      repoPath,
-		mux:           http.NewServeMux(),
-		authAllowlist: defaultAuthAllowlist(),
+		addr:            addr,
+		statusFn:        statusFn,
+		claudeManager:   claudeManager,
+		gitTracker:      gitTracker,
+		sessionCache:    sessionCache,
+		messageCache:    messageCache,
+		eventHub:        eventHub,
+		maxFileSizeKB:   maxFileSizeKB,
+		maxDiffSizeKB:   maxDiffSizeKB,
+		repoPath:        repoPath,
+		mux:             http.NewServeMux(),
+		authAllowlist:   defaultAuthAllowlist(),
 		pairAccessToken: strings.TrimSpace(os.Getenv("CDEV_TOKEN")),
 	}
 
@@ -474,6 +474,12 @@ func (s *Server) SetAuth(tokenManager *security.TokenManager, requireAuth bool) 
 	s.requireAuth = requireAuth
 }
 
+// SetPairAccessToken configures the optional token gate for pairing routes.
+// Protected routes include /pair, /api/pair/*, and /api/auth/pairing/*.
+func (s *Server) SetPairAccessToken(token string) {
+	s.pairAccessToken = strings.TrimSpace(token)
+}
+
 // SetAuthAllowlist overrides the default unauthenticated path allowlist.
 func (s *Server) SetAuthAllowlist(allowlist []string) {
 	s.authAllowlist = allowlist
@@ -644,7 +650,7 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Cdev-Token")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Cdev-Token")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)

@@ -907,7 +907,7 @@ Returns git diff for a specific file or all files.
 
 ## Repository API
 
-The Repository API provides fast file search and browsing capabilities. See [REPOSITORY-INDEXER.md](../architecture/REPOSITORY-INDEXER.md) for detailed documentation.
+The Repository API provides fast file search and browsing capabilities.
 
 ### JSON-RPC Methods (Recommended)
 

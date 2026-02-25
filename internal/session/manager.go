@@ -377,9 +377,13 @@ func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []str
 // This is used for LIVE sessions that were discovered but not explicitly activated.
 func (m *Manager) findWorkspaceForSession(sessionID string) string {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
+	workspaces := make(map[string]*workspace.Workspace, len(m.workspaces))
 	for workspaceID, ws := range m.workspaces {
+		workspaces[workspaceID] = ws
+	}
+	m.mu.RUnlock()
+
+	for workspaceID, ws := range workspaces {
 		// Check if this workspace has the session in its session files
 		exists, _ := m.sessionFileExistsForWorkspace(ws, sessionID)
 		if exists {
@@ -390,6 +394,29 @@ func (m *Manager) findWorkspaceForSession(sessionID string) string {
 			return workspaceID
 		}
 	}
+
+	// Fallback for stale/non-matching session IDs:
+	// infer workspace from LIVE Claude process detection.
+	liveWorkspaceCandidates := make([]string, 0, 1)
+	for workspaceID, ws := range workspaces {
+		detector := live.NewDetector(ws.Definition.Path)
+		liveSessions, detectErr := detector.DetectAll()
+		if detectErr != nil {
+			continue
+		}
+		if len(liveSessions) > 0 {
+			liveWorkspaceCandidates = append(liveWorkspaceCandidates, workspaceID)
+		}
+	}
+
+	if len(liveWorkspaceCandidates) == 1 {
+		log.Debug().
+			Str("session_id", sessionID).
+			Str("workspace_id", liveWorkspaceCandidates[0]).
+			Msg("resolved workspace from LIVE session fallback")
+		return liveWorkspaceCandidates[0]
+	}
+
 	return ""
 }
 
@@ -1182,7 +1209,9 @@ func (m *Manager) stopWatchingLiveSession(workspaceID, sessionID string) {
 
 	// Emit session_stopped event for multi-device sync
 	if m.hub != nil {
-		m.hub.Publish(events.NewSessionStoppedEvent(workspaceID, sessionID))
+		evt := events.NewSessionStoppedEvent(workspaceID, sessionID)
+		evt.SetAgentType(agentTypeClaude)
+		m.hub.Publish(evt)
 	}
 
 	m.logger.Info("Stopped watching LIVE session", "session_id", sessionID, "workspace_id", workspaceID)
@@ -1229,7 +1258,9 @@ func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *S
 	// Emit session_stopped event for multi-device sync
 	// All connected clients will receive this notification
 	if m.hub != nil {
-		m.hub.Publish(events.NewSessionStoppedEvent(session.WorkspaceID, session.ID))
+		evt := events.NewSessionStoppedEvent(session.WorkspaceID, session.ID)
+		evt.SetAgentType(agentTypeClaude)
+		m.hub.Publish(evt)
 	}
 
 	m.logger.Info("Stopped session", "session_id", session.ID, "workspace_id", session.WorkspaceID)
@@ -1428,14 +1459,41 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 			// Get workspace for context
 			ws, wsErr := m.GetWorkspace(workspaceID)
 			if wsErr == nil {
-				// If permission_mode is "interactive", skip LIVE detection and spawn PTY
-				// User explicitly wants PTY mode with pty_output/pty_permission events
+				// Try LIVE session first for all modes, including interactive.
+				// This matches Claude Code bridge behavior where inbound messages
+				// are written into the currently running terminal session.
+				if injector != nil {
+					detector := live.NewDetector(ws.Definition.Path)
+					liveSession := detector.GetLiveSession(sessionID)
+					if liveSession != nil {
+						log.Info().
+							Str("session_id", sessionID).
+							Str("tty", liveSession.TTY).
+							Int("pid", liveSession.PID).
+							Str("terminal_app", liveSession.TerminalApp).
+							Str("prompt", truncateString(prompt, 50)).
+							Msg("sending prompt to LIVE session via keystroke injection")
+
+						// Auto-activate the session for future calls
+						m.mu.Lock()
+						m.activeSessionWorkspaces[sessionID] = workspaceID
+						m.activeSessions[workspaceID] = sessionID
+						m.mu.Unlock()
+
+						// For LIVE sessions, inject prompt with Enter to the specific terminal app
+						if err := injector.SendWithEnterToApp(prompt, liveSession.TerminalApp); err != nil {
+							return fmt.Errorf("failed to inject prompt to LIVE session: %w", err)
+						}
+						return nil
+					}
+				}
+
 				if permissionMode == "interactive" {
 					log.Info().
 						Str("session_id", sessionID).
 						Str("workspace_id", workspaceID).
 						Str("prompt", truncateString(prompt, 50)).
-						Msg("interactive mode requested - spawning PTY session instead of LIVE injection")
+						Msg("interactive mode requested with no LIVE session - spawning PTY managed session")
 
 					// Start a new managed session with the specific session ID
 					newSession, startErr := m.startSessionWithID(workspaceID, sessionID)
@@ -1447,33 +1505,6 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 					session = newSession
 					// Fall through to normal session handling below (will hit PTY code path)
 				} else {
-					// Not interactive mode - try LIVE session first, then fall back to managed session
-					if injector != nil {
-						detector := live.NewDetector(ws.Definition.Path)
-						liveSession := detector.GetLiveSession(sessionID)
-						if liveSession != nil {
-							log.Info().
-								Str("session_id", sessionID).
-								Str("tty", liveSession.TTY).
-								Int("pid", liveSession.PID).
-								Str("terminal_app", liveSession.TerminalApp).
-								Str("prompt", truncateString(prompt, 50)).
-								Msg("sending prompt to LIVE session via keystroke injection")
-
-							// Auto-activate the session for future calls
-							m.mu.Lock()
-							m.activeSessionWorkspaces[sessionID] = workspaceID
-							m.activeSessions[workspaceID] = sessionID
-							m.mu.Unlock()
-
-							// For LIVE sessions, inject prompt with Enter to the specific terminal app
-							if err := injector.SendWithEnterToApp(prompt, liveSession.TerminalApp); err != nil {
-								return fmt.Errorf("failed to inject prompt to LIVE session: %w", err)
-							}
-							return nil
-						}
-					}
-
 					// No LIVE session found - auto-start a managed session
 					log.Info().
 						Str("session_id", sessionID).
@@ -1810,6 +1841,7 @@ func (m *Manager) EmitPermissionResolved(sessionID, clientID, input string) {
 
 	// Emit the event
 	evt := events.NewPTYPermissionResolvedEvent(sessionID, workspaceID, clientID, input)
+	evt.SetAgentType(agentTypeClaude)
 	m.hub.Publish(evt)
 
 	m.logger.Info("emitted pty_permission_resolved event",
@@ -2980,6 +3012,7 @@ func (m *Manager) executeBashCommand(workspaceID, sessionID, workDir, cmd string
 		WaitingForInput: false,
 	})
 	stateEvent.SetContext(workspaceID, sessionID)
+	stateEvent.SetAgentType(agentTypeClaude)
 	m.hub.Publish(stateEvent)
 
 	log.Info().

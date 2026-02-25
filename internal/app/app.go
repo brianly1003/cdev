@@ -600,6 +600,12 @@ func (a *App) Start(ctx context.Context) error {
 	a.httpServer.SetOriginChecker(originChecker)
 	// Configure HTTP auth (bearer tokens)
 	a.httpServer.SetAuth(a.tokenManager, a.cfg.Security.RequireAuth)
+	// Configure optional pairing-route access token (config-first, env fallback for compatibility).
+	pairAccessToken := strings.TrimSpace(a.cfg.Security.PairAccessToken)
+	if pairAccessToken == "" {
+		pairAccessToken = strings.TrimSpace(os.Getenv("CDEV_TOKEN"))
+	}
+	a.httpServer.SetPairAccessToken(pairAccessToken)
 
 	// Configure rate limiting if enabled
 	if a.cfg.Security.RateLimit.Enabled {
