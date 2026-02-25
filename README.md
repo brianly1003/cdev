@@ -67,39 +67,30 @@ make build
 
 ### Multi-Workspace Mode (IDE Integration Ready!)
 
-**cdev-agent is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
+**cdev is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
 
 **Standard Protocol: JSON-RPC 2.0** - Industry standard used by LSP, MCP, and all major IDEs.
 
-Manage multiple repositories from a single workspace manager:
+Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:8766/ws`):
 
-```bash
-# Start the workspace manager
-./bin/cdev workspace-manager start
+```json
+// Add a workspace
+{"jsonrpc": "2.0", "id": 1, "method": "workspace/add", "params": {"path": "/path/to/backend", "name": "Backend API"}}
 
-# Add workspaces
-./bin/cdev workspace add /path/to/backend --name "Backend API" --auto-start
-./bin/cdev workspace add /path/to/frontend --name "React App"
+// List workspaces
+{"jsonrpc": "2.0", "id": 2, "method": "workspace/list"}
 
-# List workspaces
-./bin/cdev workspace list
-
-# Start/stop workspaces
-./bin/cdev workspace start backend-id
-./bin/cdev workspace stop backend-id
-
-# Discover Git repositories
-./bin/cdev workspace discover
+// Start/stop a workspace
+{"jsonrpc": "2.0", "id": 3, "method": "workspace/start", "params": {"id": "ws-abc123"}}
+{"jsonrpc": "2.0", "id": 4, "method": "workspace/stop", "params": {"id": "ws-abc123"}}
 ```
 
-**Manager runs on:** `http://127.0.0.1:8765`
+**Server runs on:** `http://127.0.0.1:8766`
 - **WebSocket JSON-RPC 2.0**: `/ws` - **PRIMARY (recommended for IDE integration)**
-- REST API: `/api/workspaces` - Also available (will be deprecated)
+- REST API: `/api/*` - Also available
 - Health check: `/health`
 
-**For IDE Extensions & 3rd Party Tools:** Use JSON-RPC 2.0 protocol (LSP-compatible)
-
-**See full guide:** [Multi-Workspace Usage Guide](docs/architecture/MULTI-WORKSPACE-USAGE.md)
+**See full guide:** [Multi-Workspace Design](docs/architecture/MULTI-WORKSPACE-DESIGN.md)
 
 ## Installation
 
@@ -403,23 +394,35 @@ cdev/
 │   │   └── ports/           # Interface definitions
 │   ├── adapters/            # External system adapters
 │   │   ├── claude/          # Claude CLI adapter (process mgmt, PTY, streaming)
-│   │   ├── live/            # LIVE session detection & keystroke injection
-│   │   ├── watcher/         # File system watcher
-│   │   ├── git/             # Git tracker
 │   │   ├── codex/           # Codex CLI adapter
-│   │   └── sessioncache/    # Session message cache (SQLite)
-│   ├── session/             # Session manager (multi-session orchestration)
-│   ├── workspace/           # Workspace management
+│   │   ├── git/             # Git tracker
+│   │   ├── jsonl/           # JSONL file reading
+│   │   ├── live/            # LIVE session detection & keystroke injection
+│   │   ├── repository/      # Repository indexing
+│   │   ├── sessioncache/    # Session message cache (SQLite)
+│   │   └── watcher/         # File system watcher
+│   ├── hooks/               # Claude Code hook handling
 │   ├── hub/                 # Event hub
+│   ├── pairing/             # QR code pairing
+│   ├── permission/          # Permission management
 │   ├── rpc/                 # JSON-RPC 2.0 layer
 │   │   ├── transport/       # WebSocket & stdio transports
 │   │   ├── message/         # JSON-RPC message types
 │   │   └── handler/         # Method registry & dispatcher
 │   │       └── methods/     # RPC method implementations
-│   └── server/
-│       ├── unified/         # Unified server (HTTP + WebSocket on single port)
-│       └── http/            # HTTP-only endpoints
-├── pkg/protocol/            # Public protocol types
+│   ├── security/            # Auth tokens, CDEV_TOKEN gate, HMAC cookies
+│   ├── server/
+│   │   ├── common/          # Shared server utilities
+│   │   ├── http/            # HTTP API endpoints
+│   │   ├── unified/         # Unified server (HTTP + WebSocket on single port)
+│   │   ├── websocket/       # WebSocket implementation
+│   │   └── workspacehttp/   # Workspace-specific HTTP
+│   ├── services/            # Optional services (image storage, etc.)
+│   ├── session/             # Session manager (multi-session orchestration)
+│   ├── sync/                # Sync utilities
+│   ├── terminal/            # Terminal runner
+│   ├── testutil/            # Testing utilities
+│   └── workspace/           # Workspace management
 ├── configs/                 # Configuration examples
 └── test/                    # Integration tests
 ```
@@ -456,7 +459,6 @@ cdev/
 | [docs/api/API-REFERENCE.md](./docs/api/API-REFERENCE.md) | Complete HTTP/WebSocket API for mobile integration |
 | [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Detailed architecture and technical specification |
 | [docs/architecture/DESIGN-SPEC.md](./docs/architecture/DESIGN-SPEC.md) | Original design specification with implementation status |
-| [docs/security/TECHNICAL-REVIEW.md](./docs/security/TECHNICAL-REVIEW.md) | Security & performance analysis with roadmap |
 | [docs/mobile/LIVE-SESSION-INTEGRATION.md](./docs/mobile/LIVE-SESSION-INTEGRATION.md) | LIVE session detection, injection, and limitations |
 | [docs/mobile/INTERACTIVE-PTY-MODE.md](./docs/mobile/INTERACTIVE-PTY-MODE.md) | Interactive PTY mode specification |
 | [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) | Product backlog with prioritized work items |
@@ -469,6 +471,10 @@ cdev/
 - CORS restrictions with origin validation
 - Binds to localhost only by default (intentional security measure)
 - LIVE session injection requires same-user process ownership
+- `CDEV_TOKEN` environment variable gates access to pairing routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`)
+- Cookie tokens stored as HMAC hashes (raw token never persisted in cookie)
+- `Referrer-Policy: no-referrer` on pairing responses to prevent token leakage
+- Query-string tokens rejected; Authorization header required
 
 See [docs/security/SECURITY.md](./docs/security/SECURITY.md) for details.
 

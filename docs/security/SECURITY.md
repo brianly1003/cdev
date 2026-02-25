@@ -39,6 +39,9 @@ cdev is designed to run on a developer's local machine and provide remote access
 | Path validation | ✅ Active | `GetFileContent` and `/api/files/list` use Rel + symlink resolution to block escapes |
 | Diff size cap | ✅ Active | `limits.max_diff_size_kb` enforced for HTTP/RPC/event diffs |
 | Token-in-query removal | ✅ Active | Query-string tokens rejected; Authorization header only |
+| CDEV_TOKEN pairing gate | ✅ Active | `CDEV_TOKEN` env var gates `/pair`, `/api/pair/*`, `/api/auth/pairing/*` routes |
+| Cookie HMAC hashing | ✅ Active | Pairing cookies store HMAC hash, never the raw token |
+| Referrer-Policy | ✅ Active | `Referrer-Policy: no-referrer` on pairing responses to prevent token leakage |
 | Debug/pprof default off | ✅ Active | `debug.pprof_enabled` defaults to `false` |
 
 ### Outstanding Risks (Pending)
@@ -99,6 +102,22 @@ export CDEV_SERVER_HOST=127.0.0.1
 export CDEV_SECURITY_REQUIRE_AUTH=true
 export CDEV_SECURITY_RATE_LIMIT_ENABLED=true
 ```
+
+### CDEV_TOKEN Pairing Gate
+
+When `CDEV_TOKEN` is set, pairing routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`) require the token before granting access. This prevents unauthorized devices from initiating pairing.
+
+```bash
+# Generate and export a token
+export CDEV_TOKEN="$(openssl rand -hex 32)"
+
+# Start cdev — pairing is now gated
+cdev start
+```
+
+**Cookie hardening:** After successful token verification, the server sets an `__Host-cdev_pair` cookie containing an HMAC hash of the token (not the raw token). Subsequent requests are validated against the HMAC, preventing token exposure via browser storage.
+
+**Response headers:** Pairing responses include `Referrer-Policy: no-referrer` to prevent the token from leaking in the `Referer` header when navigating away from the pairing page.
 
 ---
 
