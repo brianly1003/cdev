@@ -182,6 +182,18 @@ func (r *AuthRegistry) PruneExpired(now time.Time) ([]string, []string, error) {
 	return expiredDevices, orphaned, nil
 }
 
+// IsRefreshNonceValid reports whether nonce is the currently registered
+// refresh nonce for any device. Returns false for unknown or removed devices.
+func (r *AuthRegistry) IsRefreshNonceValid(deviceID, nonce string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	session, ok := r.Devices[deviceID]
+	if !ok || session == nil {
+		return false
+	}
+	return session.RefreshNonce == nonce
+}
+
 // GetDevice returns the device session, if any.
 func (r *AuthRegistry) GetDevice(deviceID string) (*DeviceSession, bool) {
 	r.mu.Lock()
@@ -215,7 +227,7 @@ func (r *AuthRegistry) saveLocked() error {
 	}
 
 	dir := filepath.Dir(r.path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 

@@ -206,6 +206,20 @@ func (h *AuthHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.registry != nil {
+		oldPayload, err := h.tokenManager.ValidateToken(req.RefreshToken)
+		if err != nil {
+			log.Warn().Err(err).Msg("Token refresh failed - invalid token")
+			writeJSONError(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+			return
+		}
+		if !h.registry.IsRefreshNonceValid(oldPayload.DeviceID, oldPayload.Nonce) {
+			log.Warn().Str("device_id", oldPayload.DeviceID).Msg("refresh token nonce not in registry (revoked or restarted)")
+			writeJSONError(w, "Invalid or expired refresh token", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	pair, err := h.tokenManager.RefreshTokenPair(req.RefreshToken)
 	if err != nil {
 		log.Warn().Err(err).Msg("Token refresh failed")

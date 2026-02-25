@@ -1211,7 +1211,7 @@ func (t *Tracker) ListDirectory(ctx context.Context, path string) ([]DirectoryEn
 		return nil, err
 	}
 
-	if !strings.HasPrefix(absPath, absRoot) {
+	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
 		return nil, domain.ErrPathOutsideRepo
 	}
 

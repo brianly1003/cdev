@@ -338,6 +338,18 @@ func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+const maxRequestBodySize = 1 << 20 // 1 MB
+
+// bodySizeLimitMiddleware caps request bodies to prevent memory exhaustion.
+func bodySizeLimitMiddleware(maxBytes int64, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // timeoutMiddleware wraps handlers with a timeout to prevent hanging requests.
 func timeoutMiddleware(timeout time.Duration, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -546,6 +558,12 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Local hook calls (/api/hooks/*) are trusted from loopback — no token needed
+		if isLocalRequest(r, s.trustedProxies) && strings.HasPrefix(r.URL.Path, "/api/hooks/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		token := extractBearerToken(r.Header.Get("Authorization"))
 		if token == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -676,6 +694,7 @@ func (s *Server) Start() error {
 	handler = s.pairAccessTokenMiddleware(handler)
 	handler = s.corsMiddleware(handler)
 	handler = timeoutMiddleware(10*time.Second, handler)
+	handler = bodySizeLimitMiddleware(maxRequestBodySize, handler)
 
 	// Add rate limiting if configured
 	if s.rateLimiter != nil {
