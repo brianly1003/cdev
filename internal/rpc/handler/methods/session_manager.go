@@ -64,6 +64,8 @@ const (
 	ptyStateThinking = "thinking"
 	ptyStateIdle     = "idle"
 	ptyStateError    = "error"
+
+	codexContextWindowErrorNeedle = "codex ran out of room in the model's context window"
 )
 
 var (
@@ -3059,6 +3061,30 @@ func (s *SessionManagerService) publishCodexPTYOutput(sessionID, text, state str
 	evt := events.NewPTYOutputEventWithSession(cleanText, text, state, sessionID)
 	evt.SetAgentType(sessionManagerAgentCodex)
 	s.manager.PublishEvent(evt)
+
+	// Codex can fail before emitting structured session JSONL messages when the
+	// context window is exhausted. Emit a synthetic claude_message so clients
+	// still show this failure in the message timeline.
+	if contextErrText := extractCodexContextWindowErrorText(cleanText); contextErrText != "" {
+		var workspaceID string
+		if codexSession := s.getCodexSession(sessionID); codexSession != nil {
+			workspaceID = codexSession.workspaceID
+		}
+
+		msgEvt := events.NewClaudeMessageEventFull(events.ClaudeMessagePayload{
+			SessionID: sessionID,
+			Type:      "assistant",
+			Role:      "assistant",
+			Content: []events.ClaudeMessageContent{
+				{Type: "text", Text: contextErrText},
+			},
+			IsContextCompaction: true,
+			Timestamp:           time.Now().UTC().Format(time.RFC3339Nano),
+		})
+		msgEvt.SetAgentType(sessionManagerAgentCodex)
+		msgEvt.SetContext(workspaceID, sessionID)
+		s.manager.PublishEvent(msgEvt)
+	}
 }
 
 func (s *SessionManagerService) shouldLogCodexPTYOutput(sessionID, clean string) bool {
@@ -3092,6 +3118,24 @@ func sanitizeCodexPTYOutputText(text string) string {
 	withoutEscape := strings.ReplaceAll(withoutControl, "\x1b", "")
 	normalizedCRLF := strings.ReplaceAll(withoutEscape, "\r\n", "\n")
 	return strings.ReplaceAll(normalizedCRLF, "\r", "\n")
+}
+
+func extractCodexContextWindowErrorText(cleanText string) string {
+	if strings.TrimSpace(cleanText) == "" {
+		return ""
+	}
+
+	for _, line := range strings.Split(cleanText, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(trimmed), codexContextWindowErrorNeedle) {
+			return trimmed
+		}
+	}
+
+	return ""
 }
 
 func (s *SessionManagerService) publishCodexPTYState(sessionID, state string) {

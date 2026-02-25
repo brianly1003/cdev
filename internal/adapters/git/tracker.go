@@ -527,8 +527,9 @@ func (t *Tracker) GetEnhancedStatus(ctx context.Context) (*EnhancedStatus, error
 		} else if staged == '?' && unstaged == '?' {
 			// Untracked
 			status.Untracked = append(status.Untracked, FileEntry{
-				Path:   path,
-				Status: "?",
+				Path:      path,
+				Status:    "?",
+				Additions: t.countFileLines(path),
 			})
 		} else {
 			// Check staged changes
@@ -592,6 +593,29 @@ func (t *Tracker) getBranchInfo(ctx context.Context) (branch, upstream string, a
 	}
 
 	return
+}
+
+// countFileLines counts the number of lines in an untracked file.
+// Returns 0 for binary files, directories, or files larger than 1MB.
+func (t *Tracker) countFileLines(path string) int {
+	fullPath := filepath.Join(t.repoRoot, path)
+	info, err := os.Stat(fullPath)
+	if err != nil || info.IsDir() || info.Size() > 1024*1024 {
+		return 0
+	}
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return 0
+	}
+	if isBinaryContent(content) {
+		return 0
+	}
+	lines := strings.Split(string(content), "\n")
+	// Don't count a trailing empty line from a trailing newline
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		return len(lines) - 1
+	}
+	return len(lines)
 }
 
 // getDiffStats returns additions and deletions for a file.
@@ -2182,7 +2206,7 @@ func (t *Tracker) GetStatus(ctx context.Context) (*Status, error) {
 				unstaged := line[1]
 				path := strings.TrimLeft(line[2:], " ")
 				if staged == '?' && unstaged == '?' {
-					status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?"})
+					status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?", Additions: t.countFileLines(path)})
 				}
 			}
 		}
@@ -2225,7 +2249,7 @@ func (t *Tracker) GetStatus(ctx context.Context) (*Status, error) {
 				status.Conflicted = append(status.Conflicted, FileEntry{Path: path, Status: "!"})
 				status.HasConflicts = true
 			} else if staged == '?' && unstaged == '?' {
-				status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?"})
+				status.Untracked = append(status.Untracked, FileEntry{Path: path, Status: "?", Additions: t.countFileLines(path)})
 			} else {
 				if staged != ' ' && staged != '?' {
 					entry := FileEntry{Path: path, Status: string(staged)}

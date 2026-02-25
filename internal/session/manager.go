@@ -53,9 +53,9 @@ type Manager struct {
 	idleTimeout time.Duration
 
 	// Session streaming for live message updates
-	streamerSessions      map[watchedSessionKey]*watchedSessionStream // workspace/session -> active streamer
-	streamerClientSessions map[string]map[watchedSessionKey]bool    // clientID -> watched sessions
-	streamerMu            sync.Mutex
+	streamerSessions       map[watchedSessionKey]*watchedSessionStream // workspace/session -> active streamer
+	streamerClientSessions map[string]map[watchedSessionKey]bool       // clientID -> watched sessions
+	streamerMu             sync.Mutex
 
 	// LIVE session support (Claude running in user's terminal)
 	liveInjector *live.Injector // Shared injector (platform-specific keystroke injection)
@@ -631,11 +631,12 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 
 	// Optionally create file watcher (lazy init based on config)
 	if m.cfg.Watcher.Enabled {
-		fileWatcher := watcher.NewWatcher(
+		fileWatcher := watcher.NewWatcherWithWorkspace(
 			ws.Definition.Path,
 			m.hub,
 			m.cfg.Watcher.DebounceMS,
 			m.cfg.Watcher.IgnorePatterns,
+			workspaceID,
 		)
 		session.SetFileWatcher(fileWatcher)
 
@@ -1029,11 +1030,12 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 
 	// Create file watcher (same as StartSession)
 	if m.cfg.Watcher.Enabled {
-		fileWatcher := watcher.NewWatcher(
+		fileWatcher := watcher.NewWatcherWithWorkspace(
 			ws.Definition.Path,
 			m.hub,
 			m.cfg.Watcher.DebounceMS,
 			m.cfg.Watcher.IgnorePatterns,
+			workspaceID,
 		)
 		session.SetFileWatcher(fileWatcher)
 

@@ -22,9 +22,10 @@ type pendingRename struct {
 
 // Watcher implements the FileWatcher port interface.
 type Watcher struct {
-	rootPath   string
-	hub        ports.EventHub
-	debounceMS int
+	rootPath    string
+	workspaceID string
+	hub         ports.EventHub
+	debounceMS  int
 
 	mu             sync.RWMutex
 	watcher        *fsnotify.Watcher
@@ -42,8 +43,15 @@ type Watcher struct {
 
 // NewWatcher creates a new file system watcher.
 func NewWatcher(rootPath string, hub ports.EventHub, debounceMS int, ignorePatterns []string) *Watcher {
+	return NewWatcherWithWorkspace(rootPath, hub, debounceMS, ignorePatterns, "")
+}
+
+// NewWatcherWithWorkspace creates a new file system watcher with workspace context
+// attached to emitted events.
+func NewWatcherWithWorkspace(rootPath string, hub ports.EventHub, debounceMS int, ignorePatterns []string, workspaceID string) *Watcher {
 	return &Watcher{
 		rootPath:       rootPath,
+		workspaceID:    workspaceID,
 		hub:            hub,
 		debounceMS:     debounceMS,
 		ignorePatterns: ignorePatterns,
@@ -93,6 +101,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 
 	log.Info().
 		Str("path", w.rootPath).
+		Str("workspace_id", w.workspaceID).
 		Int("debounce_ms", w.debounceMS).
 		Msg("file watcher started")
 
@@ -237,7 +246,7 @@ func (w *Watcher) processStalePendingRenames() {
 				Str("path", pending.oldPath).
 				Msg("stale pending rename treated as deletion")
 
-			w.hub.Publish(events.NewFileChangedEvent(pending.oldPath, events.FileChangeDeleted, 0))
+			w.publishEvent(events.NewFileChangedEvent(pending.oldPath, events.FileChangeDeleted, 0))
 		}
 	}
 }
@@ -313,11 +322,12 @@ func (w *Watcher) handleDebouncedEvent(path string, changeType events.FileChange
 				w.pendingRenamesMu.Unlock()
 
 				// This is a rename! Emit proper rename event with both paths
-				w.hub.Publish(events.NewFileRenamedEvent(pending.oldPath, path))
+				w.publishEvent(events.NewFileRenamedEvent(pending.oldPath, path))
 
 				log.Info().
 					Str("old_path", pending.oldPath).
 					Str("new_path", path).
+					Str("workspace_id", w.workspaceID).
 					Msg("file renamed")
 				return
 			}
@@ -328,13 +338,21 @@ func (w *Watcher) handleDebouncedEvent(path string, changeType events.FileChange
 	}
 
 	// Publish regular event
-	w.hub.Publish(events.NewFileChangedEvent(path, changeType, size))
+	w.publishEvent(events.NewFileChangedEvent(path, changeType, size))
 
 	log.Debug().
 		Str("path", path).
 		Str("change", string(changeType)).
 		Int64("size", size).
+		Str("workspace_id", w.workspaceID).
 		Msg("file changed")
+}
+
+func (w *Watcher) publishEvent(event *events.BaseEvent) {
+	if w.workspaceID != "" {
+		event.SetContext(w.workspaceID, "")
+	}
+	w.hub.Publish(event)
 }
 
 // shouldIgnore checks if a path should be ignored.

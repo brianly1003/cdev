@@ -115,3 +115,20 @@ func TestSanitizeCodexPTYOutputText_OnlyControlSequencesReturnsEmpty(t *testing.
 		t.Fatalf("got %q, want empty", got)
 	}
 }
+
+func TestExtractCodexContextWindowErrorText_ReturnsMatchingLine(t *testing.T) {
+	input := "ERROR: Codex ran out of room in the model's context window. Start a new thread or clear earlier history before retrying.\ntokens used\n0"
+	got := extractCodexContextWindowErrorText(input)
+	want := "ERROR: Codex ran out of room in the model's context window. Start a new thread or clear earlier history before retrying."
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestExtractCodexContextWindowErrorText_NoMatch(t *testing.T) {
+	input := "mcp: playwright ready\nmcp startup: ready: playwright"
+	got := extractCodexContextWindowErrorText(input)
+	if got != "" {
+		t.Fatalf("got %q, want empty", got)
+	}
+}
