@@ -164,6 +164,10 @@ func (s *SubscriptionService) Unsubscribe(ctx context.Context, params json.RawMe
 
 	filtered.UnsubscribeWorkspace(p.WorkspaceID)
 
+	// Edge case: if the client was focused on a session in this workspace,
+	// clear the stale focus so permission events from other sessions aren't blocked.
+	filtered.ClearSessionFocusIfWorkspace(p.WorkspaceID)
+
 	// Stop git watcher for this workspace (uses reference counting)
 	if s.gitWatcherManager != nil {
 		s.gitWatcherManager.StopGitWatcher(p.WorkspaceID)
@@ -219,6 +223,10 @@ func (s *SubscriptionService) SubscribeAll(ctx context.Context, params json.RawM
 	}
 
 	filtered.SubscribeAll()
+
+	// Reset session focus too — "subscribe all" is a full filter reset.
+	// The client can re-establish focus with client/session/focus afterward.
+	filtered.ClearSessionFocus()
 
 	return map[string]interface{}{
 		"success":      true,

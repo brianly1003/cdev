@@ -24,11 +24,17 @@ type PermissionManager interface {
 	GetAndRemovePendingRequest(toolUseID string) *permission.Request
 }
 
+// WorkspaceResolver resolves workspace ID from a filesystem path.
+type WorkspaceResolver interface {
+	ResolveWorkspaceID(path string) (string, error)
+}
+
 // HooksHandler handles incoming Claude hook events.
 type HooksHandler struct {
 	hub               *hub.Hub
 	permissionManager PermissionManager
 	permissionTimeout time.Duration
+	workspaceResolver WorkspaceResolver
 }
 
 // NewHooksHandler creates a new HooksHandler.
@@ -44,9 +50,28 @@ func (h *HooksHandler) SetPermissionManager(pm PermissionManager) {
 	h.permissionManager = pm
 }
 
+// SetWorkspaceResolver sets the workspace resolver for resolving workspace IDs from paths.
+func (h *HooksHandler) SetWorkspaceResolver(resolver WorkspaceResolver) {
+	h.workspaceResolver = resolver
+}
+
 // SetPermissionTimeout sets the timeout for waiting for mobile responses.
 func (h *HooksHandler) SetPermissionTimeout(timeout time.Duration) {
 	h.permissionTimeout = timeout
+}
+
+// resolveWorkspaceID resolves a workspace ID from a cwd path.
+// Returns empty string if resolver is nil or cwd is empty.
+func (h *HooksHandler) resolveWorkspaceID(cwd string) string {
+	if h.workspaceResolver == nil || cwd == "" {
+		return ""
+	}
+	id, err := h.workspaceResolver.ResolveWorkspaceID(cwd)
+	if err != nil {
+		log.Debug().Err(err).Str("cwd", cwd).Msg("failed to resolve workspace ID")
+		return ""
+	}
+	return id
 }
 
 // ClaudeHookPayload represents the data sent by Claude hooks.
@@ -182,6 +207,7 @@ func (h *HooksHandler) handleSessionStart(payload ClaudeHookPayload) {
 	}
 
 	event := events.NewEvent(events.EventTypeClaudeHookSession, data)
+	event.WorkspaceID = h.resolveWorkspaceID(payload.Cwd)
 	h.hub.Publish(event)
 }
 
@@ -207,6 +233,7 @@ func (h *HooksHandler) handleNotification(payload ClaudeHookPayload) {
 	}
 
 	event := events.NewEvent(events.EventTypeClaudeHookPermission, data)
+	event.WorkspaceID = h.resolveWorkspaceID(payload.Cwd)
 	h.hub.Publish(event)
 }
 
@@ -261,11 +288,14 @@ func (h *HooksHandler) handlePermissionRequest(w http.ResponseWriter, payload Cl
 	}
 
 	// 2. No stored decision - need to ask mobile
+	// Resolve workspace ID from cwd
+	workspaceID := h.resolveWorkspaceID(payload.Cwd)
+
 	// Create pending request with response channel
 	req := &permission.Request{
 		ID:           payload.ToolUseID,
 		SessionID:    payload.SessionID,
-		WorkspaceID:  "", // Will be resolved from cwd if needed
+		WorkspaceID:  workspaceID,
 		ToolName:     payload.ToolName,
 		ToolInput:    toolInput,
 		ToolUseID:    payload.ToolUseID,
@@ -373,6 +403,7 @@ func (h *HooksHandler) handleToolStart(payload ClaudeHookPayload) {
 	}
 
 	event := events.NewEvent(events.EventTypeClaudeHookToolStart, data)
+	event.WorkspaceID = h.resolveWorkspaceID(payload.Cwd)
 	h.hub.Publish(event)
 }
 
@@ -396,5 +427,6 @@ func (h *HooksHandler) handleToolEnd(payload ClaudeHookPayload) {
 	}
 
 	event := events.NewEvent(events.EventTypeClaudeHookToolEnd, data)
+	event.WorkspaceID = h.resolveWorkspaceID(payload.Cwd)
 	h.hub.Publish(event)
 }

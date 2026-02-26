@@ -200,7 +200,7 @@ func (m *Manager) Start(ctx context.Context, prompt string) error {
 func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode SessionMode, sessionID string, permissionMode string) error {
 	// Handle interactive (PTY) mode - use PTY for true terminal-like permission prompts
 	if permissionMode == "interactive" {
-		return m.StartWithPTY(ctx, prompt, mode, sessionID)
+		return m.StartWithPTY(ctx, prompt, mode, sessionID, false)
 	}
 
 	m.mu.Lock()
@@ -458,7 +458,7 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 // This allows permission prompts to work interactively from remote clients.
 // The PTY makes Claude think it's running in a real terminal.
 // If prompt is empty, Claude starts in interactive mode waiting for user input.
-func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionMode, sessionID string) error {
+func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionMode, sessionID string, yoloMode bool) error {
 	m.mu.Lock()
 	if m.state == events.ClaudeStateRunning {
 		m.mu.Unlock()
@@ -483,6 +483,10 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 			return fmt.Errorf("session_id is required for continue mode")
 		}
 		cmdArgs = append(cmdArgs, "--resume", sessionID)
+	}
+
+	if yoloMode {
+		cmdArgs = append(cmdArgs, "--allow-dangerously-skip-permissions")
 	}
 
 	// NOTE: We do NOT add the prompt as a CLI argument!

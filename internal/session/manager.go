@@ -1438,7 +1438,8 @@ func (m *Manager) ListSessions(workspaceID string) []*Info {
 // - "bypassPermissions": Skip all permission checks
 // - "plan": Plan mode only
 // - "interactive": Use PTY mode for true interactive permission handling
-func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permissionMode string) error {
+// yoloMode is runtime-agnostic bypass intent (mapped to runtime-specific flags when supported).
+func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permissionMode string, yoloMode bool) error {
 	// First try to get from managed sessions
 	session, err := m.GetSession(sessionID)
 
@@ -1614,7 +1615,7 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 		}
 
 		// Start the PTY session
-		if err := cm.StartWithPTY(m.ctx, prompt, claudeMode, claudeSessionID); err != nil {
+		if err := cm.StartWithPTY(m.ctx, prompt, claudeMode, claudeSessionID, yoloMode); err != nil {
 			return err
 		}
 
@@ -1653,6 +1654,10 @@ func (m *Manager) SendPrompt(sessionID string, prompt string, mode string, permi
 	session.UpdateLastActive()
 
 	// Determine session mode and call appropriate method
+	if yoloMode && permissionMode != "interactive" && permissionMode != "bypassPermissions" {
+		permissionMode = "bypassPermissions"
+	}
+
 	if mode == "continue" {
 		// Use the cdev session ID which now equals the historical Claude session ID
 		// (set in StartSession from getMostRecentHistoricalSessionID)

@@ -672,6 +672,7 @@ func (a *App) Start(ctx context.Context) error {
 	if a.permissionManager != nil {
 		hooksHandler.SetPermissionManager(a.permissionManager)
 	}
+	hooksHandler.SetWorkspaceResolver(methods.NewWorkspaceIDResolver())
 	a.httpServer.SetHooksHandler(hooksHandler)
 
 	// Set RPC registry for dynamic OpenRPC spec generation

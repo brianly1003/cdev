@@ -16,9 +16,9 @@ import (
 	"github.com/brianly1003/cdev/internal/rpc"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/transport"
+	"github.com/brianly1003/cdev/internal/security"
 	"github.com/brianly1003/cdev/internal/session"
 	"github.com/brianly1003/cdev/internal/workspace"
-	"github.com/brianly1003/cdev/internal/security"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -441,8 +441,8 @@ func (s *Server) handleSendPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Note: HTTP API doesn't support permission_mode, use empty string for default behavior
-	if err := s.sessionManager.SendPrompt(id, req.Prompt, req.Mode, ""); err != nil {
+	// Note: HTTP API doesn't support permission_mode/yolo_mode, use defaults.
+	if err := s.sessionManager.SendPrompt(id, req.Prompt, req.Mode, "", false); err != nil {
 		s.respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -581,13 +581,13 @@ func (s *Server) respondError(w http.ResponseWriter, status int, message string)
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-	if origin == "" {
-		// Non-browser clients or same-site requests with no Origin header.
-		// Keep response CORS behavior conservative by not injecting CORS headers.
-	} else if !s.allowOrigin(origin) {
-		http.Error(w, "Origin not allowed", http.StatusForbidden)
-		return
-	} else {
+		if origin == "" {
+			// Non-browser clients or same-site requests with no Origin header.
+			// Keep response CORS behavior conservative by not injecting CORS headers.
+		} else if !s.allowOrigin(origin) {
+			http.Error(w, "Origin not allowed", http.StatusForbidden)
+			return
+		} else {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}

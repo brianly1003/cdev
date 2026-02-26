@@ -289,13 +289,14 @@ func (s *PermissionService) createPermissionEvent(req *permission.Request) *even
 		WorkspaceID: req.WorkspaceID,
 	}
 
-	// Create event with context
-	// Note: We intentionally don't set event.WorkspaceID so this is a global event
-	// that reaches all connected clients. Permission prompts should be visible
-	// on all devices so any can respond. The payload contains session_id for
-	// the mobile app to filter by session if needed.
+	// Create event with context.
+	// Both WorkspaceID and SessionID are set so that:
+	// 1. Workspace subscription filtering works (client subscribed to ws-1 only gets ws-1 permissions)
+	// 2. Workspace-scoped permission filtering works (all sessions in the focused workspace pass through)
+	// The iOS app uses session_id in the payload to route to the correct session tab.
 	event := events.NewEvent(events.EventTypePTYPermission, payload)
 	event.SessionID = req.SessionID
+	event.WorkspaceID = req.WorkspaceID
 	event.SetAgentType("claude") // Permission hooks are Claude-specific
 
 	return event

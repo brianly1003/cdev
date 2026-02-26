@@ -15,7 +15,7 @@ import (
 type sessionRuntimeDispatch struct {
 	start   func(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error)
 	stop    func(ctx context.Context, sessionID string) (interface{}, *message.Error)
-	send    func(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string) (interface{}, *message.Error)
+	send    func(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string, yoloMode bool) (interface{}, *message.Error)
 	input   func(ctx context.Context, sessionID, input, key string) (interface{}, *message.Error)
 	respond func(ctx context.Context, sessionID, responseType, response string) (interface{}, *message.Error)
 }
@@ -229,7 +229,7 @@ func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspac
 
 		go func() {
 			// Start Claude with empty prompt for interactive mode.
-			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID); err != nil {
+			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID, false); err != nil {
 				// Log error but don't fail - session is still created.
 				// The user can send a prompt via session/send.
 				fmt.Printf("Warning: failed to start Claude in interactive mode: %v\n", err)
@@ -263,7 +263,7 @@ func (s *SessionManagerService) stopClaudeSession(ctx context.Context, sessionID
 	}, nil
 }
 
-func (s *SessionManagerService) sendClaudePrompt(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string) (interface{}, *message.Error) {
+func (s *SessionManagerService) sendClaudePrompt(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string, yoloMode bool) (interface{}, *message.Error) {
 	if s.manager == nil {
 		return nil, message.NewError(message.AgentNotConfigured, "claude session manager is not configured")
 	}
@@ -311,7 +311,7 @@ func (s *SessionManagerService) sendClaudePrompt(ctx context.Context, workspaceI
 
 			// Start Claude with PTY and the prompt.
 			go func() {
-				if err := claudeManager.StartWithPTY(ctx, prompt, "new", newSession.ID); err != nil {
+				if err := claudeManager.StartWithPTY(ctx, prompt, "new", newSession.ID, yoloMode); err != nil {
 					// Log error but session was created.
 					fmt.Printf("Warning: failed to start Claude with prompt: %v\n", err)
 				}
@@ -329,7 +329,7 @@ func (s *SessionManagerService) sendClaudePrompt(ctx context.Context, workspaceI
 	}
 
 	// Session ID provided - send to existing session.
-	if err := s.manager.SendPrompt(sessionID, prompt, mode, permissionMode); err != nil {
+	if err := s.manager.SendPrompt(sessionID, prompt, mode, permissionMode, yoloMode); err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
@@ -468,8 +468,11 @@ func (s *SessionManagerService) respondCodexSessionRPC(ctx context.Context, sess
 	}, nil
 }
 
-func (s *SessionManagerService) sendCodexPromptWithPermissionMode(ctx context.Context, workspaceID, sessionID, prompt, mode, _ string) (interface{}, *message.Error) {
-	return s.sendCodexPrompt(ctx, workspaceID, sessionID, prompt, mode)
+func (s *SessionManagerService) sendCodexPromptWithPermissionMode(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string, yoloMode bool) (interface{}, *message.Error) {
+	// Keep this runtime-agnostic: permission mode can request bypass semantics,
+	// and yolo_mode is the explicit runtime-independent bypass signal.
+	enableBypass := yoloMode || permissionMode == "bypassPermissions"
+	return s.sendCodexPrompt(ctx, workspaceID, sessionID, prompt, mode, enableBypass)
 }
 
 func validatePermissionMode(permissionMode string) *message.Error {

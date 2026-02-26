@@ -158,6 +158,7 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 			{Name: "prompt", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"new", "continue"}, "default": "new", "description": "Session mode. 'new' starts fresh conversation (default), 'continue' resumes existing."}},
 			{Name: "permission_mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default", "description": "Permission handling mode. Use 'acceptEdits' to auto-accept file edits, 'bypassPermissions' to skip all permission checks, 'interactive' to use PTY mode for true terminal-like permission prompts."}},
+			{Name: "yolo_mode", Required: false, Schema: map[string]interface{}{"type": "boolean", "description": "Runtime-agnostic bypass intent. Enables runtime-specific dangerous auto-approval flags when supported."}},
 			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
@@ -771,6 +772,7 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		Prompt         string `json:"prompt"`
 		Mode           string `json:"mode"`            // "new" or "continue"
 		PermissionMode string `json:"permission_mode"` // "default", "acceptEdits", "bypassPermissions", "plan", "interactive"
+		YoloMode       bool   `json:"yolo_mode"`
 		AgentType      string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -795,7 +797,7 @@ func (s *SessionManagerService) Send(ctx context.Context, params json.RawMessage
 		p.Mode = "new"
 	}
 
-	return runtimeDispatch.send(ctx, p.WorkspaceID, p.SessionID, p.Prompt, p.Mode, p.PermissionMode)
+	return runtimeDispatch.send(ctx, p.WorkspaceID, p.SessionID, p.Prompt, p.Mode, p.PermissionMode, p.YoloMode)
 }
 
 // Input sends keyboard input to an interactive (PTY) session.
@@ -2612,7 +2614,7 @@ func (s *SessionManagerService) startCodexSession(ctx context.Context, workspace
 	}, nil
 }
 
-func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID, sessionID, prompt, mode string) (interface{}, *message.Error) {
+func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID, sessionID, prompt, mode string, yoloMode bool) (interface{}, *message.Error) {
 	if s.manager == nil {
 		return nil, message.NewErrorWithData(
 			message.AgentNotConfigured,
@@ -2704,7 +2706,7 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 	if sessionID == "" {
 		before := s.snapshotCodexSessionIDs(workspacePath)
 		temporaryID := "codex-temp-" + uuid.NewString()
-		args := buildCodexCLIArgs(workspacePath, "", prompt)
+		args := buildCodexCLIArgs(workspacePath, "", prompt, yoloMode)
 		if err := s.startCodexProcess(ctx, temporaryID, workspaceID, workspacePath, args); err != nil {
 			return nil, codexRuntimeError("session/send", err)
 		}
@@ -2732,7 +2734,7 @@ func (s *SessionManagerService) sendCodexPrompt(ctx context.Context, workspaceID
 		}, nil
 	}
 
-	args := buildCodexCLIArgs(workspacePath, sessionID, prompt)
+	args := buildCodexCLIArgs(workspacePath, sessionID, prompt, yoloMode)
 	if err := s.startCodexProcess(ctx, sessionID, workspaceID, workspacePath, args); err != nil {
 		return nil, codexRuntimeError("session/send", err)
 	}
@@ -2862,10 +2864,13 @@ func encodeCodexPTYInput(input string) string {
 	return input + "\r"
 }
 
-func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string) []string {
-	args := make([]string, 0, 7)
+func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string, yoloMode bool) []string {
+	args := make([]string, 0, 8)
 	_ = workspacePath // Workspace binding is handled via cmd.Dir.
 	args = append(args, "exec")
+	if yoloMode {
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
+	}
 	if resumeSessionID != "" {
 		args = append(args, "resume", resumeSessionID)
 	}

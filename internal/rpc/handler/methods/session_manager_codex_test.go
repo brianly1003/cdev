@@ -56,7 +56,7 @@ func TestRemapCodexSessionID_DedupeCarriesAcrossRemap(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_NewSessionWithPrompt(t *testing.T) {
-	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "", "hello")
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "", "hello", false)
 	want := []string{"exec", "hello"}
 
 	if !reflect.DeepEqual(got, want) {
@@ -65,7 +65,7 @@ func TestBuildCodexCLIArgs_NewSessionWithPrompt(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_ResumeSessionWithoutPrompt(t *testing.T) {
-	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "")
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "", false)
 	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4"}
 
 	if !reflect.DeepEqual(got, want) {
@@ -74,7 +74,7 @@ func TestBuildCodexCLIArgs_ResumeSessionWithoutPrompt(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_ResumeSessionWithPrompt(t *testing.T) {
-	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello", false)
 	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello"}
 
 	if !reflect.DeepEqual(got, want) {
@@ -83,7 +83,7 @@ func TestBuildCodexCLIArgs_ResumeSessionWithPrompt(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_WithoutWorkspacePath_OmitsCDFlag(t *testing.T) {
-	got := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	got := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello", false)
 	want := []string{"exec", "resume", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello"}
 
 	if !reflect.DeepEqual(got, want) {
@@ -92,10 +92,25 @@ func TestBuildCodexCLIArgs_WithoutWorkspacePath_OmitsCDFlag(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_WorkspacePathDoesNotAffectArgs(t *testing.T) {
-	withPath := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
-	withoutPath := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello")
+	withPath := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello", false)
+	withoutPath := buildCodexCLIArgs("", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello", false)
 	if !reflect.DeepEqual(withPath, withoutPath) {
 		t.Fatalf("withPath = %#v, withoutPath = %#v, want equal", withPath, withoutPath)
+	}
+}
+
+func TestBuildCodexCLIArgs_YoloModeAddsBypassFlag(t *testing.T) {
+	got := buildCodexCLIArgs("/Users/brianly/Projects/AIQA", "019c6572-6e3f-78a1-9d70-7af2973de2a4", "hello", true)
+	want := []string{
+		"exec",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"resume",
+		"019c6572-6e3f-78a1-9d70-7af2973de2a4",
+		"hello",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
 	}
 }
 

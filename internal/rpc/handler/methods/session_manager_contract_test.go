@@ -37,6 +37,10 @@ func TestSessionManagerProtocolContract_MethodMetadata(t *testing.T) {
 	sendPermission := assertParamContract(t, sendMeta, "permission_mode", false)
 	assertSchemaDefault(t, sendPermission, "default")
 	assertSchemaEnumContains(t, sendPermission, "default", "acceptEdits", "bypassPermissions", "plan", "interactive")
+	sendYolo := assertParamContract(t, sendMeta, "yolo_mode", false)
+	if got, _ := sendYolo.Schema["type"].(string); got != "boolean" {
+		t.Fatalf("yolo_mode type = %q, want %q", got, "boolean")
+	}
 	sendAgent := assertParamContract(t, sendMeta, "agent_type", false)
 	assertSchemaDefault(t, sendAgent, "claude")
 	assertSchemaEnumContains(t, sendAgent, "claude", "codex")

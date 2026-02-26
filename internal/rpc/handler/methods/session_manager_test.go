@@ -127,7 +127,7 @@ func TestDeleteHistorySession_ValidParams(t *testing.T) {
 }
 
 func TestBuildCodexCLIArgs_PreservesBangPrefix(t *testing.T) {
-	args := buildCodexCLIArgs("/tmp", "019c7b09-3a7c-7953-90cf-91c48d81c877", "!ls")
+	args := buildCodexCLIArgs("/tmp", "019c7b09-3a7c-7953-90cf-91c48d81c877", "!ls", false)
 	want := []string{"exec", "resume", "019c7b09-3a7c-7953-90cf-91c48d81c877", "!ls"}
 	if len(args) != len(want) {
 		t.Fatalf("args len = %d, want %d (%v)", len(args), len(want), args)

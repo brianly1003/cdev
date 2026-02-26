@@ -406,6 +406,11 @@ func (s *Server) SetSessionFocus(clientID, workspaceID, sessionID string) (inter
 
 	s.sessionFocusMu.Unlock()
 
+	// Propagate session focus to the FilteredSubscriber for event filtering
+	if filtered := s.GetFilteredSubscriber(clientID); filtered != nil {
+		filtered.SetSessionFocus(workspaceID, sessionID)
+	}
+
 	// Emit session_joined event to other viewers if any exist
 	if len(otherViewers) > 0 && s.hub != nil {
 		event := events.NewSessionJoinedEvent(clientID, workspaceID, sessionID, otherViewers)
@@ -457,6 +462,11 @@ func (s *Server) clearClientFocus(clientID string) {
 	focus, ok := s.sessionFocus[clientID]
 	delete(s.sessionFocus, clientID)
 	s.sessionFocusMu.Unlock()
+
+	// Clear session focus on the FilteredSubscriber
+	if filtered := s.GetFilteredSubscriber(clientID); filtered != nil {
+		filtered.ClearSessionFocus()
+	}
 
 	// Emit session_left if client was viewing a session
 	if ok && focus != nil {
