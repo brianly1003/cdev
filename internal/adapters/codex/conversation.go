@@ -5,6 +5,7 @@ package codex
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -588,6 +589,9 @@ func normalizeCodexUserMessage(blocks []events.ClaudeMessageContent) ([]events.C
 			block.Text = message
 			isTurnAborted = true
 		}
+		if message, ok := extractUserShellCommandMessage(block.Text); ok {
+			block.Text = message
+		}
 		out = append(out, block)
 	}
 	return out, isTurnAborted
@@ -612,4 +616,107 @@ func extractTurnAbortedMessage(text string) (string, bool) {
 		body = fallbackInterruptedMessage
 	}
 	return body, true
+}
+
+func extractUserShellCommandMessage(text string) (string, bool) {
+	body, ok := extractTaggedBody(text, "user_shell_command")
+	if !ok {
+		return "", false
+	}
+
+	command, _ := extractTaggedBody(body, "command")
+	result, _ := extractTaggedBody(body, "result")
+	command = strings.TrimSpace(command)
+	result = strings.TrimSpace(result)
+
+	if command == "" && result == "" {
+		return "", false
+	}
+
+	lines := []string{"• You ran a shell command"}
+	if command != "" {
+		lines[0] = "• You ran " + command
+	}
+
+	resultLines := summarizeUserShellCommandResult(result)
+	if len(resultLines) > 0 {
+		lines = append(lines, "  └ "+resultLines[0])
+		for _, line := range resultLines[1:] {
+			lines = append(lines, "    "+line)
+		}
+	}
+
+	return strings.Join(lines, "\n"), true
+}
+
+func summarizeUserShellCommandResult(result string) []string {
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return nil
+	}
+
+	trimmedLines := splitNonEmptyTrimmedLines(result)
+	if len(trimmedLines) == 0 {
+		return nil
+	}
+
+	outputLine := -1
+	exitLine := ""
+	for i, line := range trimmedLines {
+		lower := strings.ToLower(line)
+		if lower == "output:" {
+			outputLine = i
+			continue
+		}
+		if strings.HasPrefix(lower, "exit code:") && exitLine == "" {
+			exitLine = line
+		}
+	}
+
+	if outputLine >= 0 && outputLine+1 < len(trimmedLines) {
+		outputLines := trimmedLines[outputLine+1:]
+		if exitCode, ok := parseExitCode(result, "exit code:"); ok && exitCode != 0 {
+			if exitLine == "" {
+				exitLine = fmt.Sprintf("Exit code: %d", exitCode)
+			}
+			return append([]string{exitLine}, outputLines...)
+		}
+		return outputLines
+	}
+
+	return trimmedLines
+}
+
+func extractTaggedBody(text, tag string) (string, bool) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return "", false
+	}
+
+	openTag := "<" + tag + ">"
+	closeTag := "</" + tag + ">"
+	start := strings.Index(trimmed, openTag)
+	if start < 0 {
+		return "", false
+	}
+	start += len(openTag)
+	end := strings.Index(trimmed[start:], closeTag)
+	if end < 0 {
+		return "", false
+	}
+	body := trimmed[start : start+end]
+	return strings.TrimSpace(body), true
+}
+
+func splitNonEmptyTrimmedLines(text string) []string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }

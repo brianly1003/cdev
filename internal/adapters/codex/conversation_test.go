@@ -3,6 +3,7 @@ package codex
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -203,6 +204,56 @@ func TestParseConversationLine_NormalizesTurnAbortedMessage(t *testing.T) {
 	}
 	if got := item.Content[0].Text; got != "The user interrupted the previous turn on purpose." {
 		t.Fatalf("content text=%q", got)
+	}
+}
+
+func TestParseConversationLine_NormalizesUserShellCommandMessage(t *testing.T) {
+	line := `{"timestamp":"2026-02-26T15:50:36.37441Z","type":"response_item","payload":{"type":"message","role":"user","content":"<user_shell_command>\n<command>\nssh-add\n</command>\n<result>\nExit code: 0\nDuration: 0.0316 seconds\nOutput:\nIdentity added: /Users/brianly/.ssh/id_rsa (brian.ly@9loop.asia)\nIdentity added: /Users/brianly/.ssh/id_ed25519 ({brianly1003@gmail.com})\n\n</result>\n</user_shell_command>"}}`
+
+	item, err := ParseConversationLine(line)
+	if err != nil {
+		t.Fatalf("ParseConversationLine error: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected non-nil item")
+	}
+	if item.Role != "user" {
+		t.Fatalf("role=%q, want user", item.Role)
+	}
+	if len(item.Content) != 1 || item.Content[0].Type != "text" {
+		t.Fatalf("unexpected content: %+v", item.Content)
+	}
+
+	want := strings.Join([]string{
+		"• You ran ssh-add",
+		"  └ Identity added: /Users/brianly/.ssh/id_rsa (brian.ly@9loop.asia)",
+		"    Identity added: /Users/brianly/.ssh/id_ed25519 ({brianly1003@gmail.com})",
+	}, "\n")
+	if item.Content[0].Text != want {
+		t.Fatalf("content text=%q, want %q", item.Content[0].Text, want)
+	}
+}
+
+func TestParseConversationLine_NormalizesUserShellCommandMessageError(t *testing.T) {
+	line := `{"timestamp":"2026-02-26T15:50:36.37441Z","type":"response_item","payload":{"type":"message","role":"user","content":"<user_shell_command>\n<command>\nls missing-file\n</command>\n<result>\nExit code: 1\nDuration: 0.0123 seconds\nOutput:\nls: missing-file: No such file or directory\n</result>\n</user_shell_command>"}}`
+
+	item, err := ParseConversationLine(line)
+	if err != nil {
+		t.Fatalf("ParseConversationLine error: %v", err)
+	}
+	if item == nil {
+		t.Fatal("expected non-nil item")
+	}
+	if len(item.Content) != 1 {
+		t.Fatalf("expected one content block, got %+v", item.Content)
+	}
+	want := strings.Join([]string{
+		"• You ran ls missing-file",
+		"  └ Exit code: 1",
+		"    ls: missing-file: No such file or directory",
+	}, "\n")
+	if item.Content[0].Text != want {
+		t.Fatalf("content text=%q, want %q", item.Content[0].Text, want)
 	}
 }
 
