@@ -8,7 +8,7 @@
   "servers": [
     {
       "name": "Default",
-      "url": "ws://localhost:8766/ws"
+      "url": "ws://localhost:16180/ws"
     }
   ],
   "methods": [

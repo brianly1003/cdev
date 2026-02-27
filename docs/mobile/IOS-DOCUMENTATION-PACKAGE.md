@@ -219,7 +219,7 @@ newWorkspaceWS.connect(to: url)
 let managerURL = "ws://192.168.1.100:8765/ws"
 
 // Workspace endpoint (after getting port from list)
-let workspaceURL = "ws://192.168.1.100:8766/ws"
+let workspaceURL = "ws://192.168.1.100:16180/ws"
 ```
 
 ---

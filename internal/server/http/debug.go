@@ -107,11 +107,11 @@ func (h *DebugHandler) handleDebugIndex(w http.ResponseWriter, r *http.Request) 
 
     <h2>CPU Profiling</h2>
     <p>To capture a 30-second CPU profile:</p>
-    <pre><code>go tool pprof http://localhost:8766/debug/pprof/profile?seconds=30</code></pre>
+    <pre><code>go tool pprof http://localhost:16180/debug/pprof/profile?seconds=30</code></pre>
 
     <h2>Trace</h2>
     <p>To capture a 5-second execution trace:</p>
-    <pre><code>curl -o trace.out http://localhost:8766/debug/pprof/trace?seconds=5
+    <pre><code>curl -o trace.out http://localhost:16180/debug/pprof/trace?seconds=5
 go tool trace trace.out</code></pre>
 `)
 	} else {

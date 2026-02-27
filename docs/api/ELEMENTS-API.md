@@ -398,13 +398,13 @@ Retrieves UI elements for a session with pagination support.
 
 ```bash
 # Initial load - get last 20 elements
-curl "http://localhost:8766/api/claude/sessions/elements?session_id=xxx&limit=20"
+curl "http://localhost:16180/api/claude/sessions/elements?session_id=xxx&limit=20"
 
 # Scroll up - load older elements
-curl "http://localhost:8766/api/claude/sessions/elements?session_id=xxx&before=elem_020&limit=20"
+curl "http://localhost:16180/api/claude/sessions/elements?session_id=xxx&before=elem_020&limit=20"
 
 # Catch-up after reconnect
-curl "http://localhost:8766/api/claude/sessions/elements?session_id=xxx&after=elem_050"
+curl "http://localhost:16180/api/claude/sessions/elements?session_id=xxx&after=elem_050"
 ```
 
 ---
@@ -415,7 +415,7 @@ curl "http://localhost:8766/api/claude/sessions/elements?session_id=xxx&after=el
 
 Emitted in real-time when a new element is created during Claude execution.
 
-**Connection:** `ws://localhost:8766/ws`
+**Connection:** `ws://localhost:16180/ws`
 
 **Payload:**
 
@@ -930,7 +930,7 @@ class ElementsChatManager: ObservableObject {
 
     private let baseURL: String
 
-    init(baseURL: String = "http://localhost:8766") {
+    init(baseURL: String = "http://localhost:16180") {
         self.baseURL = baseURL
     }
 

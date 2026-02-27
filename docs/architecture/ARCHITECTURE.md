@@ -154,7 +154,7 @@
 │   ┌─────────────────────┐      ┌─────────────────────┐          │
 │   │   WebSocket Server  │      │    HTTP Server      │          │
 │   │                     │      │                     │          │
-│   │   Port: 8765        │      │   Port: 8766        │          │
+│   │   Port: 8765        │      │   Port: 16180        │          │
 │   └─────────────────────┘      └─────────────────────┘          │
 │                                                                   │
 └──────────────────────────────────────────────────────────────────┘
@@ -1437,7 +1437,7 @@ build-windows-amd64:
 # Server settings
 server:
   # Unified port for HTTP API and WebSocket connections
-  port: 8766
+  port: 16180
   host: "127.0.0.1"  # Bind to localhost only for security
 
 # Repository settings
@@ -1542,7 +1542,7 @@ func Load() (*Config, error) {
 
 | Config Key | Environment Variable | Example |
 |------------|---------------------|---------|
-| `server.port` | `CDEV_SERVER_PORT` | `8766` |
+| `server.port` | `CDEV_SERVER_PORT` | `16180` |
 | `repository.path` | `CDEV_REPOSITORY_PATH` | `/path/to/repo` |
 | `claude.command` | `CDEV_CLAUDE_COMMAND` | `/usr/local/bin/claude` |
 | `logging.level` | `CDEV_LOGGING_LEVEL` | `debug` |
@@ -1784,12 +1784,12 @@ hub.Publish(events.NewTestEvent())
 ./cdev start --repo /path/to/repo
 
 # In another terminal, trigger Claude (via HTTP for now)
-curl -X POST http://localhost:8766/api/claude/run \
+curl -X POST http://localhost:16180/api/claude/run \
   -H "Content-Type: application/json" \
   -d '{"prompt": "List all files"}'
 
 # Watch logs stream
-curl http://localhost:8766/api/claude/status
+curl http://localhost:16180/api/claude/status
 ```
 
 ---
@@ -1897,7 +1897,7 @@ websocat ws://localhost:8765
 - [ ] Write tests
 
 **Deliverables**:
-- HTTP API at `http://localhost:8766`
+- HTTP API at `http://localhost:16180`
 - OpenAPI/Swagger documentation
 
 ---

@@ -15,7 +15,7 @@ func TestValidateServer(t *testing.T) {
 		{
 			name: "valid config",
 			cfg: ServerConfig{
-				Port: 8766,
+				Port: 16180,
 				Host: "127.0.0.1",
 			},
 			wantErr: "",
@@ -39,7 +39,7 @@ func TestValidateServer(t *testing.T) {
 		{
 			name: "empty host",
 			cfg: ServerConfig{
-				Port: 8766,
+				Port: 16180,
 				Host: "",
 			},
 			wantErr: "host cannot be empty",
@@ -47,7 +47,7 @@ func TestValidateServer(t *testing.T) {
 		{
 			name: "valid external url",
 			cfg: ServerConfig{
-				Port:        8766,
+				Port:        16180,
 				Host:        "127.0.0.1",
 				ExternalURL: "https://example.com",
 			},
@@ -56,7 +56,7 @@ func TestValidateServer(t *testing.T) {
 		{
 			name: "invalid external url scheme",
 			cfg: ServerConfig{
-				Port:        8766,
+				Port:        16180,
 				Host:        "127.0.0.1",
 				ExternalURL: "wss://example.com",
 			},
@@ -424,7 +424,7 @@ func TestValidate_FullConfig(t *testing.T) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: 8766,
+			Port: 16180,
 			Host: "127.0.0.1",
 		},
 		Repository: RepositoryConfig{

@@ -8,13 +8,13 @@ import (
 )
 
 func TestPairPageURL(t *testing.T) {
-	info := &pairing.PairingInfo{HTTP: "https://abc123x4-8766.asse.devtunnels.ms"}
+	info := &pairing.PairingInfo{HTTP: "https://abc123x4-16180.asse.devtunnels.ms"}
 
-	if got := pairPageURL(info, ""); got != "https://abc123x4-8766.asse.devtunnels.ms/pair" {
+	if got := pairPageURL(info, ""); got != "https://abc123x4-16180.asse.devtunnels.ms/pair" {
 		t.Fatalf("pairPageURL without token = %q", got)
 	}
 
-	if got := pairPageURL(info, "abc123"); got != "https://abc123x4-8766.asse.devtunnels.ms/pair?token=abc123" {
+	if got := pairPageURL(info, "abc123"); got != "https://abc123x4-16180.asse.devtunnels.ms/pair?token=abc123" {
 		t.Fatalf("pairPageURL with token = %q", got)
 	}
 }

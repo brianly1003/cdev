@@ -14,7 +14,7 @@
   "servers": [
     {
       "name": "Local Development",
-      "url": "ws://localhost:8766/ws"
+      "url": "ws://localhost:16180/ws"
     }
   ],
   "methods": [

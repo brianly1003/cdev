@@ -115,14 +115,14 @@ This command:
 5. Returns the decision JSON to stdout
 
 The cdev server must be running for this command to work.
-Use --server to specify a custom server URL (default: ws://127.0.0.1:8766).
+Use --server to specify a custom server URL (default: ws://127.0.0.1:16180).
 
 Examples:
   # Called by Claude Code hook system:
   echo '{"tool_name":"Bash",...}' | cdev hook permission-request
 
   # With custom server:
-  cdev hook permission-request --server ws://localhost:8766`,
+  cdev hook permission-request --server ws://localhost:16180`,
 	RunE: runHookPermissionRequest,
 }
 
@@ -139,10 +139,10 @@ func init() {
 	hookCmd.AddCommand(hookPermissionRequestCmd)
 
 	// Flags for install
-	hookInstallCmd.Flags().IntVar(&hookPort, "port", 8766, "cdev server port for hook forwarding")
+	hookInstallCmd.Flags().IntVar(&hookPort, "port", 16180, "cdev server port for hook forwarding")
 
 	// Flags for permission-request
-	hookPermissionRequestCmd.Flags().StringVar(&hookServerURL, "server", "ws://127.0.0.1:8766", "cdev server URL (WebSocket)")
+	hookPermissionRequestCmd.Flags().StringVar(&hookServerURL, "server", "ws://127.0.0.1:16180", "cdev server URL (WebSocket)")
 	hookPermissionRequestCmd.Flags().IntVar(&hookTimeout, "timeout", 300, "timeout in seconds waiting for response")
 }
 

@@ -207,8 +207,8 @@ func createDefaultWorkspacesConfig() *WorkspacesConfig {
 			LogLevel:                "info",
 			MaxConcurrentWorkspaces: 5,
 			AutoStopIdleMinutes:     30,
-			PortRangeStart:          8766,
-			PortRangeEnd:            8799,
+			PortRangeStart:          16180,
+			PortRangeEnd:            16213,
 			RestartOnCrash:          true,
 			MaxRestartAttempts:      3,
 			RestartBackoffSeconds:   5,
@@ -254,8 +254,8 @@ func setWorkspaceDefaults(v *viper.Viper) {
 	v.SetDefault("manager.log_level", "info")
 	v.SetDefault("manager.max_concurrent_workspaces", 5)
 	v.SetDefault("manager.auto_stop_idle_minutes", 30)
-	v.SetDefault("manager.port_range_start", 8766)
-	v.SetDefault("manager.port_range_end", 8799)
+	v.SetDefault("manager.port_range_start", 16180)
+	v.SetDefault("manager.port_range_end", 16213)
 	v.SetDefault("manager.restart_on_crash", true)
 	v.SetDefault("manager.max_restart_attempts", 3)
 	v.SetDefault("manager.restart_backoff_seconds", 5)

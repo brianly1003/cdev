@@ -67,7 +67,7 @@ func (d *DesktopApp) startup(ctx context.Context) {
 		// Create default config manually
 		cfg = &config.Config{
 			Server: config.ServerConfig{
-				Port: 8766,
+				Port: 16180,
 				Host: "0.0.0.0",
 			},
 			Repository: config.RepositoryConfig{

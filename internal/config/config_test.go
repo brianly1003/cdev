@@ -19,8 +19,8 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 
 	// Check default values
-	if cfg.Server.Port != 8766 {
-		t.Errorf("default Port = %d, want 8766", cfg.Server.Port)
+	if cfg.Server.Port != 16180 {
+		t.Errorf("default Port = %d, want 16180", cfg.Server.Port)
 	}
 	if cfg.Server.Host != "127.0.0.1" {
 		t.Errorf("default Host = %s, want 127.0.0.1", cfg.Server.Host)

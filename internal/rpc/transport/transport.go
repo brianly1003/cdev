@@ -72,7 +72,7 @@ type Server interface {
 	Stop(ctx context.Context) error
 
 	// Addr returns the address the server is listening on.
-	// For WebSocket, this is the HTTP address (e.g., "localhost:8766").
+	// For WebSocket, this is the HTTP address (e.g., "localhost:16180").
 	// For stdio, this returns "stdio".
 	Addr() string
 }

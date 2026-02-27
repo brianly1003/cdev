@@ -35,7 +35,7 @@ This document presents a comprehensive architecture for integrating multiple AI 
 │  ┌─────────────┐    ┌──────────────┐    ┌─────────────────────┐ │
 │  │ Unified     │    │  Event Hub   │    │  Session Cache      │ │
 │  │ Server      │◄──►│  (Fan-out)   │◄──►│  (SQLite)           │ │
-│  │ (Port 8766) │    │              │    │                     │ │
+│  │ (Port 16180) │    │              │    │                     │ │
 │  └──────┬──────┘    └──────┬───────┘    └─────────────────────┘ │
 │         │                  │                                     │
 │         │           ┌──────┴───────┐                            │

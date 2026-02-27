@@ -60,7 +60,7 @@ cdev is designed to run on a developer's local machine and provide remote access
 ```yaml
 server:
   host: "127.0.0.1"
-  port: 8766
+  port: 16180
 
 security:
   require_auth: true
@@ -141,7 +141,7 @@ for HTTPS/WSS, or via a tunnel/reverse proxy termination.
 
 ```bash
 # Safe remote access via SSH tunnel
-ssh -L 8765:localhost:8765 -L 8766:localhost:8766 user@devmachine
+ssh -L 8765:localhost:8765 -L 16180:localhost:16180 user@devmachine
 ```
 
 ### 2. File System Protection

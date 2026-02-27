@@ -32,10 +32,10 @@ The cdev protocol defines the communication standard between cdev (server) and c
 
 | Layer | Port | Purpose |
 |-------|------|---------|
-| HTTP | 8766 | REST API, health checks, OpenRPC discovery |
-| WebSocket | 8766 | Real-time events via `/ws` endpoint (JSON-RPC 2.0) |
+| HTTP | 16180 | REST API, health checks, OpenRPC discovery |
+| WebSocket | 16180 | Real-time events via `/ws` endpoint (JSON-RPC 2.0) |
 
-**Note:** Port consolidation complete - single port 8766 serves all traffic.
+**Note:** Port consolidation complete - single port 16180 serves all traffic.
 
 ### Authentication
 
@@ -898,7 +898,7 @@ Key changes from 1.0 to 2.0:
 
 1. **JSON-RPC 2.0 Format**: Use `jsonrpc`, `id`, `method`, `params` instead of `command`, `request_id`, `payload`
 2. **Agent-Agnostic Naming**: `claude/run` → `agent/run`, `claude/stop` → `agent/stop`
-3. **Port Consolidation**: Single port 8766 instead of 8765 (WebSocket) + 8766 (HTTP)
+3. **Port Consolidation**: Single port 16180 instead of 8765 (WebSocket) + 16180 (HTTP)
 4. **Unified Endpoint**: WebSocket at `/ws` instead of root
 5. **OpenRPC Discovery**: Auto-generated spec at `/api/rpc/discover`
 6. **Capability Negotiation**: `initialize`/`initialized` handshake

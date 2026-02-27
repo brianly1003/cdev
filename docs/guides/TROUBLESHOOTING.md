@@ -150,7 +150,7 @@ This error is logged at DEBUG level and doesn't crash the application. Sessions 
 **Solutions:**
 
 1. **Enable heartbeat monitoring** - cdev sends heartbeat events every 30 seconds
-2. **Check firewall settings** - Ensure port 8766 (or configured port) is allowed
+2. **Check firewall settings** - Ensure port 16180 (or configured port) is allowed
 3. **Use the iOS app's auto-reconnect** - The mobile app automatically reconnects
 
 ### Unable to Connect
@@ -163,12 +163,12 @@ This error is logged at DEBUG level and doesn't crash the application. Sessions 
 
 1. **Verify cdev is running:**
    ```bash
-   curl http://127.0.0.1:8766/health
+   curl http://127.0.0.1:16180/health
    ```
 
 2. **Check port availability:**
    ```bash
-   lsof -i :8766
+   lsof -i :16180
    ```
 
 3. **Ensure same network** - Mobile device must be on same network as desktop
@@ -231,7 +231,7 @@ This error is logged at DEBUG level and doesn't crash the application. Sessions 
 
 1. **List available sessions:**
    ```bash
-   curl http://127.0.0.1:8766/api/claude/sessions
+   curl http://127.0.0.1:16180/api/claude/sessions
    ```
 
 2. **Check session directory exists:**
@@ -298,7 +298,7 @@ This error is logged at DEBUG level and doesn't crash the application. Sessions 
 
 3. **Use pagination:**
    ```bash
-   curl "http://127.0.0.1:8766/api/claude/sessions?limit=20&offset=0"
+   curl "http://127.0.0.1:16180/api/claude/sessions?limit=20&offset=0"
    ```
 
 ---
@@ -333,7 +333,7 @@ cat .cdev/logs/claude_<pid>.jsonl
 Use wscat to monitor WebSocket events:
 
 ```bash
-npx wscat -c ws://127.0.0.1:8766/ws
+npx wscat -c ws://127.0.0.1:16180/ws
 ```
 
 ---

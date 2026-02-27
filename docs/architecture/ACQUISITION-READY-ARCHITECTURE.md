@@ -456,7 +456,7 @@ WORKDIR /root/
 COPY --from=builder /app/cdev .
 
 # Support multiple transports
-EXPOSE 8765 8766
+EXPOSE 8765 16180
 ENV CDEV_TRANSPORT=websocket
 ENV CDEV_HOST=0.0.0.0
 
@@ -480,7 +480,7 @@ spec:
         image: cdev:latest
         ports:
         - containerPort: 8765
-        - containerPort: 8766
+        - containerPort: 16180
         env:
         - name: CDEV_TRANSPORT
           value: "websocket"
@@ -494,11 +494,11 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8766
+            port: 16180
         readinessProbe:
           httpGet:
             path: /health
-            port: 8766
+            port: 16180
 ```
 
 ---
@@ -574,7 +574,7 @@ cdev_active_clients 5
 | Agent-agnostic method naming (agent/* vs claude/*) | P0 | ✅ Done |
 | OpenRPC auto-generation from registry | P0 | ✅ Done |
 | Dual-protocol support (legacy + JSON-RPC) | P0 | ✅ Done |
-| Port consolidation (single port 8766) | P0 | ✅ Done |
+| Port consolidation (single port 16180) | P0 | ✅ Done |
 | Create TypeScript SDK | P0 | Planned |
 | Write formal protocol specification | P0 | ✅ Done |
 
@@ -670,7 +670,7 @@ Ensure license is acquisition-friendly:
 | **Protocol** | Dual-protocol support (legacy + JSON-RPC) | ✅ Done |
 | **Transport** | WebSocket | ✅ Done |
 | **Transport** | stdio (LSP-style) | ✅ Done |
-| **Transport** | Port consolidation (single port 8766) | ✅ Done |
+| **Transport** | Port consolidation (single port 16180) | ✅ Done |
 | **Transport** | gRPC | Future |
 | **SDK** | TypeScript | Planned |
 | **SDK** | Python | Planned |

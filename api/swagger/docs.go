@@ -114,6 +114,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/auth/revoke": {
+            "post": {
+                "description": "Revokes the refresh token for a device and releases any workspace bindings.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke refresh token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.TokenRevokeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/claude/respond": {
             "post": {
                 "description": "Send a response to Claude's interactive prompt or permission request",
@@ -970,6 +1017,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/hooks/{hookType}": {
+            "post": {
+                "description": "Receives events from Claude Code hooks (SessionStart, Notification, PreToolUse, PostToolUse)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "hooks"
+                ],
+                "summary": "Receive Claude hook event",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Hook type (session, permission, tool-start, tool-end)",
+                        "name": "hookType",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Hook payload from Claude",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.ClaudeHookPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/images": {
             "get": {
                 "description": "Returns list of all stored images or details of a specific image by ID",
@@ -1158,9 +1249,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/pair/code": {
+            "post": {
+                "description": "Exchanges a short pairing code for a pairing token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pairing"
+                ],
+                "summary": "Exchange pairing code",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.PairingCodeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/pair/info": {
             "get": {
-                "description": "Returns connection info for mobile app pairing (WebSocket URL, HTTP URL, session ID, token)",
+                "description": "Returns connection info for mobile app pairing (WebSocket URL, HTTP URL, session ID, auth flag)",
                 "produces": [
                     "application/json"
                 ],
@@ -1600,6 +1726,46 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "http.ClaudeHookPayload": {
+            "type": "object",
+            "properties": {
+                "cwd": {
+                    "type": "string"
+                },
+                "hook_event_name": {
+                    "description": "PreToolUse, PostToolUse, Notification, SessionStart",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "Notification fields (permission_prompt)",
+                    "type": "string"
+                },
+                "notification_type": {
+                    "description": "\"permission_prompt\"",
+                    "type": "string"
+                },
+                "permission_mode": {
+                    "description": "default, etc.",
+                    "type": "string"
+                },
+                "session_id": {
+                    "description": "Common fields (all hook types)",
+                    "type": "string"
+                },
+                "tool_input": {},
+                "tool_name": {
+                    "description": "Tool use fields (PreToolUse/PostToolUse)",
+                    "type": "string"
+                },
+                "tool_result": {},
+                "tool_use_id": {
+                    "type": "string"
+                },
+                "transcript_path": {
+                    "type": "string"
+                }
+            }
+        },
         "http.DirectoryListingResponse": {
             "type": "object",
             "properties": {
@@ -1827,6 +1993,12 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/http.GitDiffItem"
                     }
+                },
+                "truncated_paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1836,6 +2008,10 @@ const docTemplate = `{
                 "diff": {
                     "type": "string",
                     "example": "@@ -1,3 +1,4 @@\n+new line"
+                },
+                "is_truncated": {
+                    "type": "boolean",
+                    "example": false
                 },
                 "path": {
                     "type": "string",
@@ -1849,6 +2025,10 @@ const docTemplate = `{
                 "diff": {
                     "type": "string",
                     "example": "@@ -1,3 +1,4 @@\n+new line"
+                },
+                "is_truncated": {
+                    "type": "boolean",
+                    "example": false
                 },
                 "path": {
                     "type": "string",
@@ -2234,9 +2414,26 @@ const docTemplate = `{
                 }
             }
         },
+        "http.PairingCodeResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "pairing_token": {
+                    "type": "string"
+                }
+            }
+        },
         "http.PairingInfoResponse": {
             "type": "object",
             "properties": {
+                "auth_required": {
+                    "type": "boolean"
+                },
                 "http": {
                     "type": "string"
                 },
@@ -2540,6 +2737,14 @@ const docTemplate = `{
                 }
             }
         },
+        "http.TokenRevokeRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "repository.DirectoryInfo": {
             "type": "object",
             "properties": {
@@ -2827,6 +3032,7 @@ const docTemplate = `{
                 "tool_result",
                 "diff",
                 "thinking",
+                "context_compaction",
                 "interrupted"
             ],
             "x-enum-varnames": [
@@ -2836,6 +3042,7 @@ const docTemplate = `{
                 "ElementTypeToolResult",
                 "ElementTypeDiff",
                 "ElementTypeThinking",
+                "ElementTypeContextCompaction",
                 "ElementTypeInterrupted"
             ]
         },
@@ -2915,7 +3122,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8766",
+	Host:             "localhost:16180",
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "cdev API",

@@ -40,7 +40,7 @@ The multi-workspace feature allows you to manage multiple cdev-agent instances f
 ```
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │ cdev-agent   │  │ cdev-agent   │  │ cdev-agent   │
-│ (port 8766)  │  │ (port 8767)  │  │ (port 8768)  │
+│ (port 16180)  │  │ (port 8767)  │  │ (port 8768)  │
 │   Repo A     │  │   Repo B     │  │   Repo C     │
 └──────────────┘  └──────────────┘  └──────────────┘
         │                │                │
@@ -94,7 +94,7 @@ Output:
 ```
 ID          NAME       PATH                  PORT   AUTO-START   STATUS
 --          ----       ----                  ----   ----------   ------
-ws-a1b2c3   Backend    /Users/you/backend    8766   yes          running
+ws-a1b2c3   Backend    /Users/you/backend    16180   yes          running
 ws-d4e5f6   Frontend   /Users/you/frontend   8770   no           stopped
 ```
 
@@ -130,7 +130,7 @@ cdev workspace add <path> [flags]
 **Flags:**
 - `--name` - Workspace name (default: directory name)
 - `--auto-start` - Auto-start on manager launch
-- `--port` - Specific port (default: auto-allocate from 8766-8799)
+- `--port` - Specific port (default: auto-allocate from 16180-16213)
 - `--config` - Workspace-specific config file
 
 **Examples:**
@@ -204,8 +204,8 @@ manager:
   log_level: info
   max_concurrent_workspaces: 5
   auto_stop_idle_minutes: 30
-  port_range_start: 8766
-  port_range_end: 8799
+  port_range_start: 16180
+  port_range_end: 16213
   restart_on_crash: true
   max_restart_attempts: 3
   restart_backoff_seconds: 5
@@ -214,7 +214,7 @@ workspaces:
   - id: ws-a1b2c3d4
     name: Backend API
     path: /Users/you/projects/backend
-    port: 8766
+    port: 16180
     auto_start: true
     created_at: 2025-12-22T10:00:00Z
     last_accessed: 2025-12-22T15:30:00Z
@@ -260,8 +260,8 @@ defaults:
 | `auto_start_workspaces` | false | Auto-start workspaces on manager launch |
 | `max_concurrent_workspaces` | 5 | Maximum running workspaces |
 | `auto_stop_idle_minutes` | 30 | Auto-stop idle workspaces (0 = disabled) |
-| `port_range_start` | 8766 | First port for workspaces |
-| `port_range_end` | 8799 | Last port for workspaces |
+| `port_range_start` | 16180 | First port for workspaces |
+| `port_range_end` | 16213 | Last port for workspaces |
 | `restart_on_crash` | true | Auto-restart crashed workspaces |
 | `max_restart_attempts` | 3 | Max restart attempts before giving up |
 | `restart_backoff_seconds` | 5 | Base delay between restarts (exponential) |
@@ -310,7 +310,7 @@ The workspace manager supports **two protocols**:
         "id": "ws-a1b2c3d4",
         "name": "Backend API",
         "path": "/Users/you/backend",
-        "port": 8766,
+        "port": 16180,
         "status": "running",
         "auto_start": true
       }
@@ -350,7 +350,7 @@ Response:
       "id": "ws-a1b2c3d4",
       "name": "Backend API",
       "path": "/Users/you/backend",
-      "port": 8766,
+      "port": 16180,
       "status": "running",
       "auto_start": true,
       "pid": 12345,
@@ -658,7 +658,7 @@ cdev workspace add . --name "My Project" --auto-start
 
 - Maximum 100 workspaces configured
 - Maximum 100 concurrent running workspaces (configurable to lower)
-- Port range: 8766-8799 (34 ports by default)
+- Port range: 16180-16213 (34 ports by default)
 - Manager port 8765 must not conflict with workspace range
 - Workspace paths cannot be parent/child relationships
 
@@ -666,7 +666,7 @@ cdev workspace add . --name "My Project" --auto-start
 
 **Q: Can I run the workspace manager and single workspace mode together?**
 
-A: Yes! They use different ports. Workspace manager uses 8765, single mode defaults to 8766.
+A: Yes! They use different ports. Workspace manager uses 8765, single mode defaults to 16180.
 
 **Q: What happens if a workspace crashes?**
 

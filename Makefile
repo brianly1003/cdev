@@ -185,10 +185,10 @@ else
 	@CDEV_LOGGING_LEVEL=debug nohup ./$(BINARY_DIR)/$(BINARY_NAME) start --headless --config configs/config.yaml > ~/.cdev/server.log 2>&1 &
 endif
 	@sleep 1
-	@echo "Server started on port 8766. Logs: ~/.cdev/server.log"
-	@echo "  HTTP API:   http://127.0.0.1:8766/api/"
-	@echo "  WebSocket:  ws://127.0.0.1:8766/ws"
-	@echo "  Swagger:    http://127.0.0.1:8766/swagger/"
+	@echo "Server started on port 16180. Logs: ~/.cdev/server.log"
+	@echo "  HTTP API:   http://127.0.0.1:16180/api/"
+	@echo "  WebSocket:  ws://127.0.0.1:16180/ws"
+	@echo "  Swagger:    http://127.0.0.1:16180/swagger/"
 	@echo "To stop: make stop"
 
 # Stop the server
@@ -333,12 +333,12 @@ swagger:
 	@echo "Swagger docs generated in api/swagger/"
 
 # Generate OpenRPC schema from running server
-# Usage: make openrpc (requires server running on port 8766)
+# Usage: make openrpc (requires server running on port 16180)
 # Or: make openrpc-start (starts server, generates schema, stops server)
 openrpc:
 	@echo "Fetching OpenRPC schema from server..."
-	@curl -s http://localhost:8766/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || \
-		(echo "Error: Server not running on port 8766. Use 'make openrpc-start' instead." && exit 1)
+	@curl -s http://localhost:16180/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || \
+		(echo "Error: Server not running on port 16180. Use 'make openrpc-start' instead." && exit 1)
 	@echo "OpenRPC schema generated in api/openrpc/openrpc.json"
 
 # Generate OpenRPC schema (starts temporary server)
@@ -347,7 +347,7 @@ openrpc-start: build
 	@mkdir -p api/openrpc
 	@./$(BINARY_DIR)/$(BINARY_NAME) start --config configs/config.yaml &
 	@sleep 2
-	@curl -s http://localhost:8766/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || true
+	@curl -s http://localhost:16180/api/rpc/discover | jq . > api/openrpc/openrpc.json 2>/dev/null || true
 	@pkill -f "$(BINARY_NAME) start" 2>/dev/null || true
 	@if [ -s api/openrpc/openrpc.json ]; then \
 		echo "OpenRPC schema generated in api/openrpc/openrpc.json"; \
@@ -392,7 +392,7 @@ help:
 	@echo "  Release:      Stripped symbols, no absolute paths"
 	@echo "  Obfuscated:   Garble obfuscation, hidden module paths & literals"
 	@echo ""
-	@echo "Run Server (port 8766):"
+	@echo "Run Server (port 16180):"
 	@echo ""
 	@echo "  TERMINAL MODE (default) - Claude runs in current terminal:"
 	@echo "    make run               Run in terminal mode (Claude visible in this terminal)"

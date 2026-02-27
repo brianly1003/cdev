@@ -20,8 +20,8 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 
 ```json
 {
-  "ws": "ws://127.0.0.1:8766/ws",
-  "http": "http://127.0.0.1:8766",
+  "ws": "ws://127.0.0.1:16180/ws",
+  "http": "http://127.0.0.1:16180",
   "session": "uuid-session-id",
   "repo": "repository-name",
   "token": "optional-auth-token"
@@ -72,7 +72,7 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 │                                                                     │
 │  Option 2: Web Page (new)                                           │
 │  ────────────────────────────                                       │
-│  http://localhost:8766/pair (local)                                 │
+│  http://localhost:16180/pair (local)                                 │
 │  https://<tunnel>/pair (remote)                                     │
 │  ├── Shows QR code in browser                                       │
 │  ├── Works with VS Code port forwarding                             │
@@ -142,8 +142,8 @@ cdev devices revoke <id>      # Revoke device access
 
 ```json
 {
-  "ws_url": "ws://127.0.0.1:8766/ws",
-  "http_url": "http://127.0.0.1:8766",
+  "ws_url": "ws://127.0.0.1:16180/ws",
+  "http_url": "http://127.0.0.1:16180",
   "session_id": "uuid-session-id",
   "repo_name": "my-project",
   "token": "abc123",
@@ -167,8 +167,8 @@ Simple HTML page that displays:
     <img src="/api/pair/qr" alt="QR Code" />
   </div>
   <div class="connection-info">
-    <p>WebSocket: ws://127.0.0.1:8766/ws</p>
-    <p>HTTP: http://127.0.0.1:8766</p>
+    <p>WebSocket: ws://127.0.0.1:16180/ws</p>
+    <p>HTTP: http://127.0.0.1:16180</p>
     <button onclick="copyUrl()">Copy URL</button>
   </div>
   <button onclick="refresh()">Refresh QR Code</button>
@@ -300,7 +300,7 @@ security:
 ```bash
 # Developer starts cdev, scans QR with phone
 $ cdev start
-🚀 cdev started on http://127.0.0.1:8766
+🚀 cdev started on http://127.0.0.1:16180
 
 Scan QR code with cdev mobile app:
   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
@@ -329,7 +329,7 @@ Important behavior that must be preserved:
 
 1. If base pairing info points to localhost/loopback, cdev attempts request-based URL derivation.
 2. If request comes via a loopback reverse proxy/tunnel process, cdev accepts forwarded host/proto headers for pairing URL generation.
-3. This fallback exists because some local tunnel agents forward requests to cdev with `Host: localhost:8766` while carrying public domain in forwarded headers.
+3. This fallback exists because some local tunnel agents forward requests to cdev with `Host: localhost:16180` while carrying public domain in forwarded headers.
 
 Without this behavior, `/pair` can render QR payloads containing `localhost`, which breaks mobile pairing over tunnels.
 
@@ -344,7 +344,7 @@ The forwarded-header fallback is restricted to loopback proxy hops for pairing U
 $ cdev start --headless
 
 # Get connection info programmatically
-$ curl http://localhost:8766/api/pair/info
+$ curl http://localhost:16180/api/pair/info
 {"ws_url": "ws://...", "http_url": "http://...", ...}
 ```
 
@@ -352,7 +352,7 @@ $ curl http://localhost:8766/api/pair/info
 
 ```bash
 # Refresh the pairing token via API
-$ curl -X POST http://localhost:8766/api/pair/refresh
+$ curl -X POST http://localhost:16180/api/pair/refresh
 
 # Then show new QR with updated token
 $ cdev pair

@@ -7,13 +7,13 @@ import (
 )
 
 func TestNewQRGenerator(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "test-session", "myrepo")
+	gen := NewQRGenerator("localhost", 16180, "test-session", "myrepo")
 
 	if gen.host != "localhost" {
 		t.Errorf("expected host localhost, got %s", gen.host)
 	}
-	if gen.port != 8766 {
-		t.Errorf("expected port 8766, got %d", gen.port)
+	if gen.port != 16180 {
+		t.Errorf("expected port 16180, got %d", gen.port)
 	}
 	if gen.sessionID != "test-session" {
 		t.Errorf("expected sessionID test-session, got %s", gen.sessionID)
@@ -24,16 +24,16 @@ func TestNewQRGenerator(t *testing.T) {
 }
 
 func TestQRGenerator_GetPairingInfo(t *testing.T) {
-	gen := NewQRGenerator("192.168.1.100", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("192.168.1.100", 16180, "sess-123", "testrepo")
 
 	info := gen.GetPairingInfo()
 
 	// With unified port, WS is on same port with /ws path
-	if info.WebSocket != "ws://192.168.1.100:8766/ws" {
-		t.Errorf("expected ws://192.168.1.100:8766/ws, got %s", info.WebSocket)
+	if info.WebSocket != "ws://192.168.1.100:16180/ws" {
+		t.Errorf("expected ws://192.168.1.100:16180/ws, got %s", info.WebSocket)
 	}
-	if info.HTTP != "http://192.168.1.100:8766" {
-		t.Errorf("expected http://192.168.1.100:8766, got %s", info.HTTP)
+	if info.HTTP != "http://192.168.1.100:16180" {
+		t.Errorf("expected http://192.168.1.100:16180, got %s", info.HTTP)
 	}
 	if info.SessionID != "sess-123" {
 		t.Errorf("expected sess-123, got %s", info.SessionID)
@@ -47,7 +47,7 @@ func TestQRGenerator_GetPairingInfo(t *testing.T) {
 }
 
 func TestQRGenerator_SetExternalURL(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	// Set external URL (e.g., for VS Code port forwarding)
 	gen.SetExternalURL("https://example.com")
@@ -64,7 +64,7 @@ func TestQRGenerator_SetExternalURL(t *testing.T) {
 }
 
 func TestQRGenerator_SetExternalURL_HTTP(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	// Set external URL with http scheme
 	gen.SetExternalURL("http://example.com/")
@@ -81,7 +81,7 @@ func TestQRGenerator_SetExternalURL_HTTP(t *testing.T) {
 }
 
 func TestQRGenerator_SetToken(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	gen.SetToken("secret-token-123")
 
@@ -93,7 +93,7 @@ func TestQRGenerator_SetToken(t *testing.T) {
 }
 
 func TestQRGenerator_GenerateJSON(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	jsonStr, err := gen.GenerateJSON()
 	if err != nil {
@@ -106,11 +106,11 @@ func TestQRGenerator_GenerateJSON(t *testing.T) {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	if info.WebSocket != "ws://localhost:8766/ws" {
-		t.Errorf("expected ws://localhost:8766/ws, got %s", info.WebSocket)
+	if info.WebSocket != "ws://localhost:16180/ws" {
+		t.Errorf("expected ws://localhost:16180/ws, got %s", info.WebSocket)
 	}
-	if info.HTTP != "http://localhost:8766" {
-		t.Errorf("expected http://localhost:8766, got %s", info.HTTP)
+	if info.HTTP != "http://localhost:16180" {
+		t.Errorf("expected http://localhost:16180, got %s", info.HTTP)
 	}
 	if info.SessionID != "sess-123" {
 		t.Errorf("expected sess-123, got %s", info.SessionID)
@@ -121,7 +121,7 @@ func TestQRGenerator_GenerateJSON(t *testing.T) {
 }
 
 func TestQRGenerator_GenerateTerminal(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	qrStr, err := gen.GenerateTerminal()
 	if err != nil {
@@ -141,7 +141,7 @@ func TestQRGenerator_GenerateTerminal(t *testing.T) {
 }
 
 func TestQRGenerator_GeneratePNG(t *testing.T) {
-	gen := NewQRGenerator("localhost", 8766, "sess-123", "testrepo")
+	gen := NewQRGenerator("localhost", 16180, "sess-123", "testrepo")
 
 	pngData, err := gen.GeneratePNG(256)
 	if err != nil {
@@ -182,8 +182,8 @@ func TestSimpleTerminalQR(t *testing.T) {
 
 func TestPairingInfo_JSONSerialization(t *testing.T) {
 	info := PairingInfo{
-		WebSocket: "ws://localhost:8766/ws",
-		HTTP:      "http://localhost:8766",
+		WebSocket: "ws://localhost:16180/ws",
+		HTTP:      "http://localhost:16180",
 		SessionID: "test-session",
 		Token:     "secret",
 		RepoName:  "myrepo",
@@ -218,8 +218,8 @@ func TestPairingInfo_JSONSerialization(t *testing.T) {
 
 func TestPairingInfo_JSONFields(t *testing.T) {
 	info := PairingInfo{
-		WebSocket: "ws://test:8766/ws",
-		HTTP:      "http://test:8766",
+		WebSocket: "ws://test:16180/ws",
+		HTTP:      "http://test:16180",
 		SessionID: "sess",
 		RepoName:  "repo",
 	}

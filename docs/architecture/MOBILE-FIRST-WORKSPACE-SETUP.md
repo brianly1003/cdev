@@ -189,7 +189,7 @@ type DiscoveryService struct {
     {
       "id": "ws-a1b2c3",
       "name": "Backend API",
-      "port": 8766,
+      "port": 16180,
       "status": "stopped"
     }
   ],

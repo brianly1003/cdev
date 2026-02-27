@@ -5,7 +5,7 @@
 # Server settings
 server:
   # Unified port for HTTP API and WebSocket connections
-  port: 8766
+  port: 16180
   host: "127.0.0.1"  # Bind to localhost only (recommended for security)
 
   # External URL for VS Code port forwarding / tunnels

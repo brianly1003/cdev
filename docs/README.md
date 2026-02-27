@@ -98,13 +98,13 @@ docs/
 | [api/ELEMENTS-API.md](./api/ELEMENTS-API.md) | Pre-parsed UI elements for rich mobile rendering |
 | [api/WEBSOCKET-STABILITY.md](./api/WEBSOCKET-STABILITY.md) | WebSocket connection stability and heartbeat |
 | [api/REALTIME-CHAT-INTEGRATION.md](./api/REALTIME-CHAT-INTEGRATION.md) | Real-time chat integration guide |
-| [Swagger UI](http://localhost:8766/swagger/) | Interactive API explorer (when agent is running) |
-| [OpenRPC Discovery](http://localhost:8766/api/rpc/discover) | JSON-RPC 2.0 method discovery (when agent is running) |
+| [Swagger UI](http://localhost:16180/swagger/) | Interactive API explorer (when agent is running) |
+| [OpenRPC Discovery](http://localhost:16180/api/rpc/discover) | JSON-RPC 2.0 method discovery (when agent is running) |
 
 **Key Topics:**
 - JSON-RPC 2.0 protocol
 - HTTP endpoints (`/api/claude/*`, `/api/git/*`, `/api/repository/*`, `/api/images/*`)
-- WebSocket events and commands (`ws://localhost:8766/ws`)
+- WebSocket events and commands (`ws://localhost:16180/ws`)
 - Session management (new/continue)
 - Permission and interactive prompt handling
 - Image upload API

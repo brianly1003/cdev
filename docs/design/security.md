@@ -33,7 +33,7 @@ cdev is a daemon that enables remote monitoring and control of Claude Code CLI s
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  1. Network Layer                                                   │
-│     ├── Port scanning (8766 discovery)                              │
+│     ├── Port scanning (16180 discovery)                              │
 │     ├── Man-in-the-middle (unencrypted traffic)                     │
 │     └── DNS rebinding attacks                                       │
 │                                                                     │
@@ -427,8 +427,8 @@ Following JSON-RPC 2.0 specification, use standard error codes:
 │  QR Code Contains:                                                  │
 │  ─────────────────                                                  │
 │  {                                                                  │
-│    "ws": "ws://127.0.0.1:8766/ws",    // Always present             │
-│    "http": "http://127.0.0.1:8766",   // Always present             │
+│    "ws": "ws://127.0.0.1:16180/ws",    // Always present             │
+│    "http": "http://127.0.0.1:16180",   // Always present             │
 │    "session": "uuid",                  // Always present             │
 │    "repo": "my-project",               // Always present             │
 │    "token": "cdev_p_xxx"               // Optional (when auth enabled)│
@@ -682,7 +682,7 @@ DELETE /api/devices/:id      # Revoke device
 
 ```go
 // Connection with token
-ws://localhost:8766/ws?token=cdev_p_xxx
+ws://localhost:16180/ws?token=cdev_p_xxx
 
 // Or via header
 GET /ws HTTP/1.1

@@ -5,8 +5,8 @@ This document provides a complete API reference for mobile app developers and in
 ## Overview
 
 cdev exposes a unified server on a single port:
-- **HTTP API** (`http://127.0.0.1:8766`) - Request/response operations
-- **WebSocket** (`ws://127.0.0.1:8766/ws`) - Real-time event streaming and commands
+- **HTTP API** (`http://127.0.0.1:16180`) - Request/response operations
+- **WebSocket** (`ws://127.0.0.1:16180/ws`) - Real-time event streaming and commands
 
 ### Protocol Support
 
@@ -1085,14 +1085,14 @@ Triggers a full re-index of the repository (runs in background).
 
 ## WebSocket API
 
-Connect to `ws://127.0.0.1:8766/ws` for real-time events and commands.
+Connect to `ws://127.0.0.1:16180/ws` for real-time events and commands.
 
 > **Note:** Use JSON-RPC 2.0 for all WebSocket commands. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md).
 
 ### Connection
 
 ```javascript
-const ws = new WebSocket('ws://127.0.0.1:8766/ws');
+const ws = new WebSocket('ws://127.0.0.1:16180/ws');
 
 ws.onopen = () => {
   console.log('Connected to cdev');
@@ -2277,7 +2277,7 @@ class CdotClient {
 let lastHeartbeat = Date.now();
 let heartbeatTimer: NodeJS.Timer;
 
-const client = new CdotClient('http://127.0.0.1:8766', (event) => {
+const client = new CdotClient('http://127.0.0.1:16180', (event) => {
   switch (event.event) {
     case 'heartbeat':
       // Update heartbeat timestamp for connection health monitoring
@@ -2345,7 +2345,7 @@ heartbeatTimer = setInterval(() => {
   }
 }, 5000);
 
-await client.connect('ws://127.0.0.1:8766/ws');
+await client.connect('ws://127.0.0.1:16180/ws');
 client.startClaude('Create a hello world function');
 ```
 
@@ -2355,8 +2355,8 @@ client.startClaude('Create a hello world function');
 
 Interactive API documentation is available when the agent is running:
 
-- **Swagger UI**: `http://127.0.0.1:8766/swagger/`
-- **OpenAPI JSON**: `http://127.0.0.1:8766/swagger/doc.json`
+- **Swagger UI**: `http://127.0.0.1:16180/swagger/`
+- **OpenAPI JSON**: `http://127.0.0.1:16180/swagger/doc.json`
 
 ---
 

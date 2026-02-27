@@ -23,7 +23,7 @@ This document analyzes cdev's current dual-protocol architecture (WebSocket + HT
 │                        CURRENT ARCHITECTURE                              │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│    Port 8765 (WebSocket)              Port 8766 (HTTP)                  │
+│    Port 8765 (WebSocket)              Port 16180 (HTTP)                  │
 │    ┌─────────────────────┐            ┌─────────────────────┐           │
 │    │                     │            │                     │           │
 │    │  EVENTS (→ Client)  │            │  REST API           │           │
@@ -158,7 +158,7 @@ Users must understand:
 ### Option A: Keep Dual Protocol (Current)
 
 ```
-Ports: 8765 (WS) + 8766 (HTTP)
+Ports: 8765 (WS) + 16180 (HTTP)
 ```
 
 **Pros:**
@@ -178,7 +178,7 @@ Ports: 8765 (WS) + 8766 (HTTP)
 ### Option B: Single Port with Protocol Upgrade
 
 ```
-Port 8766:
+Port 16180:
 ├── GET /health              → HTTP
 ├── GET /swagger/*           → HTTP (Swagger UI)
 ├── GET /api/*               → HTTP (REST facade)
@@ -201,7 +201,7 @@ Port 8766:
 ### Option C: HTTP + SSE (Server-Sent Events)
 
 ```
-Port 8766:
+Port 16180:
 ├── GET /health              → HTTP
 ├── GET /events              → SSE (event stream)
 ├── POST /api/claude/run     → HTTP
@@ -227,7 +227,7 @@ Port 8766:
 ### Option D: Unified Protocol (RECOMMENDED)
 
 ```
-Port 8766:
+Port 16180:
 ├── GET /health              → HTTP (Kubernetes probes)
 ├── GET /info                → HTTP (capabilities discovery)
 ├── GET /swagger/*           → HTTP (optional, dev only)
@@ -262,7 +262,7 @@ Port 8766:
 ### Option E: gRPC with HTTP Transcoding
 
 ```
-Port 8766:
+Port 16180:
 ├── gRPC                     → Primary protocol
 └── HTTP                     → Auto-generated from proto (grpc-gateway)
 ```
@@ -292,7 +292,7 @@ Port 8766:
 │                      RECOMMENDED ARCHITECTURE                            │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│                          Port 8766                                      │
+│                          Port 16180                                      │
 │    ┌─────────────────────────────────────────────────────────┐         │
 │    │                                                         │         │
 │    │  HTTP (Infrastructure Only)                             │         │
@@ -380,11 +380,11 @@ type GRPCTransport struct { ... }       // Future
 # Before
 server:
   websocket_port: 8765
-  http_port: 8766
+  http_port: 16180
 
 # After
 server:
-  port: 8766
+  port: 16180
   transport: websocket  # or "stdio" for VS Code
 ```
 
@@ -494,10 +494,10 @@ func (s *Server) handleProtocol(w http.ResponseWriter, r *http.Request) {
 ```typescript
 // Old iOS client
 const ws = new WebSocket('ws://host:8765');
-const http = 'http://host:8766';
+const http = 'http://host:16180';
 
 // New iOS client
-const ws = new WebSocket('ws://host:8766/');  // Single port
+const ws = new WebSocket('ws://host:16180/');  // Single port
 // No HTTP needed for operations
 ```
 
@@ -530,10 +530,10 @@ Remove HTTP for:
 ```swift
 // Before: Two connections
 let wsConnection = WebSocket(url: "ws://\(host):8765")
-let httpClient = HTTPClient(baseURL: "http://\(host):8766")
+let httpClient = HTTPClient(baseURL: "http://\(host):16180")
 
 // After: Single connection
-let protocol = CdevProtocol(url: "ws://\(host):8766")
+let protocol = CdevProtocol(url: "ws://\(host):16180")
 // All operations through protocol
 ```
 
@@ -545,10 +545,10 @@ Minimal - already uses WebSocket primarily.
 
 ```bash
 # Before
-cdev start --ws-port 8765 --http-port 8766
+cdev start --ws-port 8765 --http-port 16180
 
 # After
-cdev start --port 8766
+cdev start --port 16180
 cdev start --transport stdio  # VS Code mode
 ```
 
@@ -593,7 +593,7 @@ This positions cdev for:
 npm install -g wscat
 
 # Connect
-wscat -c ws://localhost:8766
+wscat -c ws://localhost:16180
 
 # Send command
 > {"jsonrpc":"2.0","id":1,"method":"claude/run","params":{"prompt":"Hello"}}
@@ -609,7 +609,7 @@ wscat -c ws://localhost:8766
 brew install websocat
 
 # Connect and send
-echo '{"jsonrpc":"2.0","id":1,"method":"cdev/status"}' | websocat ws://localhost:8766
+echo '{"jsonrpc":"2.0","id":1,"method":"cdev/status"}' | websocat ws://localhost:16180
 ```
 
 ### Programmatic Testing
@@ -622,7 +622,7 @@ describe('Protocol', () => {
     let ws: WebSocket;
 
     beforeEach(() => {
-        ws = new WebSocket('ws://localhost:8766');
+        ws = new WebSocket('ws://localhost:16180');
     });
 
     it('should run claude', async () => {

@@ -33,7 +33,7 @@ This guide walks you through setting up the cdev workspace manager for iOS app i
 ┌─────────────────────────────────────────────────────────────┐
 │                   VS Code Dev Tunnel                        │
 │         Port 8765 → Workspace Manager                       │
-│         Port 8766 → Workspace Agent                         │
+│         Port 16180 → Workspace Agent                         │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ↓
@@ -46,7 +46,7 @@ This guide walks you through setting up the cdev workspace manager for iOS app i
              ↓
 ┌────────────────────┐  ┌────────────────────┐
 │  Workspace: cdev   │  │ Workspace: ios-app │
-│    (port 8766)     │  │    (port 8767)     │
+│    (port 16180)     │  │    (port 8767)     │
 └────────────────────┘  └────────────────────┘
 ```
 
@@ -55,7 +55,7 @@ This guide walks you through setting up the cdev workspace manager for iOS app i
 | Service | Port | Purpose |
 |---------|------|---------|
 | Workspace Manager | 8765 | Manage workspaces (list, start, stop) |
-| Workspace Agents | 8766-8799 | Claude operations per workspace |
+| Workspace Agents | 16180-16213 | Claude operations per workspace |
 
 ---
 
@@ -107,7 +107,7 @@ When using VS Code Dev Tunnels, pass the tunnel URL directly:
 
 ```bash
 # Copy the VS Code tunnel URL and pass it
-./bin/cdev start --external-url "https://abc123x4-8766.asse.devtunnels.ms"
+./bin/cdev start --external-url "https://abc123x4-16180.asse.devtunnels.ms"
 ```
 
 This automatically sets up the QR code with the correct public URLs.
@@ -121,7 +121,7 @@ mkdir -p ~/.cdev
 cat > ~/.cdev/config.yaml << 'EOF'
 # Server settings
 server:
-  port: 8766
+  port: 16180
   host: "127.0.0.1"
 
 # Logging
@@ -208,7 +208,7 @@ tail -f ~/.cdev/manager.log
 Output:
 ```
 ID          NAME           PATH                      PORT   STATUS
-ws-abc123   My Project     /Users/you/project        8766   stopped
+ws-abc123   My Project     /Users/you/project        16180   stopped
 ws-def456   Backend API    /Users/you/backend        8767   stopped
 ```
 
@@ -260,15 +260,15 @@ You'll get a URL like:
 https://abc123x4-8765.asse.devtunnels.ms
 ```
 
-### 5.3 Forward Port 8766 (First Workspace)
+### 5.3 Forward Port 16180 (First Workspace)
 
-Repeat the above for port `8766`:
-1. Forward port `8766`
+Repeat the above for port `16180`:
+1. Forward port `16180`
 2. Set visibility to **Public**
 
 URL example:
 ```
-https://abc123x4-8766.asse.devtunnels.ms
+https://abc123x4-16180.asse.devtunnels.ms
 ```
 
 ### 5.4 Forward Additional Workspace Ports (If Needed)
@@ -285,7 +285,7 @@ Record your tunnel URLs:
 | Service | Local Port | Tunnel URL |
 |---------|------------|------------|
 | Manager | 8765 | `https://abc123x4-8765.asse.devtunnels.ms` |
-| Workspace 1 | 8766 | `https://abc123x4-8766.asse.devtunnels.ms` |
+| Workspace 1 | 16180 | `https://abc123x4-16180.asse.devtunnels.ms` |
 | Workspace 2 | 8767 | `https://abc123x4-8767.asse.devtunnels.ms` |
 
 ### 5.6 Using --external-url Flag (Recommended)
@@ -294,18 +294,18 @@ Instead of editing config files, simply pass the tunnel URL when starting cdev:
 
 ```bash
 # Just copy the VS Code tunnel URL and pass it directly
-cdev start --external-url "https://abc123x4-8766.asse.devtunnels.ms"
+cdev start --external-url "https://abc123x4-16180.asse.devtunnels.ms"
 ```
 
 This automatically derives both HTTP and WebSocket URLs:
-- **HTTP URL**: `https://abc123x4-8766.asse.devtunnels.ms`
-- **WebSocket URL**: `wss://abc123x4-8766.asse.devtunnels.ms/ws`
+- **HTTP URL**: `https://abc123x4-16180.asse.devtunnels.ms`
+- **WebSocket URL**: `wss://abc123x4-16180.asse.devtunnels.ms/ws`
 
 You can also set them individually if needed:
 ```bash
 cdev start \
-  --external-ws-url "wss://abc123x4-8766.asse.devtunnels.ms/ws" \
-  --external-http-url "https://abc123x4-8766.asse.devtunnels.ms"
+  --external-ws-url "wss://abc123x4-16180.asse.devtunnels.ms/ws" \
+  --external-http-url "https://abc123x4-16180.asse.devtunnels.ms"
 ```
 
 ---
@@ -335,9 +335,9 @@ WebSocket: wss://abc123x4-8765.asse.devtunnels.ms/ws
    {"jsonrpc":"2.0","id":2,"method":"workspace/start","params":{"id":"ws-abc123"}}
    ```
 
-3. **Connect to Workspace** (port 8766+)
+3. **Connect to Workspace** (port 16180+)
    ```json
-   // Connect to wss://xxx-8766.devtunnels.ms/ws
+   // Connect to wss://xxx-16180.devtunnels.ms/ws
    // Use Claude operations
    {"jsonrpc":"2.0","id":1,"method":"agent/run","params":{"prompt":"Hello"}}
    ```
@@ -354,7 +354,7 @@ WebSocket: wss://abc123x4-8765.asse.devtunnels.ms/ws
 
 ### 6.4 Available Workspace Methods
 
-Once connected to a workspace (port 8766+):
+Once connected to a workspace (port 16180+):
 
 | Method | Description |
 |--------|-------------|
@@ -404,7 +404,7 @@ Then send:
 curl -X POST https://abc123x4-8765.asse.devtunnels.ms/api/workspaces/ws-abc123/start
 
 # Connect to workspace
-npx wscat -c wss://abc123x4-8766.asse.devtunnels.ms/ws
+npx wscat -c wss://abc123x4-16180.asse.devtunnels.ms/ws
 ```
 
 ---
@@ -436,7 +436,7 @@ kill -9 <PID>
 1. **Check tunnel URL is correct** - Copy from VS Code Ports panel
 2. **Use `wss://` not `ws://`** - Dev tunnels use HTTPS
 3. **Check workspace is running** - Call `workspace/list` first
-4. **Verify port is forwarded** - Both 8765 AND 8766 needed
+4. **Verify port is forwarded** - Both 8765 AND 16180 needed
 
 ### Workspace Won't Start
 
@@ -486,7 +486,7 @@ ls -la /path/to/workspace
 ```
 Manager WebSocket: wss://YOUR-TUNNEL-8765.devtunnels.ms/ws
 Manager REST API:  https://YOUR-TUNNEL-8765.devtunnels.ms/api/workspaces
-Workspace WebSocket: wss://YOUR-TUNNEL-8766.devtunnels.ms/ws
+Workspace WebSocket: wss://YOUR-TUNNEL-16180.devtunnels.ms/ws
 ```
 
 ### JSON-RPC Quick Examples

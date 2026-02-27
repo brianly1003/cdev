@@ -489,7 +489,7 @@ func checkHealthEndpoint(host string, port, timeoutSeconds int) doctorCheck {
 		host = "127.0.0.1"
 	}
 	if port <= 0 {
-		port = 8766
+		port = 16180
 	}
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 2
@@ -603,7 +603,7 @@ func defaultDoctorConfig() *config.Config {
 	return &config.Config{
 		Server: config.ServerConfig{
 			Host: "127.0.0.1",
-			Port: 8766,
+			Port: 16180,
 		},
 		Claude: config.ClaudeConfig{
 			Command: "claude",

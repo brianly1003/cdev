@@ -37,7 +37,7 @@ type DiscoverySettings struct {
 
 // ServerConfig holds server-related configuration.
 type ServerConfig struct {
-	Port        int    `mapstructure:"port"`         // Unified port for HTTP and WebSocket (default: 8766)
+	Port        int    `mapstructure:"port"`         // Unified port for HTTP and WebSocket (default: 16180)
 	Host        string `mapstructure:"host"`         // Bind address (default: 127.0.0.1)
 	ExternalURL string `mapstructure:"external_url"` // Optional: public URL for tunnels (e.g., https://tunnel.devtunnels.ms)
 	Headless    bool   `mapstructure:"headless"`     // If true, run as background daemon; if false (default), run in terminal mode
@@ -248,7 +248,7 @@ func isEnvSet(key string) bool {
 // setDefaults sets default configuration values.
 func setDefaults(v *viper.Viper) {
 	// Server defaults - unified port for HTTP and WebSocket
-	v.SetDefault("server.port", 8766)
+	v.SetDefault("server.port", 16180)
 	v.SetDefault("server.host", "127.0.0.1")
 
 	// Repository defaults

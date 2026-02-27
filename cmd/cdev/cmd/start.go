@@ -46,7 +46,7 @@ Example:
   cdev start                           # Terminal mode (default)
   cdev start --headless                # Headless/daemon mode
   cdev start --repo /path/to/project
-  cdev start --port 8766               # Custom port
+  cdev start --port 16180               # Custom port
 
 VS Code Port Forwarding:
   When using VS Code port forwarding, just copy the forwarded URL and pass it:
@@ -59,7 +59,7 @@ VS Code Port Forwarding:
 
 func init() {
 	startCmd.Flags().StringVar(&repoPath, "repo", "", "path to repository (default: current directory)")
-	startCmd.Flags().IntVar(&port, "port", 0, "server port for HTTP and WebSocket (default: 8766)")
+	startCmd.Flags().IntVar(&port, "port", 0, "server port for HTTP and WebSocket (default: 16180)")
 	startCmd.Flags().StringVar(&externalURL, "external-url", "", "external URL for tunnels - auto-derives WS and HTTP URLs (e.g., https://tunnel.devtunnels.ms)")
 	startCmd.Flags().BoolVar(&headless, "headless", false, "run in headless mode (no terminal UI, daemon mode)")
 	startCmd.Flags().BoolVar(&verbose, "verbose", false, "enable verbose/debug logging output")

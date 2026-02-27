@@ -5,7 +5,7 @@
 cdev uses a unified WebSocket endpoint with JSON-RPC 2.0.
 
 **Endpoint:** `ws://{host}:{port}/ws`
-**Default Port:** 8766
+**Default Port:** 16180
 **Protocol:** JSON-RPC 2.0
 **Status:** ✅ Fully Implemented
 
@@ -34,14 +34,14 @@ Returns the complete JSON-RPC API specification with all registered methods.
 
 ### WebSocket URL
 ```
-ws://192.168.1.100:8766/ws
+ws://192.168.1.100:16180/ws
 ```
 
 ### From QR Code
 ```json
 {
-  "ws": "ws://192.168.1.100:8766/ws",
-  "http": "http://192.168.1.100:8766",
+  "ws": "ws://192.168.1.100:16180/ws",
+  "http": "http://192.168.1.100:16180",
   "session": "abc123",
   "repo": "my-project"
 }
@@ -1767,7 +1767,7 @@ struct StatusResult: Decodable {
    let url = URL(string: "ws://\(host):8765")!
 
    // New
-   let url = URL(string: "ws://\(host):8766/ws")!
+   let url = URL(string: "ws://\(host):16180/ws")!
    // Or use QR code's ws field directly
    ```
 

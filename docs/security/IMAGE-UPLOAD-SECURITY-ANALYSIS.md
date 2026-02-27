@@ -43,7 +43,7 @@ func IPKeyExtractor(r *http.Request) string {
 ```bash
 # Without fix: Each request uses a different "IP" and bypasses rate limit
 for i in {1..100}; do
-  curl -X POST http://localhost:8766/api/images \
+  curl -X POST http://localhost:16180/api/images \
     -H "X-Forwarded-For: fake-ip-$i" \
     -F "file=@test.jpg"
 done
@@ -60,7 +60,7 @@ done
 ```bash
 # With fix: All requests use actual RemoteAddr
 for i in {1..15}; do
-  curl -X POST http://localhost:8766/api/images \
+  curl -X POST http://localhost:16180/api/images \
     -H "X-Forwarded-For: fake-ip-$i" \
     -F "file=@test.jpg"
 done
@@ -94,10 +94,10 @@ func (s *Storage) ValidatePath(path string) error {
 ### Reproduction Steps
 ```bash
 # Attempt to read files outside images directory
-curl "http://localhost:8766/api/images/validate?path=.cdev/images/../../../etc/passwd"
+curl "http://localhost:16180/api/images/validate?path=.cdev/images/../../../etc/passwd"
 
 # Attempt with null byte (may bypass some checks)
-curl "http://localhost:8766/api/images/validate?path=.cdev/images/test%00../../etc/passwd"
+curl "http://localhost:16180/api/images/validate?path=.cdev/images/test%00../../etc/passwd"
 ```
 
 ### Fix Applied
@@ -111,7 +111,7 @@ curl "http://localhost:8766/api/images/validate?path=.cdev/images/test%00../../e
 ### Post-Fix Behavior
 ```bash
 # All traversal attempts now fail with appropriate error messages
-curl "http://localhost:8766/api/images/validate?path=.cdev/images/../../../etc/passwd"
+curl "http://localhost:16180/api/images/validate?path=.cdev/images/../../../etc/passwd"
 # Response: {"valid":false,"message":"invalid path: must be within .cdev/images"}
 ```
 
@@ -128,8 +128,8 @@ Image IDs from user input were used directly without format validation. While th
 ### Reproduction Steps
 ```bash
 # Send malformed image ID
-curl "http://localhost:8766/api/images?id=<script>alert(1)</script>"
-curl "http://localhost:8766/api/images?id=../../etc/passwd"
+curl "http://localhost:16180/api/images?id=<script>alert(1)</script>"
+curl "http://localhost:16180/api/images?id=../../etc/passwd"
 ```
 
 ### Fix Applied
@@ -140,7 +140,7 @@ Added `isValidImageID()` function that validates:
 
 ### Post-Fix Behavior
 ```bash
-curl "http://localhost:8766/api/images?id=<script>"
+curl "http://localhost:16180/api/images?id=<script>"
 # Response: {"error":"invalid_id","message":"Invalid image ID format"}
 ```
 
@@ -214,7 +214,7 @@ WebP validation only checked the RIFF header (`0x52 0x49 0x46 0x46`) but not the
 ```bash
 # Create a fake RIFF file that's not WebP
 echo -n "RIFF....FAKE" > fake.webp
-curl -X POST http://localhost:8766/api/images \
+curl -X POST http://localhost:16180/api/images \
   -F "file=@fake.webp;type=image/webp"
 # Before fix: Might be accepted
 ```

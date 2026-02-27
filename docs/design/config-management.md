@@ -45,7 +45,7 @@ Priority (highest to lowest):
 │                         FIRST RUN                                     │
 │                                                                       │
 │   $ cdev start                                                       │
-│   🚀 cdev started on http://127.0.0.1:8766                           │
+│   🚀 cdev started on http://127.0.0.1:16180                           │
 │      Config: using defaults (run 'cdev config init' to customize)    │
 │                                                                       │
 │   ✓ Works immediately with sensible defaults                         │
@@ -84,7 +84,7 @@ Display current effective configuration (merged from all sources).
 ```bash
 $ cdev config
 server:
-  port: 8766
+  port: 16180
   host: 127.0.0.1
 logging:
   level: info
@@ -145,7 +145,7 @@ Set logging.level = debug in ~/.cdev/config.yaml
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `server.port` | int | 8766 | Unified port for HTTP API and WebSocket |
+| `server.port` | int | 16180 | Unified port for HTTP API and WebSocket |
 | `server.host` | string | 127.0.0.1 | Bind address |
 | `server.external_url` | string | - | Optional public URL for tunnels/port forwarding (e.g., https://tunnel.devtunnels.ms) |
 | `logging.level` | string | info | Log level: debug, info, warn, error |
@@ -168,7 +168,7 @@ Get a configuration value.
 
 ```bash
 $ cdev config get server.port
-8766
+16180
 
 $ cdev config get logging.level
 info
@@ -186,7 +186,7 @@ The config file uses YAML format with documentation comments:
 # Server settings
 server:
   # Port for HTTP API and WebSocket connections
-  port: 8766
+  port: 16180
 
   # Bind address (use 0.0.0.0 to allow external connections)
   host: "127.0.0.1"

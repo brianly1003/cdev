@@ -20,10 +20,10 @@ This guide helps the iOS team integrate with the new cdev server architecture.
 ### Server Connection
 
 ```
-Server:     http://127.0.0.1:8766
-WebSocket:  ws://127.0.0.1:8766/ws
-Swagger:    http://127.0.0.1:8766/swagger/
-OpenRPC:    http://127.0.0.1:8766/api/rpc/discover
+Server:     http://127.0.0.1:16180
+WebSocket:  ws://127.0.0.1:16180/ws
+Swagger:    http://127.0.0.1:16180/swagger/
+OpenRPC:    http://127.0.0.1:16180/api/rpc/discover
 ```
 
 ### Protocol
@@ -84,7 +84,7 @@ let localString = displayFormatter.string(from: date!)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     cdev Server (port 8766)                          │
+│                     cdev Server (port 16180)                          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐ │
@@ -1707,7 +1707,7 @@ class CDEVClient: ObservableObject {
     private var requestId = 0
     private var pendingRequests: [Int: CheckedContinuation<Any, Error>] = [:]
 
-    let serverURL = URL(string: "ws://127.0.0.1:8766/ws")!
+    let serverURL = URL(string: "ws://127.0.0.1:16180/ws")!
 
     func connect() {
         let session = URLSession(configuration: .default)
@@ -1854,7 +1854,7 @@ try await client.rpc("session/respond", params: [
 ### Health Check
 
 ```bash
-curl http://127.0.0.1:8766/health
+curl http://127.0.0.1:16180/health
 ```
 
 ### WebSocket Test (wscat)
@@ -1864,7 +1864,7 @@ curl http://127.0.0.1:8766/health
 npm install -g wscat
 
 # Connect
-wscat -c ws://127.0.0.1:8766/ws
+wscat -c ws://127.0.0.1:16180/ws
 
 # Send request
 {"jsonrpc":"2.0","id":1,"method":"workspace/list","params":{}}
@@ -1875,7 +1875,7 @@ wscat -c ws://127.0.0.1:8766/ws
 Get the full API schema:
 
 ```bash
-curl http://127.0.0.1:8766/api/rpc/discover | jq .
+curl http://127.0.0.1:16180/api/rpc/discover | jq .
 ```
 
 ---
@@ -1907,7 +1907,7 @@ curl http://127.0.0.1:8766/api/rpc/discover | jq .
 | `agent/run` | `session/start` + `session/send` |
 | `agent/stop` | `session/stop` |
 | `agent/respond` | `session/respond` |
-| Port 8765 | Port 8766 |
+| Port 8765 | Port 16180 |
 | Single workspace | Multi-workspace |
 
 ### Correct Multi-Workspace Flow
@@ -1955,6 +1955,6 @@ These legacy APIs operate on the single-repo `config.yaml` path, not the selecte
 
 ## Support
 
-- **Swagger UI**: http://127.0.0.1:8766/swagger/
-- **OpenRPC Schema**: http://127.0.0.1:8766/api/rpc/discover
+- **Swagger UI**: http://127.0.0.1:16180/swagger/
+- **OpenRPC Schema**: http://127.0.0.1:16180/api/rpc/discover
 - **Server Logs**: `~/.cdev/server.log`

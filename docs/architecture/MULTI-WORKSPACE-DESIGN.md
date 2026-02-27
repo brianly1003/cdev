@@ -17,7 +17,7 @@ The cdev-agent is currently a **single-workspace daemon by design**:
 ### Option A: Multi-Workspace in Single Server
 ```
 ┌─────────────────────────────────────────┐
-│           cdev-agent (port 8766)        │
+│           cdev-agent (port 16180)        │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │ Repo A  │ │ Repo B  │ │ Repo C  │   │
 │  │Components│ │Components│ │Components│  │
@@ -32,7 +32,7 @@ The cdev-agent is currently a **single-workspace daemon by design**:
 ```
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │ cdev-agent   │  │ cdev-agent   │  │ cdev-agent   │
-│ (port 8766)  │  │ (port 8767)  │  │ (port 8768)  │
+│ (port 16180)  │  │ (port 8767)  │  │ (port 8768)  │
 │   Repo A     │  │   Repo B     │  │   Repo C     │
 └──────────────┘  └──────────────┘  └──────────────┘
         │                │                │
@@ -114,7 +114,7 @@ workspaces:
   - id: "ws-001"
     name: "cdev"
     path: "/Users/brianly/Projects/cdev"
-    port: 8766
+    port: 16180
     auto_start: true
 
   - id: "ws-002"
@@ -130,8 +130,8 @@ workspaces:
     auto_start: false
 
 settings:
-  port_range_start: 8766
-  port_range_end: 8799
+  port_range_start: 16180
+  port_range_end: 16213
   max_workspaces: 10
   auto_stop_idle_minutes: 30
 ```
@@ -176,9 +176,9 @@ GET  /api/health                  # Manager health check
         "id": "ws-001",
         "name": "cdev",
         "path": "/Users/brianly/Projects/cdev",
-        "port": 8766,
+        "port": 16180,
         "status": "running",
-        "url": "ws://localhost:8766/ws"
+        "url": "ws://localhost:16180/ws"
       }
     ]
   },
@@ -242,7 +242,7 @@ class WorkspaceConnectionManager {
 
 2. Select Workspace
    └── Start workspace if not running
-       └── Connect to workspace (e.g., port 8766)
+       └── Connect to workspace (e.g., port 16180)
            └── Show workspace UI (sessions, files, git)
 
 3. Switch Workspace

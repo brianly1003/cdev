@@ -11,7 +11,7 @@ Keep cdev bound to localhost and require auth. Example:
 ```yaml
 server:
   host: "127.0.0.1"
-  port: 8766
+  port: 16180
 
 security:
   require_auth: true
@@ -38,11 +38,11 @@ Pick one:
 
 ### SSH tunnel (simple + safe)
 ```bash
-ssh -L 8766:localhost:8766 user@devmachine
+ssh -L 16180:localhost:16180 user@devmachine
 ```
 
 ### VS Code port forwarding
-- Forward port `8766`
+- Forward port `16180`
 - Set `security.allowed_origins` to the VS Code tunnel domain
 - Open the pairing page via the tunnel URL (e.g. `https://<tunnel>/pair`) so the QR embeds the public URL
 

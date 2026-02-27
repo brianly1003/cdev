@@ -66,7 +66,7 @@ CheckOrigin: func(r *http.Request) bool {
 
 **Process Limits:**
 - ✅ `MaxConcurrentWorkspaces` enforced (default: 5)
-- ✅ Port pool size limited (34 ports: 8766-8799)
+- ✅ Port pool size limited (34 ports: 16180-16213)
 - ✅ Max 100 total workspaces
 
 **File Size Limits:**
@@ -376,7 +376,7 @@ IdleTimeout:  120 * time.Second
 | Max workspaces | 100 | Config validation |
 | Max concurrent | 100 | Configurable limit |
 | Max connections | 1000+ | OS limits |
-| Ports available | 34 | Range 8766-8799 |
+| Ports available | 34 | Range 16180-16213 |
 
 ## Monitoring Recommendations
 

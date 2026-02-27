@@ -169,13 +169,13 @@ Retrieves messages from a Claude session with pagination support.
 
 ```bash
 # Initial load - get last 20 messages
-curl "http://localhost:8766/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&limit=20"
+curl "http://localhost:16180/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&limit=20"
 
 # Scroll up - load older messages
-curl "http://localhost:8766/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&before=dda4439d-13cc-42e3-9e13-5463c4eb05dd&limit=20"
+curl "http://localhost:16180/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&before=dda4439d-13cc-42e3-9e13-5463c4eb05dd&limit=20"
 
 # Catch-up - load messages after reconnect
-curl "http://localhost:8766/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&after=8ffb5143-b3a5-454e-85a0-f41fb22ba22c"
+curl "http://localhost:16180/api/claude/sessions/messages?session_id=decda6d9-5311-42ff-90f3-9b8895a03cdd&after=8ffb5143-b3a5-454e-85a0-f41fb22ba22c"
 ```
 
 ---
@@ -185,7 +185,7 @@ curl "http://localhost:8766/api/claude/sessions/messages?session_id=decda6d9-531
 ### Connection
 
 ```
-WebSocket URL: ws://localhost:8766/ws
+WebSocket URL: ws://localhost:16180/ws
 ```
 
 ### Event: `claude_message`
@@ -310,7 +310,7 @@ class ChatManager: ObservableObject {
     private var sessionId: String?
     private var webSocket: URLSessionWebSocketTask?
 
-    private let baseURL = "http://localhost:8766"
+    private let baseURL = "http://localhost:16180"
 
     // MARK: - Initial Load
 
@@ -360,7 +360,7 @@ class ChatManager: ObservableObject {
     // MARK: - WebSocket Real-time Updates
 
     private func connectWebSocket() {
-        let url = URL(string: "ws://localhost:8766/ws")!
+        let url = URL(string: "ws://localhost:16180/ws")!
         webSocket = URLSession.shared.webSocketTask(with: url)
         webSocket?.resume()
         receiveMessage()

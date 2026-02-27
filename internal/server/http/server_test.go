@@ -22,10 +22,10 @@ func TestNew(t *testing.T) {
 		return map[string]interface{}{"status": "ok"}
 	}
 
-	server := New("localhost", 8766, statusFn, nil, nil, nil, nil, nil, 100, 100, "/tmp/testrepo")
+	server := New("localhost", 16180, statusFn, nil, nil, nil, nil, nil, 100, 100, "/tmp/testrepo")
 
-	if server.addr != "localhost:8766" {
-		t.Errorf("expected addr localhost:8766, got %s", server.addr)
+	if server.addr != "localhost:16180" {
+		t.Errorf("expected addr localhost:16180, got %s", server.addr)
 	}
 	if server.maxFileSizeKB != 100 {
 		t.Errorf("expected maxFileSizeKB 100, got %d", server.maxFileSizeKB)
@@ -36,7 +36,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestServer_HandleHealth(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -65,7 +65,7 @@ func TestServer_HandleHealth(t *testing.T) {
 }
 
 func TestServer_HandleHealth_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/health", nil)
 	w := httptest.NewRecorder()
@@ -90,7 +90,7 @@ func TestServer_HandleStatus(t *testing.T) {
 		}
 	}
 
-	server := New("localhost", 8766, statusFn, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, statusFn, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestServer_HandleStatus(t *testing.T) {
 // --- Auth Middleware Tests ---
 
 func TestAuthMiddleware_RejectsMissingToken(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetAuth(newTestTokenManager(t), true)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +141,7 @@ func TestAuthMiddleware_RejectsMissingToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_AllowsValidToken(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	tokenManager := newTestTokenManager(t)
 	server.SetAuth(tokenManager, true)
 
@@ -168,7 +168,7 @@ func TestAuthMiddleware_AllowsValidToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_RejectsPairingToken(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	tokenManager := newTestTokenManager(t)
 	server.SetAuth(tokenManager, true)
 
@@ -195,7 +195,7 @@ func TestAuthMiddleware_RejectsPairingToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_AllowsAllowlistedPaths(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetAuth(newTestTokenManager(t), true)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +266,7 @@ func TestRootRedirectMiddleware_PassesThroughNonRoot(t *testing.T) {
 }
 
 func TestRootRedirectMiddleware_AuthEnabledRedirectsBeforeAuth(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetAuth(newTestTokenManager(t), true)
 
 	// Mirror Start() middleware order around auth and root redirect.
@@ -313,7 +313,7 @@ func TestRootRedirectMiddleware_PreservesQueryString(t *testing.T) {
 }
 
 func TestPairAccessTokenMiddleware_RequiresTokenForPairRoutes(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
 
 	nextCalled := false
@@ -388,7 +388,7 @@ func TestPairAccessTokenMiddleware_RequiresTokenForPairRoutes(t *testing.T) {
 }
 
 func TestPairAccessTokenMiddleware_QueryRedirectStripsToken(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -417,7 +417,7 @@ func TestPairAccessTokenMiddleware_QueryRedirectStripsToken(t *testing.T) {
 }
 
 func TestPairAccessTokenMiddleware_CookieIsHashed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +455,7 @@ func TestPairAccessTokenMiddleware_CookieIsHashed(t *testing.T) {
 }
 
 func TestPairAccessTokenMiddleware_ReferrerPolicySet(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -478,7 +478,7 @@ func TestPairAccessTokenMiddleware_ReferrerPolicySet(t *testing.T) {
 }
 
 func TestPairAccessTokenMiddleware_AllowsCookieAfterInitialToken(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 	server.SetPairAccessToken("secret-token")
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -525,7 +525,7 @@ func TestPairAccessTokenMiddleware_AllowsCookieAfterInitialToken(t *testing.T) {
 }
 
 func TestServer_HandleStatus_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/status", nil)
 	w := httptest.NewRecorder()
@@ -541,7 +541,7 @@ func TestServer_HandleStatus_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleGetFile_MissingPath(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/file", nil)
 	w := httptest.NewRecorder()
@@ -565,7 +565,7 @@ func TestServer_HandleGetFile_MissingPath(t *testing.T) {
 }
 
 func TestServer_HandleGetFile_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/file", nil)
 	w := httptest.NewRecorder()
@@ -581,7 +581,7 @@ func TestServer_HandleGetFile_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleGetFile_NoGitTracker(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/file?path=test.txt", nil)
 	w := httptest.NewRecorder()
@@ -609,7 +609,7 @@ func TestServer_HandleFilesList(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(tmpDir, "file2.go"), []byte("content2"), 0644)
 	_ = os.Mkdir(filepath.Join(tmpDir, "subdir"), 0755)
 
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files/list", nil)
 	w := httptest.NewRecorder()
@@ -651,7 +651,7 @@ func TestServer_HandleFilesList_SubPath(t *testing.T) {
 	_ = os.Mkdir(subDir, 0755)
 	_ = os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644)
 
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files/list?path=subdir", nil)
 	w := httptest.NewRecorder()
@@ -684,7 +684,7 @@ func TestServer_HandleFilesList_PathTraversal(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
 
 	// Attempt path traversal
 	req := httptest.NewRequest(http.MethodGet, "/api/files/list?path=../../../etc", nil)
@@ -719,7 +719,7 @@ func TestServer_HandleFilesList_SymlinkTraversal(t *testing.T) {
 		t.Skip("Cannot create symlink:", err)
 	}
 
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files/list?path=outside", nil)
 	w := httptest.NewRecorder()
@@ -743,7 +743,7 @@ func TestServer_HandleFilesList_NotADirectory(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("content"), 0644)
 
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, tmpDir)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files/list?path=file.txt", nil)
 	w := httptest.NewRecorder()
@@ -759,7 +759,7 @@ func TestServer_HandleFilesList_NotADirectory(t *testing.T) {
 }
 
 func TestServer_HandleFilesList_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/files/list", nil)
 	w := httptest.NewRecorder()
@@ -775,7 +775,7 @@ func TestServer_HandleFilesList_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRun_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/claude/run", nil)
 	w := httptest.NewRecorder()
@@ -791,7 +791,7 @@ func TestServer_HandleClaudeRun_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRun_InvalidJSON(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/run", strings.NewReader("invalid json"))
 	w := httptest.NewRecorder()
@@ -807,7 +807,7 @@ func TestServer_HandleClaudeRun_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRun_EmptyPrompt(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/run", strings.NewReader(`{"prompt":""}`))
 	w := httptest.NewRecorder()
@@ -823,7 +823,7 @@ func TestServer_HandleClaudeRun_EmptyPrompt(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRun_NoManager(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/run", strings.NewReader(`{"prompt":"test"}`))
 	w := httptest.NewRecorder()
@@ -839,7 +839,7 @@ func TestServer_HandleClaudeRun_NoManager(t *testing.T) {
 }
 
 func TestServer_HandleClaudeStop_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/claude/stop", nil)
 	w := httptest.NewRecorder()
@@ -855,7 +855,7 @@ func TestServer_HandleClaudeStop_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleClaudeStop_NoManager(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/stop", nil)
 	w := httptest.NewRecorder()
@@ -871,7 +871,7 @@ func TestServer_HandleClaudeStop_NoManager(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRespond_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/claude/respond", nil)
 	w := httptest.NewRecorder()
@@ -887,7 +887,7 @@ func TestServer_HandleClaudeRespond_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRespond_InvalidJSON(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/respond", strings.NewReader("invalid"))
 	w := httptest.NewRecorder()
@@ -903,7 +903,7 @@ func TestServer_HandleClaudeRespond_InvalidJSON(t *testing.T) {
 }
 
 func TestServer_HandleClaudeRespond_MissingToolUseID(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/claude/respond", strings.NewReader(`{"response":"yes"}`))
 	w := httptest.NewRecorder()
@@ -919,7 +919,7 @@ func TestServer_HandleClaudeRespond_MissingToolUseID(t *testing.T) {
 }
 
 func TestServer_HandleClaudeSessions_MethodNotAllowed(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodPut, "/api/claude/sessions", nil)
 	w := httptest.NewRecorder()
@@ -935,7 +935,7 @@ func TestServer_HandleClaudeSessions_MethodNotAllowed(t *testing.T) {
 }
 
 func TestServer_HandleClaudeSessionMessages_MissingSessionID(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/claude/sessions/messages", nil)
 	w := httptest.NewRecorder()
@@ -951,7 +951,7 @@ func TestServer_HandleClaudeSessionMessages_MissingSessionID(t *testing.T) {
 }
 
 func TestServer_HandleGitStatus_NoTracker(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/git/status", nil)
 	w := httptest.NewRecorder()
@@ -967,7 +967,7 @@ func TestServer_HandleGitStatus_NoTracker(t *testing.T) {
 }
 
 func TestServer_HandleGitDiff_NoTracker(t *testing.T) {
-	server := New("localhost", 8766, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
+	server := New("localhost", 16180, nil, nil, nil, nil, nil, nil, 100, 100, "/tmp")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/git/diff", nil)
 	w := httptest.NewRecorder()

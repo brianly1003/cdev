@@ -50,7 +50,7 @@ By aligning cdev with these patterns, we become a natural fit for any IDE acquis
 │  │ }                                                         │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
-│  Transport: WebSocket (port 8765) + HTTP (port 8766)           │
+│  Transport: WebSocket (port 8765) + HTTP (port 16180)           │
 │  No: Initialize handshake, capability negotiation, stdio       │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘

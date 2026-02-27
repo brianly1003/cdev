@@ -21,7 +21,7 @@ The workspace manager allows users to manage multiple cdev-agent instances (work
 **Protocol:** JSON-RPC 2.0 over WebSocket (same protocol as single workspace mode)
 
 **Manager Port:** 8765 (fixed)
-**Workspace Ports:** 8766-8799 (auto-allocated)
+**Workspace Ports:** 16180-16213 (auto-allocated)
 
 ---
 
@@ -44,14 +44,14 @@ The workspace manager allows users to manage multiple cdev-agent instances (work
          ↓              ↓
 ┌─────────────┐  ┌─────────────┐
 │ Workspace A │  │ Workspace B │
-│ (port 8766) │  │ (port 8767) │
+│ (port 16180) │  │ (port 8767) │
 │   Backend   │  │  Frontend   │
 └─────────────┘  └─────────────┘
 ```
 
 **iOS App Connections:**
 1. **Manager connection** (port 8765) - List/manage workspaces
-2. **Workspace connections** (ports 8766-8799) - Connect to active workspace for Claude operations
+2. **Workspace connections** (ports 16180-16213) - Connect to active workspace for Claude operations
 
 ---
 
@@ -101,7 +101,7 @@ managerWS.send(jsonRPC: "workspace/list")
 managerWS.send(jsonRPC: "workspace/start", params: ["id": "ws-abc123"])
 
 // 5. Connect to workspace's cdev-agent
-let workspaceWS = WebSocket(url: "ws://192.168.1.100:8766/ws")
+let workspaceWS = WebSocket(url: "ws://192.168.1.100:16180/ws")
 
 // 6. Use workspace connection for Claude operations
 workspaceWS.send(jsonRPC: "agent/run", params: ["prompt": "..."])
@@ -134,7 +134,7 @@ List all configured workspaces.
         "id": "ws-a1b2c3d4",
         "name": "Backend API",
         "path": "/Users/dev/backend",
-        "port": 8766,
+        "port": 16180,
         "status": "running",
         "auto_start": true,
         "pid": 12345,
@@ -189,7 +189,7 @@ Start a workspace server.
     "id": "ws-a1b2c3d4",
     "name": "Backend API",
     "status": "starting",
-    "port": 8766,
+    "port": 16180,
     ...
   }
 }
@@ -675,7 +675,7 @@ wscat -c ws://127.0.0.1:8765/ws
 
 ```bash
 # Connect to running workspace
-wscat -c ws://127.0.0.1:8766/ws
+wscat -c ws://127.0.0.1:16180/ws
 > {"jsonrpc":"2.0","id":1,"method":"status/get","params":{}}
 ```
 
@@ -685,13 +685,13 @@ wscat -c ws://127.0.0.1:8766/ws
 
 **Existing cdev-ios** connects to a single cdev-agent instance:
 ```
-ws://192.168.1.100:8766/ws
+ws://192.168.1.100:16180/ws
 ```
 
 **With Workspace Manager:**
 1. Connect to manager: `ws://192.168.1.100:8765/ws`
 2. List workspaces
-3. Connect to selected workspace: `ws://192.168.1.100:8766/ws` (or 8767, 8768, etc.)
+3. Connect to selected workspace: `ws://192.168.1.100:16180/ws` (or 8767, 8768, etc.)
 
 **Backward Compatibility:**
 - Old single workspace mode still works (`cdev start` unchanged)
@@ -744,7 +744,7 @@ For iOS to connect over network:
 |---------|-----|---------|
 | Manager WebSocket | `ws://<host>:8765/ws` | Workspace management (JSON-RPC) |
 | Manager REST API | `http://<host>:8765/api/workspaces` | Workspace management (HTTP) |
-| Workspace Agent | `ws://<host>:8766-8799/ws` | Claude operations (JSON-RPC) |
+| Workspace Agent | `ws://<host>:16180-16213/ws` | Claude operations (JSON-RPC) |
 
 ### JSON-RPC Methods
 

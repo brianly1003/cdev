@@ -72,7 +72,7 @@ make build
 
 **Standard Protocol: JSON-RPC 2.0** - Industry standard used by LSP, MCP, and all major IDEs.
 
-Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:8766/ws`):
+Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:16180/ws`):
 
 ```json
 // Add a workspace
@@ -86,7 +86,7 @@ Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:8766/ws`
 {"jsonrpc": "2.0", "id": 4, "method": "workspace/stop", "params": {"id": "ws-abc123"}}
 ```
 
-**Server runs on:** `http://127.0.0.1:8766`
+**Server runs on:** `http://127.0.0.1:16180`
 - **WebSocket JSON-RPC 2.0**: `/ws` - **PRIMARY (recommended for IDE integration)**
 - REST API: `/api/*` - Also available
 - Health check: `/health`
@@ -153,7 +153,7 @@ cdev.exe start
 
 **Windows environment overrides** use the same `CDEV_` prefix:
 ```powershell
-$env:CDEV_SERVER_PORT = "8766"
+$env:CDEV_SERVER_PORT = "16180"
 $env:CDEV_SECURITY_REQUIRE_AUTH = "true"
 ```
 
@@ -166,7 +166,7 @@ $env:CDEV_SECURITY_REQUIRE_AUTH = "true"
 cdev start
 
 # Start with custom port
-cdev start --port 8766
+cdev start --port 16180
 
 # Start with verbose logging
 cdev start -v
@@ -180,7 +180,7 @@ For advanced settings, create `~/.cdev/config.yaml`:
 
 ```yaml
 server:
-  port: 8766           # Single unified port (HTTP + WebSocket)
+  port: 16180           # Single unified port (HTTP + WebSocket)
   host: "127.0.0.1"
 
 logging:
@@ -202,10 +202,10 @@ Configuration is loaded from (in order):
 Environment variables override config file values (prefix: `CDEV_`):
 ```bash
 # macOS / Linux
-export CDEV_SERVER_PORT=8766
+export CDEV_SERVER_PORT=16180
 
 # Windows (PowerShell)
-$env:CDEV_SERVER_PORT = "8766"
+$env:CDEV_SERVER_PORT = "16180"
 ```
 
 ### Workspace Discovery
@@ -278,16 +278,16 @@ This auto-derives both HTTP and WebSocket URLs for QR code pairing.
 
 When the agent is running, access the interactive API documentation at:
 ```
-http://localhost:8766/swagger/
+http://localhost:16180/swagger/
 ```
 
 The OpenAPI 3.0 spec is also available at:
-- JSON: `http://localhost:8766/swagger/doc.json`
+- JSON: `http://localhost:16180/swagger/doc.json`
 - YAML: `docs/swagger.yaml` (in repository)
 
 ### WebSocket API
 
-Connect to `ws://localhost:8766/ws` for real-time events and commands.
+Connect to `ws://localhost:16180/ws` for real-time events and commands.
 
 **Protocol Support:**
 - **JSON-RPC 2.0** - Standard protocol with request/response correlation
@@ -337,14 +337,14 @@ Connect to `ws://localhost:8766/ws` for real-time events and commands.
 
 **Example - Start New Claude Conversation:**
 ```bash
-curl -X POST http://127.0.0.1:8766/api/claude/run \
+curl -X POST http://127.0.0.1:16180/api/claude/run \
   -H 'Content-Type: application/json' \
   -d '{"prompt": "Create a hello world function"}'
 ```
 
 **Example - Continue a Session by ID:**
 ```bash
-curl -X POST http://127.0.0.1:8766/api/claude/run \
+curl -X POST http://127.0.0.1:16180/api/claude/run \
   -H 'Content-Type: application/json' \
   -d '{"prompt": "Continue the task", "mode": "continue", "session_id": "550e8400-e29b-41d4-a716-446655440000"}'
 ```
@@ -357,7 +357,7 @@ curl -X POST http://127.0.0.1:8766/api/claude/run \
 
 **Example - List Available Sessions:**
 ```bash
-curl http://127.0.0.1:8766/api/claude/sessions
+curl http://127.0.0.1:16180/api/claude/sessions
 ```
 
 Response:
@@ -378,7 +378,7 @@ Response:
 
 **Example - Get Status:**
 ```bash
-curl http://127.0.0.1:8766/api/status
+curl http://127.0.0.1:16180/api/status
 ```
 
 ## Claude CLI Integration
@@ -508,7 +508,7 @@ cdev/
 | WebSocket Server | ✅ Done | Real-time event streaming with Hub pattern |
 | QR Code Generator | ✅ Done | Terminal QR code display for mobile pairing |
 | **JSON-RPC 2.0** | ✅ Done | Unified protocol with agent-agnostic methods |
-| **Unified Server** | ✅ Done | Single port (8766) serving HTTP + WebSocket |
+| **Unified Server** | ✅ Done | Single port (16180) serving HTTP + WebSocket |
 | **OpenRPC Discovery** | ✅ Done | Auto-generated API spec at `/api/rpc/discover` |
 | **Session Manager** | ✅ Done | Multi-session orchestration across workspaces |
 | **LIVE Sessions** | ✅ Done | Detect and inject into Claude running in user's terminal |

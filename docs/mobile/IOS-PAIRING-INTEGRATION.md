@@ -8,8 +8,8 @@ When scanning the QR code, the iOS app will receive a JSON payload:
 
 ```json
 {
-  "ws": "ws://127.0.0.1:8766/ws",
-  "http": "http://127.0.0.1:8766",
+  "ws": "ws://127.0.0.1:16180/ws",
+  "http": "http://127.0.0.1:16180",
   "session": "6f57d617-8d94-4810-b135-cddff5bc1007",
   "repo": "cdev",
   "token": "cdev_p_eyJwIjoiZXlKMGVYQmxJam9pY0dGcGNt..."
@@ -75,8 +75,8 @@ func connect(to info: PairingInfo, accessToken: String?) {
 ```
 
 **WebSocket URL formats:**
-- Without auth: `ws://127.0.0.1:8766/ws`
-- With auth: `ws://127.0.0.1:8766/ws` (Authorization header required)
+- Without auth: `ws://127.0.0.1:16180/ws`
+- With auth: `ws://127.0.0.1:16180/ws` (Authorization header required)
 
 ### 3. HTTP API Requests with Token
 
@@ -127,8 +127,8 @@ If `security.require_pairing_approval = true`, `/api/auth/exchange` may return `
 
 ```json
 {
-  "ws": "ws://127.0.0.1:8766/ws",
-  "http": "http://127.0.0.1:8766",
+  "ws": "ws://127.0.0.1:16180/ws",
+  "http": "http://127.0.0.1:16180",
   "session": "6f57d617-8d94-4810-b135-cddff5bc1007",
   "repo": "cdev",
   "token": "cdev_p_xxx",

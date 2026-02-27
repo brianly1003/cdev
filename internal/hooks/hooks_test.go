@@ -59,7 +59,7 @@ func TestHooksManager_PreservesOtherHooks(t *testing.T) {
 	// Create manager with custom paths
 	manager := &Manager{
 		homeDir:        homeDir,
-		cdevPort:       8766,
+		cdevPort:       16180,
 		claudeSettings: settingsPath,
 	}
 
@@ -200,7 +200,7 @@ func TestHooksManager_RemovesEmptyHooksSection(t *testing.T) {
 	// Create manager
 	manager := &Manager{
 		homeDir:        homeDir,
-		cdevPort:       8766,
+		cdevPort:       16180,
 		claudeSettings: settingsPath,
 	}
 
@@ -265,7 +265,7 @@ func TestHooksManager_BackupCreated(t *testing.T) {
 	// Create manager
 	manager := &Manager{
 		homeDir:        homeDir,
-		cdevPort:       8766,
+		cdevPort:       16180,
 		claudeSettings: settingsPath,
 	}
 
@@ -349,7 +349,7 @@ func TestHooksManager_ValidJSON(t *testing.T) {
 	// Create manager
 	manager := &Manager{
 		homeDir:        homeDir,
-		cdevPort:       8766,
+		cdevPort:       16180,
 		claudeSettings: settingsPath,
 	}
 
@@ -432,7 +432,7 @@ func TestHooksManager_IdempotentInstall(t *testing.T) {
 	// Create manager
 	manager := &Manager{
 		homeDir:        homeDir,
-		cdevPort:       8766,
+		cdevPort:       16180,
 		claudeSettings: settingsPath,
 	}
 

@@ -25,13 +25,13 @@ func TestNewServer(t *testing.T) {
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
 	hub := testutil.NewMockEventHub()
 
-	server := NewServer("localhost", 8766, dispatcher, hub)
+	server := NewServer("localhost", 16180, dispatcher, hub)
 
 	if server == nil {
 		t.Fatal("NewServer returned nil")
 	}
-	if server.addr != "localhost:8766" {
-		t.Errorf("expected addr localhost:8766, got %s", server.addr)
+	if server.addr != "localhost:16180" {
+		t.Errorf("expected addr localhost:16180, got %s", server.addr)
 	}
 	if server.dispatcher != dispatcher {
 		t.Error("dispatcher not set correctly")
@@ -47,7 +47,7 @@ func TestNewServer(t *testing.T) {
 func TestServer_SetStatusProvider(t *testing.T) {
 	dispatcher := handler.NewDispatcher(handler.NewRegistry())
 	hub := testutil.NewMockEventHub()
-	server := NewServer("localhost", 8766, dispatcher, hub)
+	server := NewServer("localhost", 16180, dispatcher, hub)
 
 	provider := &mockStatusProvider{status: "running", uptime: 3600}
 	server.SetStatusProvider(provider)

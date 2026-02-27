@@ -71,7 +71,7 @@ func (s *Server) handleOpenRPCDiscover(w http.ResponseWriter, r *http.Request) {
 
 func openrpcHostPort(addr string) (host string, port string) {
 	host = "localhost"
-	port = "8766"
+	port = "16180"
 
 	trimmed := strings.TrimSpace(addr)
 	if trimmed == "" {

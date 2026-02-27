@@ -369,7 +369,7 @@ func writeDefaultConfig(path string) error {
 # Server settings
 server:
   # Unified port for HTTP API and WebSocket connections
-  port: 8766
+  port: 16180
 
   # Bind address (use 0.0.0.0 to allow external connections)
   host: "127.0.0.1"
