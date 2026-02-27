@@ -875,7 +875,7 @@ func (d *RepoDiscovery) saveCache(repos []DiscoveredRepo, searchPaths []string) 
 	}
 	if err := os.Rename(tmpPath, d.config.CachePath); err != nil {
 		log.Warn().Err(err).Msg("failed to rename discovery cache temp file")
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 	}
 }
 
