@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/jsonl"
+	"github.com/brianly1003/cdev/internal/pathutil"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
@@ -65,8 +66,8 @@ func New(repoPath string) (*Cache, error) {
 		return nil, err
 	}
 
-	// Database path uses encoded repo path
-	encodedPath := strings.ReplaceAll(filepath.Clean(repoPath), "/", "-")
+	// Database path uses encoded repo path (cross-platform)
+	encodedPath := pathutil.EncodePath(repoPath)
 	dbPath := filepath.Join(cacheDir, encodedPath+".db")
 
 	// Open database
@@ -528,8 +529,7 @@ func getSessionsDir(repoPath string) string {
 		homeDir = "~"
 	}
 
-	repoPath = filepath.Clean(repoPath)
-	encodedPath := strings.ReplaceAll(repoPath, "/", "-")
+	encodedPath := pathutil.EncodePath(repoPath)
 
 	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }

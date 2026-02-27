@@ -472,10 +472,10 @@ func (s *Storage) ValidatePath(path string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	// Verify the absolute path is under the base directory
-	// This catches symlink escapes
+	// Verify the absolute path is under the base directory (cross-platform)
 	absBase, _ := filepath.Abs(s.baseDir)
-	if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
+	rel, relErr := filepath.Rel(absBase, absPath)
+	if relErr != nil || strings.HasPrefix(rel, "..") {
 		return fmt.Errorf("invalid path: escapes images directory")
 	}
 

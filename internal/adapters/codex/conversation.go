@@ -633,9 +633,9 @@ func extractUserShellCommandMessage(text string) (string, bool) {
 		return "", false
 	}
 
-	lines := []string{"• You ran a shell command"}
+	lines := []string{"You ran a shell command"}
 	if command != "" {
-		lines[0] = "• You ran " + command
+		lines[0] = "You ran " + command
 	}
 
 	resultLines := summarizeUserShellCommandResult(result)

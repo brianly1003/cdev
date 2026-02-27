@@ -20,7 +20,7 @@ type FilteredSubscriber struct {
 	inner      ports.Subscriber
 	workspaces map[string]bool // Set of workspace IDs to receive events for
 
-	// Session focus filtering (for permission events only)
+	// Workspace focus filtering (for permission events only)
 	focusedWorkspaceID string // Workspace that the focused session belongs to
 	focusedSessionID   string // Session ID the client is currently focused on
 	hasFocus           bool   // Whether the client has set a session focus
@@ -101,7 +101,7 @@ func (f *FilteredSubscriber) IsFiltering() bool {
 }
 
 // SetSessionFocus sets the session and workspace the client is focused on.
-// Only pty_permission and pty_permission_resolved events are session-filtered.
+// Only pty_permission and pty_permission_resolved events are workspace-filtered.
 func (f *FilteredSubscriber) SetSessionFocus(workspaceID, sessionID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -217,8 +217,9 @@ func (s *Scanner) ValidatePath(relPath string) error {
 	// Normalize path
 	cleanPath := filepath.Clean(relPath)
 
-	// Check for path traversal attempts
-	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/../") {
+	// Check for path traversal attempts (cross-platform: use filepath.Separator)
+	sep := string(filepath.Separator)
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, sep+".."+sep) || strings.HasSuffix(cleanPath, sep+"..") {
 		return ErrPathTraversal
 	}
 
@@ -229,7 +230,9 @@ func (s *Scanner) ValidatePath(relPath string) error {
 		return ErrInvalidPath
 	}
 
-	if !strings.HasPrefix(absPath, s.repoPathAbs) {
+	// Use filepath.Rel for safe containment check (works across platforms)
+	rel, err := filepath.Rel(s.repoPathAbs, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return ErrPathTraversal
 	}
 
@@ -254,8 +257,9 @@ func (s *Scanner) validateSymlink(path string) error {
 		return err
 	}
 
-	// Check if target is within repository
-	if !strings.HasPrefix(absTarget, s.repoPathAbs) {
+	// Check if target is within repository (cross-platform using filepath.Rel)
+	rel, relErr := filepath.Rel(s.repoPathAbs, absTarget)
+	if relErr != nil || strings.HasPrefix(rel, "..") {
 		return ErrSymlinkOutsideRepo
 	}
 

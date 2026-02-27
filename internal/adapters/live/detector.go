@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/rs/zerolog/log"
 )
 
@@ -123,11 +124,8 @@ func (d *Detector) sessionFileExists(sessionID string) bool {
 		return false
 	}
 
-	// Convert workspace path to Claude's project path format
-	projectPath := strings.ReplaceAll(d.workspacePath, "/", "-")
-	if !strings.HasPrefix(projectPath, "-") {
-		projectPath = "-" + projectPath
-	}
+	// Convert workspace path to Claude's project path format (cross-platform)
+	projectPath := pathutil.EncodePath(d.workspacePath)
 
 	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
 	_, err = os.Stat(sessionFile)
@@ -361,12 +359,8 @@ func (d *Detector) findSessionID(workDir string, pid int) string {
 		return ""
 	}
 
-	// Convert workDir to Claude's project path format
-	// /Users/brian/Projects/cdev -> -Users-brian-Projects-cdev
-	projectPath := strings.ReplaceAll(workDir, "/", "-")
-	if !strings.HasPrefix(projectPath, "-") {
-		projectPath = "-" + projectPath
-	}
+	// Convert workDir to Claude's project path format (cross-platform)
+	projectPath := pathutil.EncodePath(workDir)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

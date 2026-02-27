@@ -66,9 +66,8 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 │  ────────────────────────────────────────                           │
 │  $ cdev start              → Shows QR (configurable)                │
 │  $ cdev start --no-qr      → Silent start                           │
-│  $ cdev pair               → Show QR on demand                      │
-│  $ cdev pair --refresh     → New token + QR                         │
-│  $ cdev pair --page        → Print pairing page URL                 │
+│  $ cdev pair               → Open pairing page in browser            │
+│  $ cdev pair --json        → Output pairing info as JSON            │
 │  $ cdev pair --external-url https://<tunnel>  → Public URLs         │
 │                                                                     │
 │  Option 2: Web Page (new)                                           │
@@ -96,11 +95,8 @@ cdev uses QR codes to enable mobile devices to connect to the development server
 
 ```bash
 cdev start                    # Shows QR by default (if configured)
-cdev pair                     # Show QR code in terminal
-cdev pair --refresh           # Generate new token + show QR
+cdev pair                     # Open pairing page in browser
 cdev pair --json              # Output connection info as JSON
-cdev pair --url               # Output connection URL only
-cdev pair --page              # Output pairing page URL (/pair)
 cdev pair --external-url https://<tunnel>  # Override public URL
 ```
 
@@ -112,12 +108,9 @@ cdev start                    # Shows QR by default
 cdev start --no-qr            # Start without QR display
 cdev start --headless         # Daemon mode, no terminal output
 
-# On-demand pairing (new)
-cdev pair                     # Show QR code in terminal
-cdev pair --refresh           # Generate new token + show QR
+# On-demand pairing
+cdev pair                     # Open pairing page in browser
 cdev pair --json              # Output connection info as JSON
-cdev pair --url               # Output connection URL only
-cdev pair --page              # Output pairing page URL (/pair)
 cdev pair --external-url https://<tunnel>  # Override public URL
 
 # Future: Device management
@@ -200,7 +193,7 @@ Simple HTML page that displays:
 |---------|----------|-------------|
 | Token in QR | High | Include short-lived token in QR data |
 | Token expiry | High | Tokens expire after configurable time (default: 1hr) |
-| Token refresh | Medium | `cdev pair --refresh` generates new token |
+| Token refresh | Medium | `POST /api/pair/refresh` generates new token |
 | One-time tokens | Low | Token invalidated after first use |
 | Device registration | Low | Track paired devices |
 | Device revocation | Low | Ability to revoke device access |
@@ -227,10 +220,10 @@ Simple HTML page that displays:
 │             └── Invalid/Expired: Reject with 401                    │
 │                                                                     │
 │  4. Token Refresh (optional)                                        │
-│     └── cdev pair --refresh                                         │
+│     └── POST /api/pair/refresh                                      │
 │         └── Invalidates old token                                   │
 │         └── Generates new token                                     │
-│         └── Displays new QR                                         │
+│         └── Re-run `cdev pair` to display new QR                    │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -358,14 +351,11 @@ $ curl http://localhost:8766/api/pair/info
 ### Use Case 4: Regenerate QR (token compromised)
 
 ```bash
-# Show current QR
+# Refresh the pairing token via API
+$ curl -X POST http://localhost:8766/api/pair/refresh
+
+# Then show new QR with updated token
 $ cdev pair
-
-# Generate new token and show new QR
-$ cdev pair --refresh
-New pairing token generated.
-Previous connections will be disconnected.
-
 Scan QR code with cdev mobile app:
   ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
   █ QR CODE HERE █

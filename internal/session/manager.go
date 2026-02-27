@@ -19,6 +19,7 @@ import (
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/brianly1003/cdev/internal/workspace"
 	"github.com/fsnotify/fsnotify"
@@ -428,11 +429,8 @@ func (m *Manager) sessionFileExistsForWorkspace(ws *workspace.Workspace, session
 		return false, err
 	}
 
-	// Convert workspace path to Claude's project path format
-	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
-	if !strings.HasPrefix(projectPath, "-") {
-		projectPath = "-" + projectPath
-	}
+	// Convert workspace path to Claude's project path format (cross-platform)
+	projectPath := pathutil.EncodePath(ws.Definition.Path)
 
 	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
 	_, err = os.Stat(sessionFile)
@@ -452,12 +450,8 @@ func (m *Manager) SessionFileExists(workspaceID string, sessionID string) (bool,
 		return false, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	// Convert workspace path to Claude's project path format
-	// /Users/brian/Projects/cdev-ios -> -Users-brian-Projects-cdev-ios
-	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
-	if !strings.HasPrefix(projectPath, "-") {
-		projectPath = "-" + projectPath
-	}
+	// Convert workspace path to Claude's project path format (cross-platform)
+	projectPath := pathutil.EncodePath(ws.Definition.Path)
 
 	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
 	_, err = os.Stat(sessionFile)
@@ -487,11 +481,8 @@ func (m *Manager) GetLatestSessionID(workspaceID string) (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	// Convert workspace path to Claude's project path format
-	projectPath := strings.ReplaceAll(ws.Definition.Path, "/", "-")
-	if !strings.HasPrefix(projectPath, "-") {
-		projectPath = "-" + projectPath
-	}
+	// Convert workspace path to Claude's project path format (cross-platform)
+	projectPath := pathutil.EncodePath(ws.Definition.Path)
 
 	sessionsDir := filepath.Join(homeDir, ".claude", "projects", projectPath)
 
@@ -2477,8 +2468,7 @@ func getSessionsDir(repoPath string) string {
 		homeDir = "~"
 	}
 
-	repoPath = filepath.Clean(repoPath)
-	encodedPath := strings.ReplaceAll(repoPath, "/", "-")
+	encodedPath := pathutil.EncodePath(repoPath)
 
 	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }
@@ -2986,8 +2976,8 @@ func (m *Manager) emitGitStatusChanged(ctx context.Context, workspaceID string, 
 // This is used for "!" prefix commands in interactive mode.
 // It uses claude.AppendBashToSession to write in the correct Claude Code JSONL format.
 func (m *Manager) executeBashCommand(workspaceID, sessionID, workDir, cmd string) error {
-	// Execute command using bash
-	bashCmd := exec.Command("bash", "-c", cmd)
+	// Execute command using platform shell (bash on Unix, cmd.exe on Windows)
+	bashCmd := pathutil.ShellCommand(cmd)
 	bashCmd.Dir = workDir
 
 	// Capture stdout and stderr separately for correct JSONL format

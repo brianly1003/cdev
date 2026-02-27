@@ -169,7 +169,9 @@ func matchFilePattern(patternContent string, toolInput map[string]interface{}) b
 	// Handle directory patterns like "/path/to/*"
 	if strings.HasSuffix(patternContent, "/*") {
 		dir := strings.TrimSuffix(patternContent, "/*")
-		return strings.HasPrefix(filepath.Dir(path), dir)
+		// Use filepath.Rel for cross-platform path containment check
+		rel, err := filepath.Rel(dir, filepath.Dir(path))
+		return err == nil && !strings.HasPrefix(rel, "..")
 	}
 
 	// Glob pattern matching

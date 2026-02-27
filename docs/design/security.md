@@ -389,7 +389,7 @@ Following JSON-RPC 2.0 specification, use standard error codes:
         "message": "Invalid token",
         "data": {
             "reason": "Token signature verification failed",
-            "hint": "Regenerate QR code with 'cdev pair --refresh'"
+            "hint": "Regenerate QR code with 'cdev pair'"
         }
     },
     "id": 1
@@ -573,7 +573,7 @@ security:
 │  Created:     cdev start / cdev pair                                │
 │  Valid for:   1 hour (configurable)                                 │
 │  Usage:       Single use (invalidated after successful pairing)     │
-│  Refresh:     cdev pair --refresh                                   │
+│  Refresh:     POST /api/pair/refresh → then cdev pair               │
 │                                                                     │
 │  Session Token                                                      │
 │  ─────────────                                                      │
@@ -581,7 +581,7 @@ security:
 │  Valid for:   5 minutes (auto-refreshed)                            │
 │  Usage:       Multiple use during session                           │
 │  Refresh:     Automatic on activity                                 │
-│  Revoke:      Server restart / cdev pair --refresh / manual         │
+│  Revoke:      Server restart / POST /api/pair/refresh / manual      │
 │                                                                     │
 │  Timeline:                                                          │
 │  ─────────                                                          │
@@ -702,7 +702,7 @@ Authorization: Bearer cdev_p_xxx
 // 401 Unauthorized - Invalid token
 {
   "error": "invalid_token",
-  "message": "Token is invalid or expired. Regenerate with 'cdev pair --refresh'."
+  "message": "Token is invalid or expired. Regenerate with 'cdev pair'."
 }
 
 // 403 Forbidden - Origin not allowed
@@ -758,7 +758,7 @@ Authorization: Bearer cdev_p_xxx
 
 - [ ] Keep cdev bound to localhost when not using tunnels
 - [ ] Use `--require-auth` when exposing via tunnels
-- [ ] Regenerate tokens periodically (`cdev pair --refresh`)
+- [ ] Regenerate tokens periodically (`POST /api/pair/refresh` then `cdev pair`)
 - [ ] Don't share QR codes publicly
 - [ ] Use TLS when accessing remotely
 

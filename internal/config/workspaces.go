@@ -176,9 +176,9 @@ func sanitizeWorkspaceManagerConfig(cfg *WorkspaceManagerConfig) {
 
 // SaveWorkspaces saves the workspaces configuration
 func SaveWorkspaces(configPath string, cfg *WorkspacesConfig) error {
-	// Ensure directory exists
+	// Ensure directory exists (owner-only access — config may contain workspace paths)
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -188,8 +188,8 @@ func SaveWorkspaces(configPath string, cfg *WorkspacesConfig) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Write to file
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	// Write to file (owner-only read/write — prevents information disclosure of workspace paths)
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

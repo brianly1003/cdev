@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/jsonl"
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/rs/zerolog/log"
 )
 
@@ -140,7 +141,7 @@ func NewIndexCache(codexHome string) *IndexCache {
 // encodeProjectPath converts a path to Claude Code-style encoded format.
 // e.g., "/Users/brian/Projects/cdev" -> "-Users-brian-Projects-cdev"
 func encodeProjectPath(path string) string {
-	return strings.ReplaceAll(path, string(filepath.Separator), "-")
+	return pathutil.EncodePath(path)
 }
 
 // decodeProjectPath converts an encoded path back to the original.

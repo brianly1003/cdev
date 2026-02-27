@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/jsonl"
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/rs/zerolog/log"
 )
 
@@ -214,8 +215,8 @@ func getSessionsDir(repoPath string) string {
 	// Clean the path (remove trailing slashes)
 	repoPath = filepath.Clean(repoPath)
 
-	// Encode the repo path: /Users/foo/bar -> -Users-foo-bar
-	encodedPath := strings.ReplaceAll(repoPath, "/", "-")
+	// Encode the repo path: /Users/foo/bar -> -Users-foo-bar (cross-platform)
+	encodedPath := pathutil.EncodePath(repoPath)
 
 	return filepath.Join(homeDir, ".claude", "projects", encodedPath)
 }

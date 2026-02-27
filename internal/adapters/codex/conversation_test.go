@@ -225,7 +225,7 @@ func TestParseConversationLine_NormalizesUserShellCommandMessage(t *testing.T) {
 	}
 
 	want := strings.Join([]string{
-		"• You ran ssh-add",
+		"You ran ssh-add",
 		"  └ Identity added: /Users/brianly/.ssh/id_rsa (brian.ly@9loop.asia)",
 		"    Identity added: /Users/brianly/.ssh/id_ed25519 ({brianly1003@gmail.com})",
 	}, "\n")
@@ -248,7 +248,7 @@ func TestParseConversationLine_NormalizesUserShellCommandMessageError(t *testing
 		t.Fatalf("expected one content block, got %+v", item.Content)
 	}
 	want := strings.Join([]string{
-		"• You ran ls missing-file",
+		"You ran ls missing-file",
 		"  └ Exit code: 1",
 		"    ls: missing-file: No such file or directory",
 	}, "\n")

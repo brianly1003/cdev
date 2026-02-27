@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -16,10 +17,6 @@ import (
 const (
 	// CdevHooksDir is the directory for cdev hook scripts
 	CdevHooksDir = ".cdev/hooks"
-	// ForwardScriptName is the name of the hook forwarder script (fire-and-forget)
-	ForwardScriptName = "forward.sh"
-	// PermissionScriptName is the name of the blocking permission hook script
-	PermissionScriptName = "permission.sh"
 	// CdevMarker is used to identify cdev-managed hooks in settings.json
 	CdevMarker = "_cdev_managed"
 	// InstalledMarkerFile indicates hooks have been installed
@@ -27,6 +24,22 @@ const (
 	// DefaultPermissionTimeout is how long to wait for mobile response (seconds)
 	DefaultPermissionTimeout = 60
 )
+
+// ForwardScriptName returns the platform-appropriate forward hook script name.
+func ForwardScriptName() string {
+	if runtime.GOOS == "windows" {
+		return "forward.ps1"
+	}
+	return "forward.sh"
+}
+
+// PermissionScriptName returns the platform-appropriate permission hook script name.
+func PermissionScriptName() string {
+	if runtime.GOOS == "windows" {
+		return "permission.ps1"
+	}
+	return "permission.sh"
+}
 
 // Manager handles Claude Code hooks installation and management.
 type Manager struct {
@@ -112,7 +125,21 @@ func (m *Manager) Uninstall() error {
 // createForwardScript creates the fire-and-forget hook forwarder script.
 // Used for: SessionStart, Notification, PostToolUse (non-blocking notifications)
 func (m *Manager) createForwardScript(hooksDir string) error {
-	script := fmt.Sprintf(`#!/bin/bash
+	var script string
+	if runtime.GOOS == "windows" {
+		script = fmt.Sprintf(`# cdev hook forwarder (PowerShell) - forwards Claude events to cdev server
+$ErrorActionPreference = "SilentlyContinue"
+$HookType = $args[0]
+$CdevPort = %d
+$Input = [Console]::In.ReadToEnd()
+try {
+    $null = Invoke-WebRequest -Uri "http://127.0.0.1:${CdevPort}/health" -TimeoutSec 1 -ErrorAction Stop
+    Invoke-WebRequest -Uri "http://127.0.0.1:${CdevPort}/api/hooks/${HookType}" -Method POST -ContentType "application/json" -Body $Input -ErrorAction SilentlyContinue | Out-Null
+} catch {}
+exit 0
+`, m.cdevPort)
+	} else {
+		script = fmt.Sprintf(`#!/bin/bash
 # cdev hook forwarder - forwards Claude events to cdev server (fire-and-forget)
 # Used for: SessionStart, Notification, PostToolUse
 # This script only forwards if cdev is running (silent fail otherwise)
@@ -134,8 +161,9 @@ fi
 # Always exit successfully so Claude doesn't error
 exit 0
 `, m.cdevPort)
+	}
 
-	scriptPath := filepath.Join(hooksDir, ForwardScriptName)
+	scriptPath := filepath.Join(hooksDir, ForwardScriptName())
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		return err
 	}
@@ -154,7 +182,33 @@ exit 0
 // 4. If no match, forwards to iOS and waits for response (with timeout)
 // 5. Returns decision to Claude: allow, deny, or ask (fallback to desktop)
 func (m *Manager) createPermissionScript(hooksDir string) error {
-	script := fmt.Sprintf(`#!/bin/bash
+	var script string
+	if runtime.GOOS == "windows" {
+		script = fmt.Sprintf(`# cdev permission hook (PowerShell) - mobile permission approval
+$ErrorActionPreference = "SilentlyContinue"
+$CdevPort = %d
+$Timeout = %d
+$Input = [Console]::In.ReadToEnd()
+try {
+    $null = Invoke-WebRequest -Uri "http://127.0.0.1:${CdevPort}/health" -TimeoutSec 1 -ErrorAction Stop
+} catch { exit 0 }
+try {
+    $resp = Invoke-WebRequest -Uri "http://127.0.0.1:${CdevPort}/api/hooks/permission-request" -Method POST -ContentType "application/json" -Body $Input -TimeoutSec $Timeout -ErrorAction Stop
+    $json = $resp.Content | ConvertFrom-Json
+    $decision = $json.decision
+} catch { exit 0 }
+if (-not $decision) { exit 0 }
+if ($decision -eq "allow") {
+    Write-Output '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"Approved by cdev"}}'
+} elseif ($decision -eq "deny") {
+    Write-Output '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Denied by cdev"}}'
+} else {
+    Write-Output '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask"}}'
+}
+exit 0
+`, m.cdevPort, DefaultPermissionTimeout)
+	} else {
+		script = fmt.Sprintf(`#!/bin/bash
 # cdev permission hook - enables mobile permission approval for external Claude sessions
 # Used for: PreToolUse (blocking - waits for mobile response)
 #
@@ -214,8 +268,9 @@ fi
 
 exit 0
 `, m.cdevPort, DefaultPermissionTimeout)
+	}
 
-	scriptPath := filepath.Join(hooksDir, PermissionScriptName)
+	scriptPath := filepath.Join(hooksDir, PermissionScriptName())
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		return err
 	}
@@ -245,8 +300,22 @@ func (m *Manager) addHooksToSettings() error {
 	}
 
 	// Script paths
-	forwardScript := filepath.Join(m.homeDir, CdevHooksDir, ForwardScriptName)
-	permissionScript := filepath.Join(m.homeDir, CdevHooksDir, PermissionScriptName)
+	forwardScript := filepath.Join(m.homeDir, CdevHooksDir, ForwardScriptName())
+	permissionScript := filepath.Join(m.homeDir, CdevHooksDir, PermissionScriptName())
+
+	// Build commands — Windows uses "powershell.exe -File <script>", Unix runs scripts directly
+	var fwdSession, fwdNotification, fwdToolEnd, permCmd string
+	if runtime.GOOS == "windows" {
+		fwdSession = fmt.Sprintf("powershell.exe -ExecutionPolicy Bypass -File \"%s\" session", forwardScript)
+		fwdNotification = fmt.Sprintf("powershell.exe -ExecutionPolicy Bypass -File \"%s\" notification", forwardScript)
+		fwdToolEnd = fmt.Sprintf("powershell.exe -ExecutionPolicy Bypass -File \"%s\" tool-end", forwardScript)
+		permCmd = fmt.Sprintf("powershell.exe -ExecutionPolicy Bypass -File \"%s\"", permissionScript)
+	} else {
+		fwdSession = fmt.Sprintf("%s session", forwardScript)
+		fwdNotification = fmt.Sprintf("%s notification", forwardScript)
+		fwdToolEnd = fmt.Sprintf("%s tool-end", forwardScript)
+		permCmd = permissionScript
+	}
 
 	// Define cdev hooks
 	// PreToolUse uses the blocking permission script for mobile approval
@@ -257,7 +326,7 @@ func (m *Manager) addHooksToSettings() error {
 			CdevMarker: true,
 			"hooks": []map[string]interface{}{{
 				"type":    "command",
-				"command": fmt.Sprintf("%s session", forwardScript),
+				"command": fwdSession,
 			}},
 		}},
 		"Notification": {{
@@ -265,7 +334,7 @@ func (m *Manager) addHooksToSettings() error {
 			CdevMarker: true,
 			"hooks": []map[string]interface{}{{
 				"type":    "command",
-				"command": fmt.Sprintf("%s notification", forwardScript),
+				"command": fwdNotification,
 			}},
 		}},
 		"PreToolUse": {{
@@ -274,7 +343,7 @@ func (m *Manager) addHooksToSettings() error {
 			"hooks": []map[string]interface{}{{
 				"type":    "command",
 				// Use blocking permission script - enables mobile approval
-				"command": permissionScript,
+				"command": permCmd,
 			}},
 		}},
 		"PostToolUse": {{
@@ -282,7 +351,7 @@ func (m *Manager) addHooksToSettings() error {
 			CdevMarker: true,
 			"hooks": []map[string]interface{}{{
 				"type":    "command",
-				"command": fmt.Sprintf("%s tool-end", forwardScript),
+				"command": fwdToolEnd,
 			}},
 		}},
 	}
@@ -431,7 +500,8 @@ func (m *Manager) isCdevHook(hook map[string]interface{}) bool {
 		for _, h := range hooksList {
 			if hMap, ok := h.(map[string]interface{}); ok {
 				if cmd, ok := hMap["command"].(string); ok {
-					if strings.Contains(cmd, ".cdev/hooks/") {
+					// Cross-platform: check both forward and backward slash variants
+					if strings.Contains(cmd, ".cdev/hooks/") || strings.Contains(cmd, ".cdev\\hooks\\") {
 						return true
 					}
 				}
@@ -515,7 +585,7 @@ func (m *Manager) Status() string {
 	}
 
 	// Check if forward script exists
-	scriptPath := filepath.Join(m.homeDir, CdevHooksDir, ForwardScriptName)
+	scriptPath := filepath.Join(m.homeDir, CdevHooksDir, ForwardScriptName())
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return "partially installed (missing forward script)"
 	}

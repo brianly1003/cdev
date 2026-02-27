@@ -40,4 +40,6 @@
 
 ## Agent-Specific Instructions
 - Do not create commits unless explicitly asked by the user.
+- Always run `make lint` once coding is complete.
+- Always fix lint failures before committing.
 - Always run `make build` before saying work is done.

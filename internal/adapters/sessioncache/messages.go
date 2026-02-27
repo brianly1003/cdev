@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brianly1003/cdev/internal/adapters/jsonl"
+	"github.com/brianly1003/cdev/internal/pathutil"
 
 	"github.com/rs/zerolog/log"
 )
@@ -90,8 +91,8 @@ func NewMessageCache(sessionsDir string) (*MessageCache, error) {
 		return nil, err
 	}
 
-	// Database path
-	encodedPath := strings.ReplaceAll(filepath.Clean(sessionsDir), "/", "-")
+	// Database path (cross-platform)
+	encodedPath := pathutil.EncodePath(sessionsDir)
 	dbPath := filepath.Join(cacheDir, encodedPath+"-messages.db")
 
 	// Open database

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -609,11 +610,10 @@ func escapeFTSQuery(query string) string {
 	return strings.Join(words, " ")
 }
 
-// getBaseName returns the base name of a path.
+// getBaseName returns the base name of a path (cross-platform).
 func getBaseName(path string) string {
 	if path == "" {
 		return ""
 	}
-	parts := strings.Split(path, "/")
-	return parts[len(parts)-1]
+	return filepath.Base(path)
 }

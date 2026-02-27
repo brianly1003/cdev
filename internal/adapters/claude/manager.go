@@ -20,6 +20,7 @@ import (
 	"github.com/brianly1003/cdev/internal/domain"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/creack/pty"
 	"github.com/rs/zerolog/log"
@@ -1750,8 +1751,8 @@ func (m *Manager) executeBashLocally(ctx context.Context, command string, mode S
 		Str("work_dir", workDir).
 		Msg("executing bash command locally")
 
-	// Execute bash command
-	cmd := exec.CommandContext(ctx, "bash", "-c", command)
+	// Execute command using platform shell (bash on Unix, cmd.exe on Windows)
+	cmd := pathutil.ShellCommandContext(ctx, command)
 	cmd.Dir = workDir
 
 	var stdout, stderr strings.Builder

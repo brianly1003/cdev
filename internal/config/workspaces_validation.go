@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -155,18 +156,28 @@ func validateWorkspaceDefinitions(workspaces []WorkspaceDefinition, managerCfg *
 	return nil
 }
 
-// isParentOrChild checks if path1 is a parent or child of path2
+// isParentOrChild checks if path1 is a parent or child of path2.
+// Uses case-insensitive comparison on Windows/macOS (case-insensitive filesystems).
 func isParentOrChild(path1, path2 string) bool {
 	path1Clean := filepath.Clean(path1)
 	path2Clean := filepath.Clean(path2)
 
+	// On case-insensitive filesystems (Windows NTFS, macOS HFS+/APFS),
+	// normalize to lowercase for comparison.
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		path1Clean = strings.ToLower(path1Clean)
+		path2Clean = strings.ToLower(path2Clean)
+	}
+
+	sep := string(filepath.Separator)
+
 	// Check if path1 is parent of path2
-	if strings.HasPrefix(path2Clean+string(filepath.Separator), path1Clean+string(filepath.Separator)) {
+	if strings.HasPrefix(path2Clean+sep, path1Clean+sep) {
 		return true
 	}
 
 	// Check if path2 is parent of path1
-	if strings.HasPrefix(path1Clean+string(filepath.Separator), path2Clean+string(filepath.Separator)) {
+	if strings.HasPrefix(path1Clean+sep, path2Clean+sep) {
 		return true
 	}
 

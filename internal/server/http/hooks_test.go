@@ -59,7 +59,7 @@ type hooksEventCapture struct {
 func (c *hooksEventCapture) ID() string                { return "hooks-test-capture" }
 func (c *hooksEventCapture) Send(e events.Event) error { c.events = append(c.events, e); return nil }
 func (c *hooksEventCapture) Close() error              { return nil }
-func (c *hooksEventCapture) Done() <-chan struct{}      { return c.done }
+func (c *hooksEventCapture) Done() <-chan struct{}     { return c.done }
 
 // setupHooksTest creates a HooksHandler with a hub that captures events.
 func setupHooksTest(resolver WorkspaceResolver) (*HooksHandler, *hub.Hub, *hooksEventCapture) {
@@ -75,6 +75,13 @@ func setupHooksTest(resolver WorkspaceResolver) (*HooksHandler, *hub.Hub, *hooks
 	}
 
 	return handler, h, capture
+}
+
+func stopTestHub(t *testing.T, h *hub.Hub) {
+	t.Helper()
+	if err := h.Stop(); err != nil {
+		t.Fatalf("failed to stop test hub: %v", err)
+	}
 }
 
 // drainHookEvents gives the hub a moment to deliver events.
@@ -143,7 +150,7 @@ func TestHandleHook_Session_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-1",
@@ -178,7 +185,7 @@ func TestHandleHook_Session_SetsWorkspaceID(t *testing.T) {
 
 func TestHandleHook_Session_NoResolver_EmptyWorkspaceID(t *testing.T) {
 	handler, h, capture := setupHooksTest(nil)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-1",
@@ -206,7 +213,7 @@ func TestHandleHook_Notification_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID:        "sess-2",
@@ -242,7 +249,7 @@ func TestHandleHook_Permission_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-3",
@@ -270,7 +277,7 @@ func TestHandleHook_ToolStart_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-4",
@@ -305,7 +312,7 @@ func TestHandleHook_ToolEnd_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-5",
@@ -340,7 +347,7 @@ func TestHandleHook_PermissionRequest_SetsWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	pm := &hooksPermissionManager{}
 	handler.SetPermissionManager(pm)
@@ -401,7 +408,7 @@ func TestHandleHook_PermissionRequest_SetsWorkspaceID(t *testing.T) {
 
 func TestHandleHook_PermissionRequest_NoResolver_EmptyWorkspaceID(t *testing.T) {
 	handler, h, _ := setupHooksTest(nil)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	pm := &hooksPermissionManager{}
 	handler.SetPermissionManager(pm)
@@ -429,7 +436,7 @@ func TestHandleHook_PermissionRequest_NoResolver_EmptyWorkspaceID(t *testing.T) 
 
 func TestHandleHook_PermissionRequest_NoPermissionManager(t *testing.T) {
 	handler, h, _ := setupHooksTest(nil)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-8",
@@ -455,7 +462,7 @@ func TestHandleHook_PermissionRequest_NoPermissionManager(t *testing.T) {
 
 func TestHandleHook_MethodNotAllowed(t *testing.T) {
 	handler, h, _ := setupHooksTest(nil)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/hooks/session", nil)
 	w := httptest.NewRecorder()
@@ -477,7 +484,7 @@ func TestHandleHook_EmptyCwd_EmptyWorkspaceID(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	payload := ClaudeHookPayload{
 		SessionID: "sess-empty-cwd",
@@ -500,7 +507,7 @@ func TestHandleHook_EmptyCwd_EmptyWorkspaceID(t *testing.T) {
 
 func TestHandleHook_UnknownHookType(t *testing.T) {
 	handler, h, _ := setupHooksTest(nil)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/hooks/unknown-type", strings.NewReader("{}"))
 	w := httptest.NewRecorder()
@@ -522,7 +529,7 @@ func TestHandleHook_DifferentWorkspaces_DifferentIDs(t *testing.T) {
 		},
 	}
 	handler, h, capture := setupHooksTest(resolver)
-	defer h.Stop()
+	defer stopTestHub(t, h)
 
 	workspaces := []struct {
 		cwd      string

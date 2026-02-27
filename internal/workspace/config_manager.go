@@ -25,11 +25,29 @@ type ConfigManager struct {
 }
 
 // NewConfigManager creates a new workspace config manager.
-func NewConfigManager(cfg *config.WorkspacesConfig, configPath string) *ConfigManager {
+// appCfg is optional — when non-nil, discovery settings from config.yaml are applied.
+func NewConfigManager(cfg *config.WorkspacesConfig, configPath string, appCfg ...*config.Config) *ConfigManager {
+	discoveryCfg := DefaultDiscoveryConfig()
+	if len(appCfg) > 0 && appCfg[0] != nil {
+		ds := appCfg[0].Discovery
+		if ds.MaxDepth > 0 {
+			discoveryCfg.MaxDepth = ds.MaxDepth
+		}
+		if ds.TimeoutSeconds > 0 {
+			discoveryCfg.Timeout = time.Duration(ds.TimeoutSeconds) * time.Second
+		}
+		if ds.CacheTTLMinutes > 0 {
+			discoveryCfg.CacheTTL = time.Duration(ds.CacheTTLMinutes) * time.Minute
+		}
+		if len(ds.SearchPaths) > 0 {
+			discoveryCfg.UserSearchPaths = ds.SearchPaths
+		}
+	}
+
 	m := &ConfigManager{
 		workspaces:    make(map[string]*Workspace),
 		configPath:    configPath,
-		repoDiscovery: NewRepoDiscovery(DefaultDiscoveryConfig()),
+		repoDiscovery: NewRepoDiscovery(discoveryCfg),
 	}
 
 	// Load workspaces from config

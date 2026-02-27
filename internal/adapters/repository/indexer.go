@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/rs/zerolog/log"
 	_ "modernc.org/sqlite"
 )
@@ -61,8 +62,8 @@ func NewIndexer(repoPath string, skipDirs []string) (*SQLiteIndexer, error) {
 		return nil, fmt.Errorf("failed to create cache dir: %w", err)
 	}
 
-	// Create unique database path based on repo path
-	encodedPath := strings.ReplaceAll(filepath.Clean(absPath), string(filepath.Separator), "-")
+	// Create unique database path based on repo path (cross-platform)
+	encodedPath := pathutil.EncodePath(absPath)
 	if len(encodedPath) > 100 {
 		encodedPath = encodedPath[len(encodedPath)-100:]
 	}

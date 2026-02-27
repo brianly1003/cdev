@@ -385,8 +385,8 @@ func (t *Tracker) GetFileContent(ctx context.Context, path string, maxSizeKB int
 		return "", false, err
 	}
 
-	// Ensure path is within repo (add separator to prevent prefix attack on similar dir names)
-	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
+	// Ensure path is within repo using filepath.Rel (cross-platform)
+	if relCheck, relErr := filepath.Rel(absRoot, absPath); relErr != nil || strings.HasPrefix(relCheck, "..") {
 		return "", false, domain.ErrPathOutsideRepo
 	}
 
@@ -1211,7 +1211,8 @@ func (t *Tracker) ListDirectory(ctx context.Context, path string) ([]DirectoryEn
 		return nil, err
 	}
 
-	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
+	rel, relErr := filepath.Rel(absRoot, absPath)
+	if relErr != nil || strings.HasPrefix(rel, "..") {
 		return nil, domain.ErrPathOutsideRepo
 	}
 

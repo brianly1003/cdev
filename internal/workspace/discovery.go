@@ -28,6 +28,8 @@ type DiscoveryConfig struct {
 	CacheTTL time.Duration
 	// CachePath is where to store the cache file
 	CachePath string
+	// UserSearchPaths are additional paths from config.yaml (scanned before defaults)
+	UserSearchPaths []string
 }
 
 // DefaultDiscoveryConfig returns sensible defaults.
@@ -339,6 +341,12 @@ func (d *RepoDiscovery) processDirectory(
 	}
 
 	for _, entry := range entries {
+		// Skip symlinks to prevent traversal outside intended search paths.
+		// A symlink could point to /etc, ~/.ssh, or create infinite loops.
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+
 		if !entry.IsDir() {
 			continue
 		}
@@ -680,17 +688,29 @@ func normalizePathForComparison(path string) string {
 }
 
 // defaultSearchPaths returns smart default paths to search.
+// User-configured paths (from config.yaml discovery.search_paths) are scanned first,
+// followed by built-in defaults. This ensures developers who store repos in
+// non-standard locations get their repositories discovered automatically.
 // NOTE: Excludes Documents by default as it's typically slow and rarely contains repos.
-// Uses normalizeSearchPaths internally to deduplicate on case-insensitive filesystems.
 func (d *RepoDiscovery) defaultSearchPaths() []string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil
 	}
 
-	// Priority-ordered paths (most likely to contain repos first)
-	// Include both case variants to support Linux (case-sensitive) properly
-	candidates := []string{
+	// Start with user-configured paths (highest priority, scanned first).
+	// Tilde (~) is expanded to $HOME for convenience.
+	candidates := make([]string, 0, len(d.config.UserSearchPaths)+13)
+	for _, p := range d.config.UserSearchPaths {
+		if strings.HasPrefix(p, "~/") || p == "~" {
+			p = filepath.Join(homeDir, p[1:])
+		}
+		candidates = append(candidates, p)
+	}
+
+	// Built-in defaults (most likely to contain repos first).
+	// Include both case variants to support Linux (case-sensitive) properly.
+	candidates = append(candidates,
 		filepath.Join(homeDir, "Projects"),
 		filepath.Join(homeDir, "projects"),
 		filepath.Join(homeDir, "Code"),
@@ -705,21 +725,25 @@ func (d *RepoDiscovery) defaultSearchPaths() []string {
 		filepath.Join(homeDir, "Workspace"),
 		filepath.Join(homeDir, "Desktop"),
 		// Documents intentionally excluded - too slow, rarely has repos
-	}
+	)
 
 	// Deduplicate paths (handles case-insensitive filesystems like macOS/Windows)
 	result := make([]string, 0)
 	seen := make(map[string]bool)
 
 	for _, p := range candidates {
-		normalizedPath := normalizePathForComparison(p)
+		absPath, absErr := filepath.Abs(p)
+		if absErr != nil {
+			continue
+		}
+		normalizedPath := normalizePathForComparison(absPath)
 		if seen[normalizedPath] {
 			continue
 		}
 
-		if info, err := os.Stat(p); err == nil && info.IsDir() {
+		if info, statErr := os.Stat(absPath); statErr == nil && info.IsDir() {
 			seen[normalizedPath] = true
-			result = append(result, p)
+			result = append(result, absPath)
 		}
 	}
 
@@ -836,15 +860,22 @@ func (d *RepoDiscovery) saveCache(repos []DiscoveredRepo, searchPaths []string) 
 		return
 	}
 
-	// Ensure cache directory exists
+	// Ensure cache directory exists (owner-only access)
 	cacheDir := filepath.Dir(d.config.CachePath)
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		log.Warn().Err(err).Msg("failed to create cache directory")
 		return
 	}
 
-	if err := os.WriteFile(d.config.CachePath, data, 0644); err != nil {
-		log.Warn().Err(err).Msg("failed to write discovery cache")
+	// Atomic write: write to temp file then rename to prevent partial reads
+	tmpPath := d.config.CachePath + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+		log.Warn().Err(err).Msg("failed to write discovery cache temp file")
+		return
+	}
+	if err := os.Rename(tmpPath, d.config.CachePath); err != nil {
+		log.Warn().Err(err).Msg("failed to rename discovery cache temp file")
+		os.Remove(tmpPath)
 	}
 }
 
