@@ -8,39 +8,33 @@ import (
 	"net/http"
 	neturl "net/url"
 	"os"
-	"path/filepath"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/pairing"
-	"github.com/google/uuid"
-	"github.com/skip2/go-qrcode"
 	"github.com/spf13/cobra"
 )
 
 var (
 	pairJSON        bool
-	pairURL         bool
-	pairPage        bool
-	pairRefresh     bool
 	pairExternalURL string
 )
 
-// pairCmd displays QR code for mobile pairing.
+// pairCmd opens the pairing page for mobile app connection.
 var pairCmd = &cobra.Command{
 	Use:   "pair",
-	Short: "Display QR code for mobile app pairing",
-	Long: `Display a QR code that can be scanned by the cdev mobile app to connect.
+	Short: "Open pairing page for mobile app connection",
+	Long: `Open the pairing page in your browser for the cdev mobile app to connect.
 
-If a cdev server is running, it will use the server's session information.
-Otherwise, it generates pairing info based on the configuration.
+Requires a running cdev server. Start one first with: cdev start
 
 Examples:
-  cdev pair              # Display QR code in terminal
-  cdev pair --json       # Output pairing info as JSON
-  cdev pair --url        # Output connection URL only
-  cdev pair --refresh    # Generate new session ID`,
+  cdev pair                                       # Open pairing page in browser
+  cdev pair --json                                # Output pairing info as JSON
+  cdev pair --external-url https://<tunnel>       # Override public URL`,
 	RunE: runPair,
 }
 
@@ -48,9 +42,6 @@ func init() {
 	rootCmd.AddCommand(pairCmd)
 
 	pairCmd.Flags().BoolVar(&pairJSON, "json", false, "output pairing info as JSON")
-	pairCmd.Flags().BoolVar(&pairURL, "url", false, "output connection URL only")
-	pairCmd.Flags().BoolVar(&pairPage, "page", false, "output pairing page URL (/pair entrypoint)")
-	pairCmd.Flags().BoolVar(&pairRefresh, "refresh", false, "generate new session ID (ignore running server)")
 	pairCmd.Flags().StringVar(&pairExternalURL, "external-url", "", "override external URL for pairing output")
 }
 
@@ -69,35 +60,22 @@ func runPair(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	pairAccessToken := resolvePairAccessToken(cfg)
+	cdevAccessToken := resolveCdevAccessToken(cfg)
 
-	var info *pairing.PairingInfo
-
-	// Try to get pairing info from running server (unless --refresh)
-	if !pairRefresh {
-		serverInfo, err := getPairingFromServer(cfg, pairAccessToken)
-		if err == nil && serverInfo != nil {
-			info = &pairing.PairingInfo{
-				WebSocket: serverInfo.WebSocket,
-				HTTP:      serverInfo.HTTP,
-				SessionID: serverInfo.SessionID,
-				Token:     serverInfo.Token,
-				RepoName:  serverInfo.RepoName,
-			}
-		}
+	// Check if cdev server is running
+	serverInfo, srvErr := getPairingFromServer(cfg, cdevAccessToken)
+	if srvErr != nil || serverInfo == nil {
+		return fmt.Errorf("cdev server is not running on %s:%d — start it first with: cdev start", cfg.Server.Host, cfg.Server.Port)
 	}
 
-	// If no server or --refresh, generate new pairing info
-	if info == nil {
-		info = generatePairingInfo(cfg, pairExternalURL)
-		if pairRefresh {
-			fmt.Fprintln(os.Stderr, "Generated new session ID (not connected to running server)")
-		} else {
-			fmt.Fprintln(os.Stderr, "No running cdev server found, using config defaults")
-		}
-	} else {
-		fmt.Fprintln(os.Stderr, "Connected to running cdev server")
+	info := &pairing.PairingInfo{
+		WebSocket: serverInfo.WebSocket,
+		HTTP:      serverInfo.HTTP,
+		SessionID: serverInfo.SessionID,
+		Token:     serverInfo.Token,
+		RepoName:  serverInfo.RepoName,
 	}
+	fmt.Fprintln(os.Stderr, "Connected to running cdev server")
 
 	if pairExternalURL != "" {
 		applyExternalURL(info, pairExternalURL)
@@ -108,18 +86,11 @@ func runPair(cmd *cobra.Command, args []string) error {
 		return outputJSON(info)
 	}
 
-	if pairPage {
-		return outputPairPage(info, pairAccessToken)
-	}
-
-	if pairURL {
-		return outputURL(info)
-	}
-
-	return outputQR(info)
+	// Default: open pairing page in browser
+	return openPairPage(info, cdevAccessToken)
 }
 
-func getPairingFromServer(cfg *config.Config, pairAccessToken string) (*serverPairingInfo, error) {
+func getPairingFromServer(cfg *config.Config, cdevAccessToken string) (*serverPairingInfo, error) {
 	url := fmt.Sprintf("http://%s:%d/api/pair/info", cfg.Server.Host, cfg.Server.Port)
 
 	client := &http.Client{
@@ -130,8 +101,8 @@ func getPairingFromServer(cfg *config.Config, pairAccessToken string) (*serverPa
 	if err != nil {
 		return nil, err
 	}
-	if pairAccessToken != "" {
-		req.Header.Set("X-Cdev-Token", pairAccessToken)
+	if cdevAccessToken != "" {
+		req.Header.Set("X-Cdev-Token", cdevAccessToken)
 	}
 
 	resp, err := client.Do(req)
@@ -157,34 +128,6 @@ func getPairingFromServer(cfg *config.Config, pairAccessToken string) (*serverPa
 	return &info, nil
 }
 
-func generatePairingInfo(cfg *config.Config, externalURL string) *pairing.PairingInfo {
-	// Generate new session ID
-	sessionID := uuid.New().String()
-
-	// Get repo name from current directory
-	repoName := "unknown"
-	if cwd, err := os.Getwd(); err == nil {
-		repoName = filepath.Base(cwd)
-	}
-
-	// Create QR generator with unified port
-	gen := pairing.NewQRGenerator(
-		cfg.Server.Host,
-		cfg.Server.Port,
-		sessionID,
-		repoName,
-	)
-
-	// Set external URL if configured
-	if externalURL != "" {
-		gen.SetExternalURL(externalURL)
-	} else if cfg.Server.ExternalURL != "" {
-		gen.SetExternalURL(cfg.Server.ExternalURL)
-	}
-
-	return gen.GetPairingInfo()
-}
-
 func outputJSON(info *pairing.PairingInfo) error {
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
@@ -194,69 +137,39 @@ func outputJSON(info *pairing.PairingInfo) error {
 	return nil
 }
 
-func outputURL(info *pairing.PairingInfo) error {
-	fmt.Printf("WebSocket: %s\n", info.WebSocket)
-	fmt.Printf("HTTP:      %s\n", info.HTTP)
-	return nil
+func openPairPage(info *pairing.PairingInfo, cdevAccessToken string) error {
+	pageURL := pairPageURL(info, cdevAccessToken)
+	fmt.Fprintf(os.Stderr, "Opening pairing page: %s\n", pageURL)
+	return openBrowser(pageURL)
 }
 
-func outputPairPage(info *pairing.PairingInfo, pairAccessToken string) error {
-	fmt.Printf("%s\n", pairPageURL(info, pairAccessToken))
-	return nil
+// openBrowser opens the given URL in the default browser.
+func openBrowser(url string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "windows":
+		return exec.Command("cmd", "/c", "start", "", url).Start()
+	default: // linux, freebsd, etc.
+		return exec.Command("xdg-open", url).Start()
+	}
 }
 
-func resolvePairAccessToken(cfg *config.Config) string {
+func resolveCdevAccessToken(cfg *config.Config) string {
 	if cfg != nil {
-		if token := strings.TrimSpace(cfg.Security.PairAccessToken); token != "" {
+		if token := strings.TrimSpace(cfg.Security.CdevAccessToken); token != "" {
 			return token
 		}
 	}
-	return strings.TrimSpace(os.Getenv("CDEV_TOKEN"))
+	return strings.TrimSpace(os.Getenv("CDEV_ACCESS_TOKEN"))
 }
 
-func pairPageURL(info *pairing.PairingInfo, pairAccessToken string) string {
+func pairPageURL(info *pairing.PairingInfo, cdevAccessToken string) string {
 	pageURL := strings.TrimRight(info.HTTP, "/") + "/pair"
-	if pairAccessToken == "" {
+	if cdevAccessToken == "" {
 		return pageURL
 	}
-	return pageURL + "?token=" + neturl.QueryEscape(pairAccessToken)
-}
-
-func outputQR(info *pairing.PairingInfo) error {
-	// Generate QR code from info
-	jsonData, err := json.Marshal(info)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println()
-	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     Cdev Pairing                           ║")
-	fmt.Println("╠════════════════════════════════════════════════════════════╣")
-	fmt.Printf("║  WebSocket: %-47s ║\n", truncate(info.WebSocket, 47))
-	fmt.Printf("║  HTTP:      %-47s ║\n", truncate(info.HTTP, 47))
-	fmt.Printf("║  Session:   %-47s ║\n", truncate(info.SessionID, 47))
-	fmt.Printf("║  Repo:      %-47s ║\n", truncate(info.RepoName, 47))
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
-
-	// Generate and print QR code
-	qrStr, err := generateQRString(string(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to generate QR code: %w", err)
-	}
-
-	fmt.Println()
-	fmt.Println("  Scan with cdev mobile app:")
-	fmt.Println()
-	// Indent QR code
-	for _, line := range splitLines(qrStr) {
-		if line != "" {
-			fmt.Printf("  %s\n", line)
-		}
-	}
-	fmt.Println()
-
-	return nil
+	return pageURL + "?token=" + neturl.QueryEscape(cdevAccessToken)
 }
 
 func applyExternalURL(info *pairing.PairingInfo, externalURL string) {
@@ -275,33 +188,3 @@ func applyExternalURL(info *pairing.PairingInfo, externalURL string) {
 	info.WebSocket = wsURL + "/ws"
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
-}
-
-func generateQRString(data string) (string, error) {
-	// Use the go-qrcode library directly
-	qr, err := qrcode.New(data, qrcode.Medium)
-	if err != nil {
-		return "", err
-	}
-	return qr.ToSmallString(false), nil
-}

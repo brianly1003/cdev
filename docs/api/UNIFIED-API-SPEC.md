@@ -2,11 +2,11 @@
 
 ## Overview
 
-cdev uses a unified WebSocket endpoint that supports both JSON-RPC 2.0 and legacy command formats.
+cdev uses a unified WebSocket endpoint with JSON-RPC 2.0.
 
 **Endpoint:** `ws://{host}:{port}/ws`
 **Default Port:** 8766
-**Protocol:** JSON-RPC 2.0 (recommended) or Legacy Commands
+**Protocol:** JSON-RPC 2.0
 **Status:** ✅ Fully Implemented
 
 ### Implementation Status
@@ -14,11 +14,9 @@ cdev uses a unified WebSocket endpoint that supports both JSON-RPC 2.0 and legac
 | Feature | Status |
 |---------|--------|
 | JSON-RPC 2.0 format | ✅ Done |
-| Dual-protocol detection | ✅ Done |
 | Agent-agnostic naming (agent/* vs claude/*) | ✅ Done |
 | OpenRPC auto-generation | ✅ Done |
 | Capability negotiation (initialize) | ✅ Done |
-| Legacy command support | ✅ Done (backward compatible) |
 
 ### API Discovery
 
@@ -1643,31 +1641,6 @@ Git branch changed (emitted after `git/checkout`).
 
 ---
 
-## Legacy Command Format (Deprecated)
-
-For backward compatibility, the server also accepts legacy commands:
-
-```json
-{
-  "command": "run_claude",
-  "payload": {
-    "prompt": "Hello"
-  },
-  "request_id": "req_123"
-}
-```
-
-**Supported Legacy Commands:**
-- `run_claude` → `agent/run`
-- `stop_claude` → `agent/stop`
-- `respond_to_claude` → `agent/respond`
-- `get_status` → `status/get`
-- `get_file` → `file/get`
-- `watch_session` → `session/watch`
-- `unwatch_session` → `session/unwatch`
-
----
-
 ## Swift Types (iOS)
 
 ```swift
@@ -1786,9 +1759,7 @@ struct StatusResult: Decodable {
 
 ---
 
-## Migration Guide
-
-### From Legacy to JSON-RPC 2.0
+## Client Integration Guide
 
 1. **Update WebSocket URL:**
    ```swift
@@ -1800,14 +1771,8 @@ struct StatusResult: Decodable {
    // Or use QR code's ws field directly
    ```
 
-2. **Update message format:**
+2. **Send requests using JSON-RPC:**
    ```swift
-   // Old
-   let message = """
-   {"command": "run_claude", "payload": {"prompt": "\(prompt)"}}
-   """
-
-   // New
    let request = JSONRPCRequest(
        id: nextId(),
        method: "agent/run",
@@ -1816,11 +1781,7 @@ struct StatusResult: Decodable {
    let message = try JSONEncoder().encode(request)
    ```
 
-3. **Update event handling:**
+3. **Handle events as JSON-RPC notifications:**
    ```swift
-   // Old
-   if json["event"] == "heartbeat" { ... }
-
-   // New
    if json["method"] == "event/heartbeat" { ... }
    ```

@@ -35,7 +35,7 @@ By aligning cdev with these patterns, we become a natural fit for any IDE acquis
 │  Commands (Client → Server):                                    │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ {                                                         │  │
-│  │   "command": "run_claude",        ← snake_case            │  │
+│  │   "command": "agent/run",        ← snake_case            │  │
 │  │   "request_id": "req-001",        ← custom correlation    │  │
 │  │   "payload": { "prompt": "..." }  ← nested payload        │  │
 │  │ }                                                         │  │
@@ -109,7 +109,7 @@ By aligning cdev with these patterns, we become a natural fit for any IDE acquis
 | **Transport** | WebSocket only | stdio (primary), WebSocket | Blocking | 3 days |
 | **Initialize** | None | `initialize` / `initialized` handshake | Blocking | 2 days |
 | **Capability Negotiation** | None | Client/server capability exchange | Required | 2 days |
-| **Method Names** | `run_claude` | `claude/run` | Easy | 1 day |
+| **Method Names** | `agent/run` | `claude/run` | Easy | 1 day |
 | **Error Format** | Custom | JSON-RPC error codes | Required | 1 day |
 
 ### Important Gaps (Should fix)
@@ -118,7 +118,7 @@ By aligning cdev with these patterns, we become a natural fit for any IDE acquis
 |-----|---------|----------|--------|--------|
 | **Shutdown** | None | `shutdown` / `exit` sequence | Important | 1 day |
 | **Progress Reporting** | Ad-hoc events | `$/progress` notifications | Nice-to-have | 2 days |
-| **Cancellation** | `stop_claude` | `$/cancelRequest` | Nice-to-have | 1 day |
+| **Cancellation** | `agent/stop` | `$/cancelRequest` | Nice-to-have | 1 day |
 | **Tracing** | Logs | `$/logTrace` | Nice-to-have | 1 day |
 
 ---
@@ -129,13 +129,13 @@ By aligning cdev with these patterns, we become a natural fit for any IDE acquis
 
 | Current | JSON-RPC 2.0 | Type |
 |---------|--------------|------|
-| `run_claude` | `claude/run` | Request |
-| `stop_claude` | `claude/stop` | Request |
-| `respond_to_claude` | `claude/respond` | Request |
-| `get_status` | `cdev/status` | Request |
-| `get_file` | `files/read` | Request |
-| `watch_session` | `session/watch` | Request |
-| `unwatch_session` | `session/unwatch` | Request |
+| `agent/run` | `claude/run` | Request |
+| `agent/stop` | `claude/stop` | Request |
+| `agent/respond` | `claude/respond` | Request |
+| `status/get` | `cdev/status` | Request |
+| `file/get` | `files/read` | Request |
+| `session/watch` | `session/watch` | Request |
+| `session/unwatch` | `session/unwatch` | Request |
 
 ### Event to Notification Migration
 
@@ -685,7 +685,7 @@ Even before full JSON-RPC migration, start using namespaced method names:
 // New method constants (alongside old ones for compatibility)
 const (
     // Legacy (keep for backward compatibility)
-    CommandRunClaude CommandType = "run_claude"
+    CommandRunClaude CommandType = "agent/run"
 
     // New namespaced versions
     MethodClaudeRun    = "claude/run"
@@ -761,7 +761,7 @@ The key changes for VS Code integration readiness are:
 1. **Transport abstraction** - Support stdio alongside WebSocket
 2. **JSON-RPC 2.0** - Standard message format
 3. **Initialize handshake** - Capability negotiation
-4. **Namespaced methods** - `claude/run` instead of `run_claude`
+4. **Namespaced methods** - `claude/run` instead of `agent/run`
 
 By implementing these in parallel with existing protocol support, we can:
 - Maintain backward compatibility with iOS app

@@ -10,20 +10,19 @@
 
 The cdev protocol defines the communication standard between cdev (server) and clients (cdev-ios, VS Code extensions, etc.) for remote supervision and control of AI coding assistant sessions.
 
-> **Note:** This document reflects the legacy/transition protocol. For current JSON-RPC method names and multi-runtime behavior (`agent_type` routing, Codex support), use `docs/api/UNIFIED-API-SPEC.md`.
+> **Note:** This document tracks the current JSON-RPC protocol. For complete method-by-method examples and payloads, see `docs/api/UNIFIED-API-SPEC.md`.
 
 ### Protocol Evolution
 
 | Version | Description |
 |---------|-------------|
-| 1.0 | Legacy custom commands (deprecated but supported) |
 | 2.0 | JSON-RPC 2.0 with agent-agnostic naming (current) |
 
 ### Design Principles
 
 1. **JSON-RPC 2.0 Standard** - Industry-standard message format for IDE integration
 2. **Agent-Agnostic** - Methods use `agent/*` prefix to support Claude, Gemini, Codex, etc.
-3. **Dual-Protocol Support** - Single WebSocket endpoint handles both JSON-RPC and legacy commands
+3. **Single Protocol** - WebSocket endpoint accepts JSON-RPC 2.0 messages
 4. **OpenRPC Discovery** - Auto-generated API specification at `/api/rpc/discover`
 5. **Mobile-Optimized** - Handles network transitions, background states, reconnection
 6. **Capability Negotiation** - LSP-style initialize/initialized handshake
@@ -34,7 +33,7 @@ The cdev protocol defines the communication standard between cdev (server) and c
 | Layer | Port | Purpose |
 |-------|------|---------|
 | HTTP | 8766 | REST API, health checks, OpenRPC discovery |
-| WebSocket | 8766 | Real-time events via `/ws` endpoint (JSON-RPC 2.0 + legacy) |
+| WebSocket | 8766 | Real-time events via `/ws` endpoint (JSON-RPC 2.0) |
 
 **Note:** Port consolidation complete - single port 8766 serves all traffic.
 
@@ -177,39 +176,28 @@ Runtime registry contract reference: `docs/api/RUNTIME-CAPABILITY-REGISTRY.md`
 
 ---
 
-### Legacy Event Structure (Deprecated)
+### Base Notification Structure (JSON-RPC)
 
-Legacy format for backward compatibility. New clients should use JSON-RPC 2.0.
-
-### Base Event Structure
-
-All events from server to client follow this structure:
+All server-to-client events are JSON-RPC notifications:
 
 ```json
 {
-  "event": "<event_type>",
-  "timestamp": "2025-12-20T15:30:00.000Z",
-  "payload": { ... },
-  "request_id": "optional-correlation-id"
+  "jsonrpc": "2.0",
+  "method": "event/<event_type>",
+  "params": { ... }
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `event` | string | Yes | Event type identifier |
-| `timestamp` | ISO 8601 | Yes | UTC timestamp |
-| `payload` | object | Yes | Event-specific data |
-| `request_id` | string | No | Correlates response to request |
+### Base Request Structure (JSON-RPC)
 
-### Base Command Structure
-
-All commands from client to server:
+All client-to-server commands are JSON-RPC requests:
 
 ```json
 {
-  "command": "<command_type>",
-  "request_id": "optional-id-for-response-correlation",
-  "payload": { ... }
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "<method_name>",
+  "params": { ... }
 }
 ```
 
@@ -329,7 +317,7 @@ Claude is requesting permission for a tool operation.
 }
 ```
 
-**Client Response Required:** Send `respond_to_claude` command with approval or denial.
+**Client Response Required:** Send `agent/respond` JSON-RPC request with approval or denial.
 
 #### `claude_waiting`
 
@@ -391,7 +379,7 @@ File system change detected by watcher.
 
 #### `file_content`
 
-Response to `get_file` command.
+Response to `file/get` request.
 
 ```json
 {
@@ -579,7 +567,7 @@ Periodic health check (every 30 seconds).
 
 #### `status_response`
 
-Response to `get_status` command.
+Response to `status/get` request.
 
 ```json
 {
@@ -623,120 +611,57 @@ Error response.
 
 ## WebSocket Commands (Client → Server)
 
-### `run_claude`
+Commands are sent as JSON-RPC 2.0 requests.
 
-Start Claude with a prompt.
+### Core Methods
+
+- `agent/run` - Start an agent with prompt/mode/session context
+- `agent/stop` - Stop the running agent
+- `agent/respond` - Respond to permission or interactive prompt
+- `status/get` - Retrieve current server/agent status
+- `file/get` - Fetch file content
+- `session/watch` - Subscribe to real-time session updates
+- `session/unwatch` - Unsubscribe from real-time updates
+
+### Example Requests
 
 ```json
 {
-  "command": "run_claude",
-  "request_id": "req-001",
-  "payload": {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "agent/run",
+  "params": {
     "prompt": "Fix the bug in app.js",
     "mode": "new",
-    "session_id": null
+    "agent_type": "claude"
   }
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `prompt` | string | Yes | The prompt to send to Claude |
-| `mode` | string | No | `new` or `continue` (default: `new`) |
-| `session_id` | string | No | Required when mode is `continue` |
-
-### `stop_claude`
-
-Stop the running Claude process.
-
 ```json
 {
-  "command": "stop_claude",
-  "request_id": "req-002"
-}
-```
-
-**Note:** This is asynchronous. Wait for `claude_status` with `state: "stopped"` or `state: "idle"`.
-
-### `respond_to_claude`
-
-Respond to a permission request or interactive prompt.
-
-```json
-{
-  "command": "respond_to_claude",
-  "request_id": "req-003",
-  "payload": {
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "agent/respond",
+  "params": {
     "tool_use_id": "toolu_abc123",
-    "response": "yes",
+    "response": "approved",
     "is_error": false
   }
 }
 ```
 
-| Response | Description |
-|----------|-------------|
-| `"yes"` or `"y"` | Approve the operation |
-| `"no"` or `"n"` | Deny the operation |
-| `<text>` | Answer to interactive prompt |
-
-### `get_status`
-
-Request current agent status.
-
 ```json
 {
-  "command": "get_status",
-  "request_id": "req-004"
-}
-```
-
-**Response:** `status_response` event with matching `request_id`.
-
-### `get_file`
-
-Request file content.
-
-```json
-{
-  "command": "get_file",
-  "request_id": "req-005",
-  "payload": {
-    "path": "src/app.js"
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "session/watch",
+  "params": {
+    "session_id": "claude-session-id",
+    "agent_type": "claude"
   }
 }
 ```
-
-**Response:** `file_content` event with matching `request_id`.
-
-### `watch_session`
-
-Start watching a Claude session for real-time updates.
-
-```json
-{
-  "command": "watch_session",
-  "request_id": "req-006",
-  "payload": {
-    "session_id": "claude-session-id"
-  }
-}
-```
-
-**Response:** `session_watch_started` event.
-
-### `unwatch_session`
-
-Stop watching a Claude session.
-
-```json
-{
-  "command": "unwatch_session",
-  "request_id": "req-007"
-}
-```
-
-**Response:** `session_watch_stopped` event.
 
 ---
 
@@ -951,7 +876,7 @@ In failed state: Retry every 60s
 ```
 [ ] Add rate limiting
     - 100 commands/minute per client
-    - 10 run_claude/minute per client
+    - 10 agent/run per minute per client
 
 [ ] Add message acknowledgment (optional)
     - Server sends ack with message_id
@@ -965,7 +890,7 @@ In failed state: Retry every 60s
 | Version | Date | Changes |
 |---------|------|---------|
 | 2.0.0 | 21 Dec 2025 | JSON-RPC 2.0 adoption, agent-agnostic naming, port consolidation |
-| 1.0.0-draft | Dec 2025 | Initial draft specification (legacy format) |
+| 1.0.0-draft | Dec 2025 | Initial draft specification |
 
 ### Migration to 2.0
 

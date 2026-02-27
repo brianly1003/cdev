@@ -39,7 +39,7 @@ cdev is designed to run on a developer's local machine and provide remote access
 | Path validation | ✅ Active | `GetFileContent` and `/api/files/list` use Rel + symlink resolution to block escapes |
 | Diff size cap | ✅ Active | `limits.max_diff_size_kb` enforced for HTTP/RPC/event diffs |
 | Token-in-query removal | ✅ Active | Query-string tokens rejected; Authorization header only |
-| CDEV_TOKEN pairing gate | ✅ Active | `CDEV_TOKEN` env var gates `/pair`, `/api/pair/*`, `/api/auth/pairing/*` routes |
+| cdev_access_token gate | ✅ Active | `security.cdev_access_token` / `CDEV_ACCESS_TOKEN` gates `/pair`, `/api/pair/*`, `/api/auth/pairing/*` routes |
 | Cookie HMAC hashing | ✅ Active | Pairing cookies store HMAC hash, never the raw token |
 | Referrer-Policy | ✅ Active | `Referrer-Policy: no-referrer` on pairing responses to prevent token leakage |
 | Debug/pprof default off | ✅ Active | `debug.pprof_enabled` defaults to `false` |
@@ -103,13 +103,13 @@ export CDEV_SECURITY_REQUIRE_AUTH=true
 export CDEV_SECURITY_RATE_LIMIT_ENABLED=true
 ```
 
-### CDEV_TOKEN Pairing Gate
+### cdev_access_token Gate
 
-When `CDEV_TOKEN` is set, pairing routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`) require the token before granting access. This prevents unauthorized devices from initiating pairing.
+When `security.cdev_access_token` (or env `CDEV_ACCESS_TOKEN`) is set, pairing routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`) require the token before granting access. This prevents unauthorized devices from initiating pairing.
 
 ```bash
 # Generate and export a token
-export CDEV_TOKEN="$(openssl rand -hex 32)"
+export CDEV_ACCESS_TOKEN="$(openssl rand -hex 32)"
 
 # Start cdev — pairing is now gated
 cdev start
@@ -173,7 +173,53 @@ Claude CLI runs with the same permissions as the agent. Mitigations:
 - Use separate user for agent if possible
 - Consider container isolation in production
 
-### 4. Logging Security
+### 4. Workspace Discovery Security
+
+The `workspace/discover` RPC method scans the host filesystem for Git repositories. Security controls:
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| Symlink skip | ✅ Active | `os.ReadDir` entries with `ModeSymlink` are skipped — prevents traversal to `/etc`, `~/.ssh`, etc. |
+| Cache file permissions | ✅ Active | `~/.cache/cdev/discovered-repos.json` written with `0600` (owner-only) |
+| Atomic cache writes | ✅ Active | Temp file + rename pattern prevents partial reads |
+| Cache directory | ✅ Active | `~/.cache/cdev/` created with `0700` |
+| Config file permissions | ✅ Active | `~/.cdev/workspaces.yaml` written with `0600` |
+| Depth limit | ✅ Active | Default `max_depth: 4` prevents deep traversal |
+| Timeout | ✅ Active | Default 10 seconds; prevents DoS from huge directory trees |
+| No shell execution | ✅ Active | Git remote URL extracted via `exec.Command("git", ...)` — no shell interpolation |
+| Skip list | ✅ Active | 60+ directories skipped (node_modules, .git, venv, build, etc.) |
+
+**Custom search paths** (`discovery.search_paths` in config.yaml) are validated:
+- Converted to absolute paths via `filepath.Abs()`
+- Verified to exist via `os.Stat()` before scanning
+- Deduplicated with case-insensitive comparison (macOS/Windows)
+
+**Information disclosed in discovery results:**
+- Repository absolute paths and folder names
+- Git remote URLs (if `origin` remote is configured)
+- Whether a repo is already added as a workspace
+
+This information is only accessible to authenticated clients (Bearer token required).
+
+### 5. Windows Platform Security
+
+On Windows, cdev adapts security controls to the platform:
+
+| Control | Unix/macOS | Windows |
+|---------|-----------|---------|
+| File permissions (0600) | Enforced by kernel | Ignored — relies on Windows ACLs (user profile directory) |
+| Hook scripts | Bash `.sh` | PowerShell `.ps1` with `-ExecutionPolicy Bypass` |
+| Process termination | SIGTERM → SIGKILL | `taskkill /T` → `taskkill /T /F` |
+| Shell execution | `bash -c` | `cmd.exe /C` |
+| Path traversal checks | `filepath.Rel` | `filepath.Rel` (case-insensitive on NTFS) |
+| Path encoding | `/` → `-` | `\` normalised to `/` via `filepath.ToSlash`, then `/` → `-` |
+
+**Windows-specific recommendations:**
+- Ensure `%USERPROFILE%\.cdev\` is not readable by other users (check folder properties → Security tab)
+- PowerShell execution policy: cdev hook scripts use `-ExecutionPolicy Bypass` for the hook process only — this does not change the system-wide policy
+- Windows Defender may flag `cdev.exe` on first run — add an exclusion if needed
+
+### 6. Logging Security
 
 **DO NOT log:**
 - Authentication tokens

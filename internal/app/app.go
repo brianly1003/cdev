@@ -240,7 +240,7 @@ func (a *App) Start(ctx context.Context) error {
 			Workspaces: []config.WorkspaceDefinition{},
 		}
 	}
-	a.workspaceConfigManager = workspace.NewConfigManager(workspacesCfg, workspacesPath)
+	a.workspaceConfigManager = workspace.NewConfigManager(workspacesCfg, workspacesPath, a.cfg)
 	log.Info().
 		Str("workspaces_path", workspacesPath).
 		Int("workspaces", len(a.workspaceConfigManager.ListWorkspaces())).
@@ -600,12 +600,12 @@ func (a *App) Start(ctx context.Context) error {
 	a.httpServer.SetOriginChecker(originChecker)
 	// Configure HTTP auth (bearer tokens)
 	a.httpServer.SetAuth(a.tokenManager, a.cfg.Security.RequireAuth)
-	// Configure optional pairing-route access token (config-first, env fallback for compatibility).
-	pairAccessToken := strings.TrimSpace(a.cfg.Security.PairAccessToken)
-	if pairAccessToken == "" {
-		pairAccessToken = strings.TrimSpace(os.Getenv("CDEV_TOKEN"))
+	// Configure optional cdev access token (config-first, env override).
+	cdevAccessToken := strings.TrimSpace(a.cfg.Security.CdevAccessToken)
+	if cdevAccessToken == "" {
+		cdevAccessToken = strings.TrimSpace(os.Getenv("CDEV_ACCESS_TOKEN"))
 	}
-	a.httpServer.SetPairAccessToken(pairAccessToken)
+	a.httpServer.SetCdevAccessToken(cdevAccessToken)
 
 	// Configure rate limiting if enabled
 	if a.cfg.Security.RateLimit.Enabled {

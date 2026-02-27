@@ -148,7 +148,20 @@ func TestLoad_EnvOverrides_ServerHttpPort_LegacyAlias(t *testing.T) {
 	}
 }
 
-func TestLoad_EnvOverrides_SecurityPairAccessToken(t *testing.T) {
+func TestLoad_EnvOverrides_SecurityCdevAccessToken(t *testing.T) {
+	t.Setenv("CDEV_ACCESS_TOKEN", "cdev-token-abc")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Security.CdevAccessToken != "cdev-token-abc" {
+		t.Fatalf("Security.CdevAccessToken = %q, want %q", cfg.Security.CdevAccessToken, "cdev-token-abc")
+	}
+}
+
+func TestLoad_EnvOverrides_SecurityPairAccessToken_Ignored(t *testing.T) {
 	t.Setenv("CDEV_SECURITY_PAIR_ACCESS_TOKEN", "pair-token-abc")
 
 	cfg, err := Load("")
@@ -156,8 +169,30 @@ func TestLoad_EnvOverrides_SecurityPairAccessToken(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if cfg.Security.PairAccessToken != "pair-token-abc" {
-		t.Fatalf("Security.PairAccessToken = %q, want %q", cfg.Security.PairAccessToken, "pair-token-abc")
+	if cfg.Security.CdevAccessToken != "" {
+		t.Fatalf("Security.CdevAccessToken = %q, want empty", cfg.Security.CdevAccessToken)
+	}
+}
+
+func TestLoad_FromFile_SecurityPairAccessToken_Ignored(t *testing.T) {
+	tempDir := t.TempDir()
+
+	configContent := `
+security:
+  pair_access_token: "legacy-config-token"
+`
+	configPath := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Security.CdevAccessToken != "" {
+		t.Fatalf("Security.CdevAccessToken = %q, want empty", cfg.Security.CdevAccessToken)
 	}
 }
 

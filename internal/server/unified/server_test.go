@@ -351,7 +351,7 @@ func TestServer_InvalidMessage_Logged(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Send an invalid message (not JSON-RPC format)
-	invalidMsg := `{"command":"get_status"}` // Legacy format - should be ignored
+	invalidMsg := `{"foo":"bar"}` // Non-JSON-RPC format - should be ignored
 	err = ws.WriteMessage(websocket.TextMessage, []byte(invalidMsg))
 	if err != nil {
 		t.Fatalf("Failed to write message: %v", err)

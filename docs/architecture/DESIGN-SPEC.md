@@ -165,12 +165,12 @@ All events are JSON with consistent structure:
 
 | Command | Status | Notes |
 |---------|--------|-------|
-| run_claude | ✅ | Supports new/continue modes |
-| stop_claude | ✅ | Graceful + force stop |
-| get_status | ✅ | Returns agent state |
-| get_file | ✅ | With path validation |
+| agent/run | ✅ | Supports new/continue modes |
+| agent/stop | ✅ | Graceful + force stop |
+| status/get | ✅ | Returns agent state |
+| file/get | ✅ | With path validation |
 | **Additional Commands** | | |
-| respond_to_claude | ✅ | Answer prompts/permissions |
+| agent/respond | ✅ | Answer prompts/permissions |
 
 ---
 
@@ -270,7 +270,7 @@ VS Code is optional and passive.
 
 ```json
 {
-  "command": "get_file",
+  "command": "file/get",
   "payload": {
     "path": "src/auth.ts"
   }

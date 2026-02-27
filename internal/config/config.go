@@ -24,6 +24,15 @@ type Config struct {
 	Security    SecurityConfig    `mapstructure:"security"`
 	Permissions PermissionsConfig `mapstructure:"permissions"`
 	Debug       DebugConfig       `mapstructure:"debug"`
+	Discovery   DiscoverySettings `mapstructure:"discovery"`
+}
+
+// DiscoverySettings holds workspace discovery configuration from config.yaml.
+type DiscoverySettings struct {
+	SearchPaths     []string `mapstructure:"search_paths"`
+	MaxDepth        int      `mapstructure:"max_depth"`
+	TimeoutSeconds  int      `mapstructure:"timeout_seconds"`
+	CacheTTLMinutes int      `mapstructure:"cache_ttl_minutes"`
 }
 
 // ServerConfig holds server-related configuration.
@@ -102,7 +111,7 @@ type SecurityConfig struct {
 	RequireAuth            bool            `mapstructure:"require_auth"`             // If true, require token for WebSocket connections
 	RequirePairingApproval bool            `mapstructure:"require_pairing_approval"` // If true, pairing exchange requires local approve/reject
 	TokenExpirySecs        int             `mapstructure:"token_expiry_secs"`        // Pairing token expiry in seconds
-	PairAccessToken        string          `mapstructure:"pair_access_token"`        // Optional token gate for /pair and /api/pair/* routes
+	CdevAccessToken        string          `mapstructure:"cdev_access_token"`        // Optional access token gate for cdev web endpoints
 	AllowedOrigins         []string        `mapstructure:"allowed_origins"`          // Allowed origins for CORS/WebSocket (empty = localhost only)
 	BindLocalhostOnly      bool            `mapstructure:"bind_localhost_only"`      // If true, only bind to localhost
 	RequireSecureTransport bool            `mapstructure:"require_secure_transport"` // If true, require TLS/WSS for non-localhost use
@@ -191,6 +200,11 @@ func Load(configPath string) (*Config, error) {
 }
 
 func applyLegacyKeyMappings(v *viper.Viper) {
+	applyLegacyServerPortMapping(v)
+	applyLegacySecurityAccessTokenMapping(v)
+}
+
+func applyLegacyServerPortMapping(v *viper.Viper) {
 	// Treat server.http_port as an alias for server.port.
 	// Precedence:
 	// - `server.port` env override always wins (CDEV_SERVER_PORT)
@@ -213,6 +227,16 @@ func applyLegacyKeyMappings(v *viper.Viper) {
 	}
 	if httpPortCfg {
 		v.Set("server.port", v.Get("server.http_port"))
+	}
+}
+
+func applyLegacySecurityAccessTokenMapping(v *viper.Viper) {
+	// Map CDEV_ACCESS_TOKEN env var into security.cdev_access_token.
+	// Precedence:
+	// - CDEV_ACCESS_TOKEN always wins
+	// - then config file key (security.cdev_access_token)
+	if token := strings.TrimSpace(os.Getenv("CDEV_ACCESS_TOKEN")); token != "" {
+		v.Set("security.cdev_access_token", token)
 	}
 }
 
@@ -275,7 +299,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.require_auth", true) // Auth required by default
 	v.SetDefault("security.require_pairing_approval", true)
 	v.SetDefault("security.token_expiry_secs", 3600) // 1 hour
-	v.SetDefault("security.pair_access_token", "")
+	v.SetDefault("security.cdev_access_token", "")
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.bind_localhost_only", true) // Localhost only by default
 	v.SetDefault("security.require_secure_transport", true)
@@ -293,6 +317,12 @@ func setDefaults(v *viper.Viper) {
 	// Debug defaults - disabled by default for security
 	v.SetDefault("debug.enabled", false)
 	v.SetDefault("debug.pprof_enabled", false) // Must be explicitly enabled
+
+	// Discovery defaults
+	v.SetDefault("discovery.search_paths", []string{})
+	v.SetDefault("discovery.max_depth", 4)
+	v.SetDefault("discovery.timeout_seconds", 10)
+	v.SetDefault("discovery.cache_ttl_minutes", 60)
 }
 
 // postProcess applies post-processing to configuration.

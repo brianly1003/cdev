@@ -19,21 +19,21 @@ func TestPairPageURL(t *testing.T) {
 	}
 }
 
-func TestResolvePairAccessToken(t *testing.T) {
-	t.Setenv("CDEV_TOKEN", "env-token")
+func TestResolveCdevAccessToken(t *testing.T) {
+	t.Setenv("CDEV_ACCESS_TOKEN", "env-token")
 
 	cfg := &config.Config{
 		Security: config.SecurityConfig{
-			PairAccessToken: "config-token",
+			CdevAccessToken: "config-token",
 		},
 	}
 
-	if got := resolvePairAccessToken(cfg); got != "config-token" {
-		t.Fatalf("resolvePairAccessToken config precedence = %q", got)
+	if got := resolveCdevAccessToken(cfg); got != "config-token" {
+		t.Fatalf("resolveCdevAccessToken config precedence = %q", got)
 	}
 
-	cfg.Security.PairAccessToken = ""
-	if got := resolvePairAccessToken(cfg); got != "env-token" {
-		t.Fatalf("resolvePairAccessToken env fallback = %q", got)
+	cfg.Security.CdevAccessToken = ""
+	if got := resolveCdevAccessToken(cfg); got != "env-token" {
+		t.Fatalf("resolveCdevAccessToken env fallback = %q", got)
 	}
 }

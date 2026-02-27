@@ -705,7 +705,7 @@ type EventHub interface {
 │                          │                                               │
 │                          ▼                                               │
 │   ┌──────────────────────────────────────┐                              │
-│   │  {"command": "run_claude",           │                              │
+│   │  {"command": "agent/run",           │                              │
 │   │   "payload": {"prompt": "Fix bug"}}  │                              │
 │   └──────────────────────┬───────────────┘                              │
 │                          │                                               │
@@ -844,7 +844,7 @@ The session ID is captured **asynchronously** from Claude's stream-json output. 
 Claude CLI takes several seconds to initialize before outputting any JSON. Blocking the HTTP response would cause timeouts. The async approach allows immediate feedback while delivering the session_id when available.
 
 **Flow:**
-1. HTTP/WebSocket receives `run_claude` command
+1. HTTP/WebSocket receives `agent/run` command
 2. cdev spawns Claude CLI process
 3. Response returned immediately (session_id may be empty)
 4. Claude outputs initial JSON with session_id
@@ -1068,7 +1068,7 @@ Emitted when Claude is waiting for user input (AskUserQuestion tool).
 
 #### file_content
 
-Response to `get_file` command.
+Response to `file/get` command.
 
 ```json
 {
@@ -1096,13 +1096,13 @@ All commands follow this structure:
 }
 ```
 
-#### run_claude
+#### agent/run
 
 Start Claude CLI with a prompt.
 
 ```json
 {
-  "command": "run_claude",
+  "command": "agent/run",
   "request_id": "req-001",
   "payload": {
     "prompt": "Refactor the auth service to use JWT validation"
@@ -1110,24 +1110,24 @@ Start Claude CLI with a prompt.
 }
 ```
 
-#### stop_claude
+#### agent/stop
 
 Gracefully stop Claude CLI.
 
 ```json
 {
-  "command": "stop_claude",
+  "command": "agent/stop",
   "request_id": "req-002"
 }
 ```
 
-#### get_status
+#### status/get
 
 Request current agent status.
 
 ```json
 {
-  "command": "get_status",
+  "command": "status/get",
   "request_id": "req-003"
 }
 ```
@@ -1147,13 +1147,13 @@ Response:
 }
 ```
 
-#### get_file
+#### file/get
 
 Request file content.
 
 ```json
 {
-  "command": "get_file",
+  "command": "file/get",
   "request_id": "req-004",
   "payload": {
     "path": "src/auth/service.ts"
@@ -1161,13 +1161,13 @@ Request file content.
 }
 ```
 
-#### respond_to_claude
+#### agent/respond
 
 Send a response to Claude's interactive prompt or permission request.
 
 ```json
 {
-  "command": "respond_to_claude",
+  "command": "agent/respond",
   "request_id": "req-005",
   "payload": {
     "tool_use_id": "toolu_01ABC123...",
@@ -1683,10 +1683,10 @@ func ValidatePrompt(prompt string) error {
 // Validate command JSON
 func ValidateCommand(cmd *Command) error {
     allowedCommands := map[string]bool{
-        "run_claude":  true,
-        "stop_claude": true,
-        "get_status":  true,
-        "get_file":    true,
+        "agent/run":  true,
+        "agent/stop": true,
+        "status/get":  true,
+        "file/get":    true,
     }
     if !allowedCommands[cmd.Command] {
         return ErrInvalidCommand

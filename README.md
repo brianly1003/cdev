@@ -8,28 +8,30 @@
     <img alt="Cdev Logo" src="assets/logo.png" width="140" height="140" />
   </picture>
 
-  <h1>Cdev</h1>
+  <h1>cdev+</h1>
 
   **Mobile AI Coding Monitor & Controller Agent**
 
-  The laptop/desktop component of the cdev system
+  The laptop/desktop component of the cdev+ system
 
   [![Go Version](https://img.shields.io/github/go-mod/go-version/brianly1003/cdev?style=flat-square)](https://golang.org/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
   [![GitHub Issues](https://img.shields.io/github/issues/brianly1003/cdev?style=flat-square)](https://github.com/brianly1003/cdev/issues)
+
+  **Looking for the mobile app?** &nbsp; [cdev-ios](https://github.com/brianly1003/cdev-ios) — the native iOS companion app for monitoring and controlling AI coding sessions from your iPhone or iPad.
 </div>
 
 ---
 
 ## Overview
 
-`cdev` is a lightweight Go daemon that enables remote monitoring and control of AI coding agents (Claude Code, Codex, Gemini CLI, etc.) from mobile devices. It serves as the bridge between your development machine and the cdev mobile app.
+`cdev+` is a lightweight Go daemon that enables remote monitoring and control of AI coding agents (Claude Code, Codex, etc.) from mobile devices. It serves as the bridge between your development machine and the [cdev-ios](https://github.com/brianly1003/cdev-ios) mobile app.
 
 ## Features
 
-- **AI Agent Management**: Spawn, monitor, and control AI coding agents (Claude Code, Codex, Gemini CLI)
+- **AI Agent Management**: Spawn, monitor, and control AI coding agents (Claude Code, Codex)
 - **LIVE Session Support**: Detect Claude running in your terminal and send messages from mobile via keystroke injection
-- **Multi-Workspace Support**: Manage multiple repositories simultaneously with workspace manager
+- **Workspace Management (Default)**: Manage multiple repositories simultaneously with the built-in workspace manager
 - **Multi-Runtime Support**: Claude, Codex via `agent_type` routing with runtime-specific dispatch
 - **Interactive PTY Mode**: Full terminal experience with parsed permission prompts and state tracking
 - **Real-time Streaming**: Stream stdout/stderr output in real-time via WebSocket
@@ -43,31 +45,30 @@
 
 ## AI Agent Transformation Plan
 
-cdev is evolving from a monitor/controller into a goal-driven AI Agent runtime platform.
+cdev+ is evolving from a monitor/controller into a goal-driven AI Agent runtime platform.
 The implementation plan is documented here:
 
 - [AI Agent Runtime Roadmap](docs/planning/AI-AGENT-RUNTIME-ROADMAP.md)
+- Future workspace direction: multi-workspace is the default model, and legacy single-workspace assumptions are being phased out.
+- Future runtime direction: Gemini CLI support is planned and will be added in a later phase.
 
 The roadmap is phased and security-first so current users can keep running existing workflows during the transition.
 
 ## Quick Start
 
-### Single Workspace Mode
+### Start the Daemon
 
 ```bash
 # Build
 make build
 
-# Run in your project directory
+# Run the daemon
 ./bin/cdev start
-
-# Or specify a repository path
-./bin/cdev start --repo /path/to/your/project
 ```
 
-### Multi-Workspace Mode (IDE Integration Ready!)
+### Manage Workspaces (Default Behavior)
 
-**cdev is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
+**cdev+ is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
 
 **Standard Protocol: JSON-RPC 2.0** - Industry standard used by LSP, MCP, and all major IDEs.
 
@@ -90,9 +91,16 @@ Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:8766/ws`
 - REST API: `/api/*` - Also available
 - Health check: `/health`
 
-**See full guide:** [Multi-Workspace Design](docs/architecture/MULTI-WORKSPACE-DESIGN.md)
+**See full guide:** [Workspace Manager Design](docs/architecture/MULTI-WORKSPACE-DESIGN.md)
 
 ## Installation
+
+### Homebrew (Recommended)
+
+```bash
+brew tap brianly1003/tap
+brew install cdev
+```
 
 ### From Source
 
@@ -118,16 +126,44 @@ Available platforms:
 - Windows: `cdev-windows-amd64.exe`
 - Linux: `cdev-linux-amd64`
 
+### Platform Notes
+
+cdev runs on **macOS**, **Linux**, and **Windows**. Most features work identically across platforms, with a few differences:
+
+| Feature | macOS / Linux | Windows |
+|---------|--------------|---------|
+| Config directory | `~/.cdev/` | `%USERPROFILE%\.cdev\` |
+| Hook scripts | Bash (`.sh`) | PowerShell (`.ps1`) |
+| LIVE session detection | Full (macOS), partial (Linux) | Not yet supported |
+| Process management | SIGTERM/SIGKILL | `taskkill /T` |
+| Shell commands | `bash -c` | `cmd.exe /C` |
+
+**Windows quick start:**
+
+```powershell
+# Download the pre-built binary (or build from source with `go build`)
+# Place cdev.exe in a directory on your PATH
+
+# Start the daemon
+cdev.exe start
+
+# Config file location
+# %USERPROFILE%\.cdev\config.yaml
+```
+
+**Windows environment overrides** use the same `CDEV_` prefix:
+```powershell
+$env:CDEV_SERVER_PORT = "8766"
+$env:CDEV_SECURITY_REQUIRE_AUTH = "true"
+```
+
 ## Usage
 
 ### Start the Agent
 
 ```bash
-# Start with default settings (current directory)
+# Start with default settings
 cdev start
-
-# Start with specific repository
-cdev start --repo /path/to/project
 
 # Start with custom port
 cdev start --port 8766
@@ -157,15 +193,60 @@ claude:
   timeout_minutes: 30
 ```
 
-Configuration is loaded from:
+Configuration is loaded from (in order):
 1. `--config` flag (if provided)
-2. `./config.yaml`
-3. `~/.cdev/config.yaml`
-4. `/etc/cdev/config.yaml`
+2. `./config.yaml` (current directory)
+3. `~/.cdev/config.yaml` (macOS/Linux) or `%USERPROFILE%\.cdev\config.yaml` (Windows)
+4. `/etc/cdev/config.yaml` (macOS/Linux only)
 
 Environment variables override config file values (prefix: `CDEV_`):
 ```bash
+# macOS / Linux
 export CDEV_SERVER_PORT=8766
+
+# Windows (PowerShell)
+$env:CDEV_SERVER_PORT = "8766"
+```
+
+### Workspace Discovery
+
+When the cdev-ios app scans for repositories, the agent searches common directories under `$HOME`:
+
+> `~/Projects`, `~/Code`, `~/Developer`, `~/dev`, `~/Repos`, `~/src`, `~/go/src`, `~/workspace`, `~/Desktop`
+
+**If your repositories live elsewhere**, add custom search paths in `~/.cdev/config.yaml`:
+
+```yaml
+# macOS / Linux
+discovery:
+  search_paths:
+    - ~/work
+    - ~/company-name
+    - /opt/repos
+```
+
+```yaml
+# Windows (use forward slashes or escaped backslashes)
+discovery:
+  search_paths:
+    - C:/Users/you/work
+    - D:/repos
+    - ~/company-name   # ~ expands to %USERPROFILE%
+```
+
+```yaml
+# Shared settings
+discovery:
+  max_depth: 4           # How deep to recurse (default: 4)
+  timeout_seconds: 10    # Max scan time (default: 10s)
+  cache_ttl_minutes: 60  # Cache validity (default: 60 min)
+```
+
+Custom paths are scanned **first**, then the built-in defaults. Results are cached for 1 hour.
+
+You can also pass paths per-request via the `workspace/discover` JSON-RPC method:
+```json
+{"jsonrpc": "2.0", "id": 1, "method": "workspace/discover", "params": {"paths": ["/opt/repos"]}}
 ```
 
 ### Diagnostics
@@ -209,8 +290,7 @@ The OpenAPI 3.0 spec is also available at:
 Connect to `ws://localhost:8766/ws` for real-time events and commands.
 
 **Protocol Support:**
-- **JSON-RPC 2.0** (recommended) - Standard protocol with request/response correlation
-- **Legacy commands** (deprecated) - Original command format, will be removed in v3.0
+- **JSON-RPC 2.0** - Standard protocol with request/response correlation
 
 **Events received:**
 - `session_start` - When connected
@@ -239,21 +319,6 @@ Connect to `ws://localhost:8766/ws` for real-time events and commands.
 // Git operations
 {"jsonrpc": "2.0", "id": 5, "method": "git/status"}
 {"jsonrpc": "2.0", "id": 6, "method": "git/stage", "params": {"paths": ["src/main.ts"]}}
-```
-
-**Legacy Commands (Deprecated):**
-```json
-// Start new conversation (default)
-{"command": "run_claude", "payload": {"prompt": "Your prompt here"}}
-
-// Continue a specific session by ID
-{"command": "run_claude", "payload": {"prompt": "Continue with...", "mode": "continue", "session_id": "550e8400-..."}}
-
-// Other commands
-{"command": "stop_claude"}
-{"command": "respond_to_claude", "payload": {"tool_use_id": "...", "response": "user answer"}}
-{"command": "get_status"}
-{"command": "get_file", "payload": {"path": "src/main.ts"}}
 ```
 
 ### HTTP API
@@ -333,7 +398,7 @@ By default, cdev requires permission approval for tool use. When Claude wants to
 
 **Responding to Permissions:**
 Mobile clients can approve or deny via:
-- WebSocket: `{"command": "respond_to_claude", "payload": {"tool_use_id": "...", "response": "approved"}}`
+- WebSocket JSON-RPC: `{"jsonrpc":"2.0","id":7,"method":"agent/respond","params":{"tool_use_id":"...","response":"approved"}}`
 - HTTP: `POST /api/claude/respond` with JSON body
 - To deny: set `"is_error": true` and `"response": "Permission denied by user"`
 
@@ -410,7 +475,7 @@ cdev/
 │   │   ├── message/         # JSON-RPC message types
 │   │   └── handler/         # Method registry & dispatcher
 │   │       └── methods/     # RPC method implementations
-│   ├── security/            # Auth tokens, CDEV_TOKEN gate, HMAC cookies
+│   ├── security/            # Auth tokens, cdev_access_token gate, HMAC cookies
 │   ├── server/
 │   │   ├── common/          # Shared server utilities
 │   │   ├── http/            # HTTP API endpoints
@@ -454,7 +519,7 @@ cdev/
 
 | Document | Description |
 |----------|-------------|
-| [docs/api/PROTOCOL.md](./docs/api/PROTOCOL.md) | Protocol specification (JSON-RPC 2.0 + legacy) |
+| [docs/api/PROTOCOL.md](./docs/api/PROTOCOL.md) | Protocol specification (JSON-RPC 2.0) |
 | [docs/api/UNIFIED-API-SPEC.md](./docs/api/UNIFIED-API-SPEC.md) | JSON-RPC 2.0 API specification with examples |
 | [docs/api/API-REFERENCE.md](./docs/api/API-REFERENCE.md) | Complete HTTP/WebSocket API for mobile integration |
 | [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md) | Detailed architecture and technical specification |
@@ -464,6 +529,12 @@ cdev/
 | [docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md) | Product backlog with prioritized work items |
 | [docs/security/SECURITY.md](./docs/security/SECURITY.md) | Security guidelines and best practices |
 
+### Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [cdev-ios](https://github.com/brianly1003/cdev-ios) | Native iOS app for monitoring and controlling AI coding sessions from iPhone/iPad |
+
 ## Security Notice
 
 **Important:** Security measures implemented:
@@ -471,7 +542,7 @@ cdev/
 - CORS restrictions with origin validation
 - Binds to localhost only by default (intentional security measure)
 - LIVE session injection requires same-user process ownership
-- `CDEV_TOKEN` environment variable gates access to pairing routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`)
+- `security.cdev_access_token` (or `CDEV_ACCESS_TOKEN`) gates access to protected web routes (`/pair`, `/api/pair/*`, `/api/auth/pairing/*`)
 - Cookie tokens stored as HMAC hashes (raw token never persisted in cookie)
 - `Referrer-Policy: no-referrer` on pairing responses to prevent token leakage
 - Query-string tokens rejected; Authorization header required

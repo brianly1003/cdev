@@ -544,7 +544,7 @@ func (s *Server) broadcastHeartbeat() {
 
 	seq := atomic.AddInt64(&s.heartbeatSeq, 1)
 
-	// Send legacy format heartbeat
+	// Build and broadcast heartbeat event payload
 	heartbeat := events.NewHeartbeatEvent(seq, agentStatus, uptimeSeconds)
 	data, err := heartbeat.ToJSON()
 	if err != nil {

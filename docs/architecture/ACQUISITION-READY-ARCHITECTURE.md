@@ -41,7 +41,7 @@ The most valuable asset isn't the cdev application itself - it's the **AI Agent 
 **Current Format:**
 ```json
 {
-  "command": "run_claude",
+  "command": "agent/run",
   "request_id": "req-001",
   "payload": { "prompt": "..." }
 }
@@ -626,7 +626,7 @@ Add to every message:
 
 ### 2. Namespace Methods
 
-Current: `run_claude`, `stop_claude`
+Current: `agent/run`, `agent/stop`
 Recommended: `claude/run`, `claude/stop`, `git/status`, `files/read`
 
 ### 3. Add Server Info Endpoint

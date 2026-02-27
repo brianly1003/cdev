@@ -45,7 +45,7 @@ send: make(chan []byte, 256)  // 256-message buffer
        │                                      │
        │ ◄──── claude_log events ──────────  │
        │                                      │
-       │ ──── run_claude command ──────────► │
+       │ ──── agent/run request ───────────► │
        │                                      │
 ```
 

@@ -64,7 +64,7 @@ type Server struct {
 	rateLimitKeyExtractor  middleware.KeyExtractor
 	trustedProxies         []*net.IPNet
 	tokenManager           *security.TokenManager
-	pairAccessToken        string
+	cdevAccessToken        string
 	requireAuth            bool
 	authAllowlist          []string
 	requireSecureTransport bool
@@ -87,7 +87,7 @@ func New(host string, port int, statusFn func() map[string]interface{}, claudeMa
 		repoPath:        repoPath,
 		mux:             http.NewServeMux(),
 		authAllowlist:   defaultAuthAllowlist(),
-		pairAccessToken: strings.TrimSpace(os.Getenv("CDEV_TOKEN")),
+		cdevAccessToken: strings.TrimSpace(os.Getenv("CDEV_ACCESS_TOKEN")),
 	}
 
 	s.mux.HandleFunc("/health", s.handleHealth)
@@ -297,15 +297,15 @@ func secureTokenMatch(a, b string) bool {
 const cookieHMACPurpose = "cdev_pair_cookie_v1"
 
 // hashTokenForCookie returns a hex-encoded HMAC-SHA256 of a fixed purpose string
-// keyed by the token. This avoids storing the raw CDEV_TOKEN in the cookie.
+// keyed by the token. This avoids storing the raw access token in the cookie.
 func hashTokenForCookie(token string) string {
 	mac := hmac.New(sha256.New, []byte(token))
 	mac.Write([]byte(cookieHMACPurpose))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// pairAccessTokenMiddleware enforces optional CDEV_TOKEN access control for pairing routes.
-// If CDEV_TOKEN is set, requests to /pair, /api/pair/*, and /api/auth/pairing/* must provide
+// pairAccessTokenMiddleware enforces optional cdev access-token control for pairing routes.
+// If the access token is set, requests to /pair, /api/pair/*, and /api/auth/pairing/* must provide
 // a matching token via query (?token=...), X-Cdev-Token header, or established cookie.
 //
 // Security hardening:
@@ -316,7 +316,7 @@ func hashTokenForCookie(token string) string {
 //   - Referrer-Policy: no-referrer is set on all pairing responses.
 func (s *Server) pairAccessTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requiredToken := strings.TrimSpace(s.pairAccessToken)
+		requiredToken := strings.TrimSpace(s.cdevAccessToken)
 		if requiredToken == "" || !s.isPairingPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
@@ -514,10 +514,16 @@ func (s *Server) SetAuth(tokenManager *security.TokenManager, requireAuth bool) 
 	s.requireAuth = requireAuth
 }
 
+// SetCdevAccessToken configures the optional token gate for protected cdev web routes.
+// Protected routes currently include /pair, /api/pair/*, and /api/auth/pairing/*.
+func (s *Server) SetCdevAccessToken(token string) {
+	s.cdevAccessToken = strings.TrimSpace(token)
+}
+
 // SetPairAccessToken configures the optional token gate for pairing routes.
-// Protected routes include /pair, /api/pair/*, and /api/auth/pairing/*.
+// DEPRECATED: use SetCdevAccessToken. Kept for backward compatibility.
 func (s *Server) SetPairAccessToken(token string) {
-	s.pairAccessToken = strings.TrimSpace(token)
+	s.SetCdevAccessToken(token)
 }
 
 // SetAuthAllowlist overrides the default unauthenticated path allowlist.

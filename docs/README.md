@@ -34,7 +34,7 @@ This directory contains all project documentation organized by category.
 docs/
 ├── README.md                  # This index file
 ├── api/                       # API & Integration docs
-│   ├── PROTOCOL.md            # Protocol specification (JSON-RPC 2.0 + legacy)
+│   ├── PROTOCOL.md            # Protocol specification (JSON-RPC 2.0)
 │   ├── UNIFIED-API-SPEC.md    # JSON-RPC 2.0 method reference
 │   ├── RUNTIME-CAPABILITY-REGISTRY.md # Runtime contract for server-driven runtime behavior
 │   ├── API-REFERENCE.md       # Complete HTTP and WebSocket API
@@ -91,7 +91,7 @@ docs/
 
 | Document | Description |
 |----------|-------------|
-| [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - JSON-RPC 2.0 + legacy formats |
+| [api/PROTOCOL.md](./api/PROTOCOL.md) | **Protocol specification** - JSON-RPC 2.0 |
 | [api/UNIFIED-API-SPEC.md](./api/UNIFIED-API-SPEC.md) | **JSON-RPC 2.0 API** - Complete method reference with examples |
 | [api/RUNTIME-CAPABILITY-REGISTRY.md](./api/RUNTIME-CAPABILITY-REGISTRY.md) | Runtime Capability Registry contract (`initialize.capabilities.runtimeRegistry`) |
 | [api/API-REFERENCE.md](./api/API-REFERENCE.md) | Complete HTTP and WebSocket API documentation |
@@ -102,7 +102,7 @@ docs/
 | [OpenRPC Discovery](http://localhost:8766/api/rpc/discover) | JSON-RPC 2.0 method discovery (when agent is running) |
 
 **Key Topics:**
-- JSON-RPC 2.0 protocol (recommended) and legacy command format
+- JSON-RPC 2.0 protocol
 - HTTP endpoints (`/api/claude/*`, `/api/git/*`, `/api/repository/*`, `/api/images/*`)
 - WebSocket events and commands (`ws://localhost:8766/ws`)
 - Session management (new/continue)

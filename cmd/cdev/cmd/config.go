@@ -459,13 +459,13 @@ pairing:
   show_qr_in_terminal: false
 
 # Security settings
-# Optional pairing-route guard for tunnel/worker exposure:
-#   export CDEV_TOKEN="$(openssl rand -hex 32)"
-#   open https://your-worker.workers.dev?token=$CDEV_TOKEN
+# Optional cdev access-token guard for tunnel/worker exposure:
+#   export CDEV_ACCESS_TOKEN="$(openssl rand -hex 32)"
+#   open https://your-worker.workers.dev?token=$CDEV_ACCESS_TOKEN
 security:
   require_auth: true
   require_pairing_approval: false
-  pair_access_token: ""
+  cdev_access_token: ""
 `
 
 	return os.WriteFile(path, []byte(content), 0644)

@@ -1,5 +1,6 @@
 # cdev Configuration
 # Copy this file to ~/.cdev/config.yaml and modify as needed
+# Windows: copy to %USERPROFILE%\.cdev\config.yaml
 
 # Server settings
 server:
@@ -54,14 +55,14 @@ git:
 
 # Security settings
 # IMPORTANT: For production/remote access, keep require_auth: true
-# Optional pairing-route guard for tunnel/worker exposure:
-#   export CDEV_TOKEN="$(openssl rand -hex 32)"
-#   open https://your-worker.workers.dev?token=$CDEV_TOKEN
+# Optional cdev access-token guard for tunnel/worker exposure:
+#   export CDEV_ACCESS_TOKEN="$(openssl rand -hex 32)"
+#   open https://your-worker.workers.dev?token=$CDEV_ACCESS_TOKEN
 security:
   require_auth: true            # Require token authentication for WebSocket and HTTP
   require_pairing_approval: false # Require local approve/reject before exchanging pairing token
   token_expiry_secs: 3600       # How long tokens are valid (default: 1 hour)
-  pair_access_token: ""         # Optional token gate for /pair and /api/pair/* (URL: ?token=...)
+  cdev_access_token: ""         # Optional token gate for cdev web endpoints (URL: ?token=...)
   bind_localhost_only: true     # Only accept connections from localhost (recommended)
   allowed_origins: []           # Additional allowed origins for CORS (empty = localhost only)
   require_secure_transport: true # Require HTTPS/WSS for non-localhost access
@@ -94,10 +95,27 @@ logging:
 
 # Resource limits
 limits:
-  max_file_size_kb: 200    # Max file size for get_file command
+  max_file_size_kb: 200    # Max file size for file/get API
   max_diff_size_kb: 500    # Max diff size to send
   max_log_buffer: 1000     # Max log lines to buffer
   max_prompt_len: 10000    # Max prompt length
+
+# Workspace discovery settings
+# cdev scans for Git repositories when the mobile app calls workspace/discover.
+# By default, it searches common directories under $HOME (Projects, Code, Developer,
+# dev, Repos, src, go/src, workspace, Desktop). If your repositories live elsewhere,
+# add custom paths here — they are scanned FIRST, before the defaults.
+discovery:
+  # Extra directories to scan (absolute paths; ~ is expanded to $HOME / %USERPROFILE%)
+  # search_paths:
+  #   - ~/work
+  #   - ~/company-name
+  #   - /opt/repos          # macOS/Linux
+  #   - C:/Users/you/repos  # Windows (use forward slashes)
+  #   - D:/projects         # Windows additional drive
+  max_depth: 4                  # How deep to recurse (default: 4)
+  timeout_seconds: 10           # Max scan time (default: 10s)
+  cache_ttl_minutes: 60         # Cache validity (default: 60 min)
 
 # Mobile pairing settings
 pairing:

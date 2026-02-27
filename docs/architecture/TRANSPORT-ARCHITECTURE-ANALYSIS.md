@@ -34,11 +34,11 @@ This document analyzes cdev's current dual-protocol architecture (WebSocket + HT
 │    │  • heartbeat        │            │  • POST /api/claude/│           │
 │    │                     │            │    stop             │           │
 │    │  COMMANDS (← Client)│            │  • GET /api/git/*   │           │
-│    │  • run_claude       │            │  • GET /api/file    │           │
-│    │  • stop_claude      │            │  • GET /swagger/*   │           │
-│    │  • respond_to_claude│            │                     │           │
-│    │  • get_status       │            │                     │           │
-│    │  • get_file         │            │                     │           │
+│    │  • agent/run       │            │  • GET /api/file    │           │
+│    │  • agent/stop      │            │  • GET /swagger/*   │           │
+│    │  • agent/respond│            │                     │           │
+│    │  • status/get       │            │                     │           │
+│    │  • file/get         │            │                     │           │
 │    │                     │            │                     │           │
 │    └─────────────────────┘            └─────────────────────┘           │
 │              │                                  │                        │
@@ -58,11 +58,11 @@ This document analyzes cdev's current dual-protocol architecture (WebSocket + HT
 
 | Operation | WebSocket Command | HTTP Endpoint | Duplicated? |
 |-----------|-------------------|---------------|-------------|
-| Run Claude | `run_claude` | `POST /api/claude/run` | **Yes** |
-| Stop Claude | `stop_claude` | `POST /api/claude/stop` | **Yes** |
-| Respond | `respond_to_claude` | `POST /api/claude/respond` | **Yes** |
-| Get Status | `get_status` | `GET /api/status` | **Yes** |
-| Get File | `get_file` | `GET /api/file` | **Yes** |
+| Run Claude | `agent/run` | `POST /api/claude/run` | **Yes** |
+| Stop Claude | `agent/stop` | `POST /api/claude/stop` | **Yes** |
+| Respond | `agent/respond` | `POST /api/claude/respond` | **Yes** |
+| Get Status | `status/get` | `GET /api/status` | **Yes** |
+| Get File | `file/get` | `GET /api/file` | **Yes** |
 | Git Status | - | `GET /api/git/status` | No (HTTP only) |
 | Git Diff | - | `GET /api/git/diff` | No (HTTP only) |
 | Health Check | - | `GET /health` | No (HTTP only) |
@@ -128,7 +128,7 @@ What if HTTP and WebSocket have different views of the same state?
 
 ```
 Timeline:
-1. Client A: WebSocket run_claude
+1. Client A: WebSocket agent/run
 2. Client B: HTTP GET /api/status  ← May miss in-flight state
 3. Claude starts
 4. Client A: Receives claude_status

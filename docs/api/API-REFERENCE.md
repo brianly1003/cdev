@@ -10,9 +10,8 @@ cdev exposes a unified server on a single port:
 
 ### Protocol Support
 
-The WebSocket endpoint supports two protocols:
-- **JSON-RPC 2.0** (recommended) - Standard protocol with request/response correlation. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md) for complete method reference.
-- **Legacy commands** (deprecated) - Original command format, will be removed in v3.0
+The WebSocket endpoint uses JSON-RPC 2.0 for request/response correlation.
+See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md) for complete method reference.
 
 ### Runtime Notes (JSON-RPC)
 
@@ -1088,7 +1087,7 @@ Triggers a full re-index of the repository (runs in background).
 
 Connect to `ws://127.0.0.1:8766/ws` for real-time events and commands.
 
-> **Note:** For JSON-RPC 2.0 protocol examples, see [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md). The legacy command format documented below is deprecated and will be removed in v3.0.
+> **Note:** Use JSON-RPC 2.0 for all WebSocket commands. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md).
 
 ### Connection
 
@@ -1101,95 +1100,91 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  console.log('Event:', data.event, data.payload);
+  console.log('Message:', data);
 };
 ```
 
-### Sending Commands (Legacy Format)
+### Sending Commands (JSON-RPC 2.0)
 
-> **Deprecated:** Use JSON-RPC 2.0 format instead. See [UNIFIED-API-SPEC.md](./UNIFIED-API-SPEC.md).
-
-Commands are sent as JSON objects:
+Commands are sent as JSON-RPC requests:
 
 ```javascript
 // Start Claude
 ws.send(JSON.stringify({
-  command: "run_claude",
-  payload: {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "agent/run",
+  params: {
     prompt: "Create a hello world function",
-    mode: "new"
-  }
-}));
-
-// Continue conversation
-ws.send(JSON.stringify({
-  command: "run_claude",
-  payload: {
-    prompt: "Now add error handling",
-    mode: "continue"
-  }
-}));
-
-// Continue specific session
-ws.send(JSON.stringify({
-  command: "run_claude",
-  payload: {
-    prompt: "Continue the task",
-    mode: "continue",
-    session_id: "bd2ddce2-d50a-43b9-8129-602e7cdba072"
+    mode: "new",
+    agent_type: "claude"
   }
 }));
 
 // Stop Claude
 ws.send(JSON.stringify({
-  command: "stop_claude"
+  jsonrpc: "2.0",
+  id: 2,
+  method: "agent/stop"
 }));
 
 // Respond to permission/question
 ws.send(JSON.stringify({
-  command: "respond_to_claude",
-  payload: {
+  jsonrpc: "2.0",
+  id: 3,
+  method: "agent/respond",
+  params: {
     tool_use_id: "toolu_01ABC123...",
-    response: "approved"
+    response: "approved",
+    is_error: false
   }
 }));
 
 // Get current status
 ws.send(JSON.stringify({
-  command: "get_status"
+  jsonrpc: "2.0",
+  id: 4,
+  method: "status/get"
 }));
 
 // Get file content
 ws.send(JSON.stringify({
-  command: "get_file",
-  payload: {
+  jsonrpc: "2.0",
+  id: 5,
+  method: "file/get",
+  params: {
     path: "src/main.ts"
   }
 }));
 
-// Watch a session for real-time updates (when Claude Code runs on laptop)
+// Watch a session for real-time updates
 ws.send(JSON.stringify({
-  command: "watch_session",
-  payload: {
-    session_id: "bd2ddce2-d50a-43b9-8129-602e7cdba072"
+  jsonrpc: "2.0",
+  id: 6,
+  method: "session/watch",
+  params: {
+    session_id: "bd2ddce2-d50a-43b9-8129-602e7cdba072",
+    agent_type: "claude"
   }
 }));
 
 // Stop watching session
 ws.send(JSON.stringify({
-  command: "unwatch_session"
+  jsonrpc: "2.0",
+  id: 7,
+  method: "session/unwatch"
 }));
 ```
 
 ### Real-Time Session Watching
 
-The `watch_session` command enables real-time message streaming when Claude Code runs directly on the laptop (not through cdev). This is useful when:
+The `session/watch` method enables real-time message streaming when Claude Code runs directly on the laptop (not through cdev). This is useful when:
 - User is working with Claude Code in terminal
 - iOS app wants to observe the conversation in real-time
 - You want to sync messages without running Claude through cdev
 
 **How it works:**
-1. iOS sends `watch_session` with the session ID to observe
+1. iOS sends `session/watch` with the session ID to observe
 2. cdev watches the session's JSONL file for changes
 3. When Claude Code writes new messages, cdev emits `claude_message` events
 4. iOS receives real-time updates via WebSocket
@@ -1203,28 +1198,33 @@ The `watch_session` command enables real-time message streaming when Claude Code
 
 | Scenario | Server Action |
 |----------|---------------|
-| Client sends `watch_session` | Send `session_watch_started`, then stream `claude_message` events |
-| Client sends `unwatch_session` | Send `session_watch_stopped`, stop streaming |
-| Client sends `watch_session` for new session | Auto-unwatch previous, watch new session |
+| Client sends `session/watch` | Send `session_watch_started`, then stream `claude_message` events |
+| Client sends `session/unwatch` | Send `session_watch_stopped`, stop streaming |
+| Client sends `session/watch` for new session | Auto-unwatch previous, watch new session |
 | Client disconnects | Clean up watch subscription (no event sent) |
 | Session file doesn't exist | Send error response |
 
 **Commands:**
 
-**watch_session** - Subscribe to real-time updates
+**session/watch** - Subscribe to real-time updates
 ```json
 {
-  "command": "watch_session",
-  "payload": {
-    "session_id": "bd2ddce2-d50a-43b9-8129-602e7cdba072"
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "session/watch",
+  "params": {
+    "session_id": "bd2ddce2-d50a-43b9-8129-602e7cdba072",
+    "agent_type": "claude"
   }
 }
 ```
 
-**unwatch_session** - Unsubscribe from updates
+**session/unwatch** - Unsubscribe from updates
 ```json
 {
-  "command": "unwatch_session"
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "session/unwatch"
 }
 ```
 
@@ -1258,7 +1258,7 @@ The `watch_session` command enables real-time message streaming when Claude Code
 **session_watch_stopped.reason values:**
 | Reason | Description |
 |--------|-------------|
-| `client_request` | Client sent `unwatch_session` command |
+| `client_request` | Client sent `session/unwatch` request |
 | `session_ended` | Session file was deleted or session completed (future) |
 | `error` | Error occurred while watching (future) |
 
@@ -1805,10 +1805,13 @@ Sent when Claude requests permission for a tool.
 To approve:
 ```javascript
 ws.send(JSON.stringify({
-  command: "respond_to_claude",
-  payload: {
+  jsonrpc: "2.0",
+  id: 101,
+  method: "agent/respond",
+  params: {
     tool_use_id: "toolu_01ABC123XYZ...",
-    response: "approved"
+    response: "approved",
+    is_error: false
   }
 }));
 ```
@@ -1816,8 +1819,10 @@ ws.send(JSON.stringify({
 To deny:
 ```javascript
 ws.send(JSON.stringify({
-  command: "respond_to_claude",
-  payload: {
+  jsonrpc: "2.0",
+  id: 102,
+  method: "agent/respond",
+  params: {
     tool_use_id: "toolu_01ABC123XYZ...",
     response: "Permission denied by user",
     is_error: true
@@ -1846,8 +1851,10 @@ Sent when Claude is waiting for user input (AskUserQuestion tool).
 **Responding to Questions:**
 ```javascript
 ws.send(JSON.stringify({
-  command: "respond_to_claude",
-  payload: {
+  jsonrpc: "2.0",
+  id: 103,
+  method: "agent/respond",
+  params: {
     tool_use_id: "toolu_01XYZ789...",
     response: "PostgreSQL"
   }
@@ -2221,19 +2228,27 @@ class CdotClient {
 
   startClaude(prompt: string, mode: 'new' | 'continue' = 'new', sessionId?: string) {
     this.ws?.send(JSON.stringify({
-      command: 'run_claude',
-      payload: { prompt, mode, session_id: sessionId }
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'agent/run',
+      params: { prompt, mode, session_id: sessionId, agent_type: 'claude' }
     }));
   }
 
   stopClaude() {
-    this.ws?.send(JSON.stringify({ command: 'stop_claude' }));
+    this.ws?.send(JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'agent/stop'
+    }));
   }
 
   respondToPermission(toolUseId: string, approved: boolean) {
     this.ws?.send(JSON.stringify({
-      command: 'respond_to_claude',
-      payload: {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'agent/respond',
+      params: {
         tool_use_id: toolUseId,
         response: approved ? 'approved' : 'Permission denied by user',
         is_error: !approved
@@ -2243,8 +2258,10 @@ class CdotClient {
 
   answerQuestion(toolUseId: string, answer: string) {
     this.ws?.send(JSON.stringify({
-      command: 'respond_to_claude',
-      payload: {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'agent/respond',
+      params: {
         tool_use_id: toolUseId,
         response: answer
       }
