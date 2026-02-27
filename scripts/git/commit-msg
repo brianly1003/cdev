@@ -20,4 +20,12 @@ if grep -q "Co-Authored-By: Claude" "$COMMIT_MSG_FILE"; then
     exit 1
 fi
 
+# Run lint before allowing commit
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+echo "Running make lint..."
+if ! (cd "$REPO_ROOT" && make lint); then
+    echo "ERROR: make lint failed. Commit aborted."
+    exit 1
+fi
+
 exit 0

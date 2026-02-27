@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,14 +53,29 @@ func (m *hooksPermissionManager) GetAndRemovePendingRequest(toolUseID string) *p
 
 // hooksEventCapture is a hub subscriber that captures published events.
 type hooksEventCapture struct {
+	mu     sync.Mutex
 	events []events.Event
 	done   chan struct{}
 }
 
-func (c *hooksEventCapture) ID() string                { return "hooks-test-capture" }
-func (c *hooksEventCapture) Send(e events.Event) error { c.events = append(c.events, e); return nil }
-func (c *hooksEventCapture) Close() error              { return nil }
-func (c *hooksEventCapture) Done() <-chan struct{}     { return c.done }
+func (c *hooksEventCapture) ID() string { return "hooks-test-capture" }
+func (c *hooksEventCapture) Send(e events.Event) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.events = append(c.events, e)
+	return nil
+}
+func (c *hooksEventCapture) Close() error          { return nil }
+func (c *hooksEventCapture) Done() <-chan struct{} { return c.done }
+
+// getEvents returns a snapshot of captured events (safe for concurrent access).
+func (c *hooksEventCapture) getEvents() []events.Event {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	result := make([]events.Event, len(c.events))
+	copy(result, c.events)
+	return result
+}
 
 // setupHooksTest creates a HooksHandler with a hub that captures events.
 func setupHooksTest(resolver WorkspaceResolver) (*HooksHandler, *hub.Hub, *hooksEventCapture) {
@@ -170,11 +186,12 @@ func TestHandleHook_Session_SetsWorkspaceID(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
 
-	evt := capture.events[0]
+	evt := captured[0]
 	if evt.Type() != events.EventTypeClaudeHookSession {
 		t.Errorf("expected event type %s, got %s", events.EventTypeClaudeHookSession, evt.Type())
 	}
@@ -198,11 +215,12 @@ func TestHandleHook_Session_NoResolver_EmptyWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
-	if capture.events[0].GetWorkspaceID() != "" {
-		t.Errorf("expected empty workspace_id without resolver, got %q", capture.events[0].GetWorkspaceID())
+	if captured[0].GetWorkspaceID() != "" {
+		t.Errorf("expected empty workspace_id without resolver, got %q", captured[0].GetWorkspaceID())
 	}
 }
 
@@ -228,11 +246,12 @@ func TestHandleHook_Notification_SetsWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
 
-	evt := capture.events[0]
+	evt := captured[0]
 	if evt.Type() != events.EventTypeClaudeHookPermission {
 		t.Errorf("expected event type %s, got %s", events.EventTypeClaudeHookPermission, evt.Type())
 	}
@@ -262,11 +281,12 @@ func TestHandleHook_Permission_SetsWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
-	if capture.events[0].GetWorkspaceID() != "old-endpoint-ws" {
-		t.Errorf("expected workspace_id %q, got %q", "old-endpoint-ws", capture.events[0].GetWorkspaceID())
+	if captured[0].GetWorkspaceID() != "old-endpoint-ws" {
+		t.Errorf("expected workspace_id %q, got %q", "old-endpoint-ws", captured[0].GetWorkspaceID())
 	}
 }
 
@@ -292,11 +312,12 @@ func TestHandleHook_ToolStart_SetsWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
 
-	evt := capture.events[0]
+	evt := captured[0]
 	if evt.Type() != events.EventTypeClaudeHookToolStart {
 		t.Errorf("expected event type %s, got %s", events.EventTypeClaudeHookToolStart, evt.Type())
 	}
@@ -327,11 +348,12 @@ func TestHandleHook_ToolEnd_SetsWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
 
-	evt := capture.events[0]
+	evt := captured[0]
 	if evt.Type() != events.EventTypeClaudeHookToolEnd {
 		t.Errorf("expected event type %s, got %s", events.EventTypeClaudeHookToolEnd, evt.Type())
 	}
@@ -386,8 +408,9 @@ func TestHandleHook_PermissionRequest_SetsWorkspaceID(t *testing.T) {
 
 	// Verify the pty_permission event was published with workspace ID
 	drainHookEvents()
+	captured := capture.getEvents()
 	var permEvent events.Event
-	for _, e := range capture.events {
+	for _, e := range captured {
 		if e.Type() == events.EventTypePTYPermission {
 			permEvent = e
 			break
@@ -497,11 +520,12 @@ func TestHandleHook_EmptyCwd_EmptyWorkspaceID(t *testing.T) {
 	handler.HandleHook(w, req)
 	drainHookEvents()
 
-	if len(capture.events) == 0 {
+	captured := capture.getEvents()
+	if len(captured) == 0 {
 		t.Fatal("expected at least one event")
 	}
-	if capture.events[0].GetWorkspaceID() != "" {
-		t.Errorf("expected empty workspace_id with empty cwd, got %q", capture.events[0].GetWorkspaceID())
+	if captured[0].GetWorkspaceID() != "" {
+		t.Errorf("expected empty workspace_id with empty cwd, got %q", captured[0].GetWorkspaceID())
 	}
 }
 
@@ -551,12 +575,13 @@ func TestHandleHook_DifferentWorkspaces_DifferentIDs(t *testing.T) {
 	}
 	drainHookEvents()
 
-	if len(capture.events) != 2 {
-		t.Fatalf("expected 2 events, got %d", len(capture.events))
+	captured := capture.getEvents()
+	if len(captured) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(captured))
 	}
 
 	for i, ws := range workspaces {
-		got := capture.events[i].GetWorkspaceID()
+		got := captured[i].GetWorkspaceID()
 		if got != ws.expected {
 			t.Errorf("event %d: expected workspace_id %q, got %q", i, ws.expected, got)
 		}
