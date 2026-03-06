@@ -66,32 +66,17 @@ make build
 ./bin/cdev start
 ```
 
-### Manage Workspaces (Default Behavior)
+### Workspace Mode
 
-**cdev+ is designed as a platform for IDE integration** - enabling VS Code extensions, Cursor, JetBrains, and other tools to control AI coding agents.
+`cdev+` runs as a single daemon with multi-workspace management by default.
 
-**Standard Protocol: JSON-RPC 2.0** - Industry standard used by LSP, MCP, and all major IDEs.
-
-Workspaces are managed via JSON-RPC 2.0 over WebSocket (`ws://127.0.0.1:16180/ws`):
-
-```json
-// Add a workspace
-{"jsonrpc": "2.0", "id": 1, "method": "workspace/add", "params": {"path": "/path/to/backend", "name": "Backend API"}}
-
-// List workspaces
-{"jsonrpc": "2.0", "id": 2, "method": "workspace/list"}
-
-// Start/stop a workspace
-{"jsonrpc": "2.0", "id": 3, "method": "workspace/start", "params": {"id": "ws-abc123"}}
-{"jsonrpc": "2.0", "id": 4, "method": "workspace/stop", "params": {"id": "ws-abc123"}}
-```
-
-**Server runs on:** `http://127.0.0.1:16180`
-- **WebSocket JSON-RPC 2.0**: `/ws` - **PRIMARY (recommended for IDE integration)**
-- REST API: `/api/*` - Also available
+Server endpoint:
+- `http://127.0.0.1:16180`
+- WebSocket JSON-RPC 2.0: `/ws`
+- REST API: `/api/*`
 - Health check: `/health`
 
-**See full guide:** [Workspace Manager Design](docs/architecture/MULTI-WORKSPACE-DESIGN.md)
+See full guide: [Workspace Manager Design](docs/architecture/MULTI-WORKSPACE-DESIGN.md)
 
 ## Installation
 

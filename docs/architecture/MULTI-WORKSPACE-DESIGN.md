@@ -1,372 +1,159 @@
 # Multi-Workspace Architecture Design
 
+> Status: Implemented (current cdev behavior)
+> Scope: cdev daemon + JSON-RPC workspace/session orchestration
+
 ## Executive Summary
 
-This document outlines the design for supporting multiple workspaces/repositories in cdev, enabling the iOS app to switch between different projects.
+cdev uses a **single daemon architecture** with **multi-workspace management built in**.
 
-## Current State Analysis
+- One server process
+- One transport endpoint (`http://127.0.0.1:16180`, `ws://127.0.0.1:16180/ws`)
+- Multiple registered workspaces
+- Workspace-scoped sessions, git state, and event routing
 
-The cdev-agent is currently a **single-workspace daemon by design**:
-- One repository path in configuration
-- All components (Claude, Git, Watcher, Sessions) bound to single repo
-- Events broadcast to all clients without repo context
-- API endpoints assume single repo context
+The previous alternatives ("one server per workspace" and "coordinator + workers") are no longer the target architecture for cdev.
 
-## Design Options Evaluated
-
-### Option A: Multi-Workspace in Single Server
-```
-┌─────────────────────────────────────────┐
-│           cdev-agent (port 16180)        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │ Repo A  │ │ Repo B  │ │ Repo C  │   │
-│  │Components│ │Components│ │Components│  │
-│  └─────────┘ └─────────┘ └─────────┘   │
-│         Unified API + Event Hub         │
-└─────────────────────────────────────────┘
-```
-- **Pros**: Single connection, unified API
-- **Cons**: Complex routing, resource contention, major refactoring needed
-
-### Option B: One Server Per Workspace (Recommended)
-```
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ cdev-agent   │  │ cdev-agent   │  │ cdev-agent   │
-│ (port 16180)  │  │ (port 8767)  │  │ (port 8768)  │
-│   Repo A     │  │   Repo B     │  │   Repo C     │
-└──────────────┘  └──────────────┘  └──────────────┘
-        │                │                │
-        └────────────────┼────────────────┘
-                         │
-              ┌──────────────────┐
-              │ Workspace Manager│
-              │   (port 8765)    │
-              └──────────────────┘
-                         │
-              ┌──────────────────┐
-              │    cdev-ios      │
-              └──────────────────┘
-```
-- **Pros**: Clean isolation, minimal server changes, natural Claude CLI fit
-- **Cons**: Multiple connections to manage
-
-### Option C: Hybrid Coordinator + Workers
-- Most complex, overkill for current needs
-
-## Recommended Architecture: Option B
-
-### Rationale
-
-1. **Minimal code changes** - Current server works perfectly for single repo
-2. **Natural isolation** - Each workspace independent, no cross-talk
-3. **Claude CLI alignment** - Claude runs in working directory, one-at-a-time makes sense
-4. **Scalability** - Add/remove workspaces without affecting others
-5. **Failure isolation** - One workspace crash doesn't affect others
-
-### Components
-
-#### 1. Workspace Manager Service (New)
-A lightweight coordinator that manages workspace configurations and server lifecycle.
-
-```go
-// internal/workspace/manager.go
-type WorkspaceManager struct {
-    configPath  string
-    workspaces  map[string]*Workspace
-    mu          sync.RWMutex
-}
-
-type Workspace struct {
-    ID          string    `json:"id"`
-    Name        string    `json:"name"`
-    Path        string    `json:"path"`
-    Port        int       `json:"port"`
-    Status      string    `json:"status"` // "running", "stopped", "error"
-    PID         int       `json:"pid,omitempty"`
-    LastActive  time.Time `json:"last_active"`
-    AutoStart   bool      `json:"auto_start"`
-}
-
-type WorkspaceManager interface {
-    // Workspace CRUD
-    ListWorkspaces() []Workspace
-    AddWorkspace(name, path string) (*Workspace, error)
-    RemoveWorkspace(id string) error
-    UpdateWorkspace(id string, updates WorkspaceUpdate) error
-
-    // Lifecycle
-    StartWorkspace(id string) error
-    StopWorkspace(id string) error
-    RestartWorkspace(id string) error
-
-    // Discovery
-    GetWorkspace(id string) (*Workspace, error)
-    GetWorkspaceByPath(path string) (*Workspace, error)
-    GetAvailablePort() int
-}
-```
-
-#### 2. Workspace Configuration File
-
-```yaml
-# ~/.cdev/workspaces.yaml
-workspaces:
-  - id: "ws-001"
-    name: "cdev"
-    path: "/Users/brianly/Projects/cdev"
-    port: 16180
-    auto_start: true
-
-  - id: "ws-002"
-    name: "messenger-integrator"
-    path: "/Users/brianly/Projects/messenger-integrator"
-    port: 8767
-    auto_start: false
-
-  - id: "ws-003"
-    name: "my-ios-app"
-    path: "/Users/brianly/Projects/my-ios-app"
-    port: 8768
-    auto_start: false
-
-settings:
-  port_range_start: 16180
-  port_range_end: 16213
-  max_workspaces: 10
-  auto_stop_idle_minutes: 30
-```
-
-#### 3. Workspace Manager API (New Service)
-
-Runs on a dedicated port (e.g., 8765) to manage all workspaces:
+## Current Architecture
 
 ```
-# Workspace Manager Endpoints (port 8765)
-
-GET  /api/workspaces              # List all workspaces
-POST /api/workspaces              # Add new workspace
-GET  /api/workspaces/{id}         # Get workspace details
-PUT  /api/workspaces/{id}         # Update workspace
-DELETE /api/workspaces/{id}       # Remove workspace
-
-POST /api/workspaces/{id}/start   # Start workspace server
-POST /api/workspaces/{id}/stop    # Stop workspace server
-POST /api/workspaces/{id}/restart # Restart workspace server
-
-GET  /api/workspaces/discover     # Auto-discover repos in common paths
-GET  /api/health                  # Manager health check
+┌──────────────────────────────────────────────────────────────┐
+│ cdev daemon (single process, single port 16180)             │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Workspace registry (persistent)                       │  │
+│  │ - workspace IDs, names, paths, settings               │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Session manager (runtime)                             │  │
+│  │ - session lifecycle per workspace                     │  │
+│  │ - LIVE/PTY/historical session handling                │  │
+│  │ - workspace-aware active session tracking             │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Event hub + workspace subscriptions                   │  │
+│  │ - workspace/subscribe filtering                       │  │
+│  │ - session/file/git events with workspace context      │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-#### 4. JSON-RPC Methods for Workspace Manager
+## Design Principles
 
-```json
-// workspace/list
-{
-  "jsonrpc": "2.0",
-  "method": "workspace/list",
-  "id": 1
-}
+1. Keep transport simple: one endpoint for HTTP + WebSocket.
+2. Model workspaces as configuration/state, not separate daemon processes.
+3. Keep runtime isolation at the session/workspace level inside one process.
+4. Route events by workspace context and subscription filters.
+5. Preserve backward compatibility where practical, but document current truth clearly.
 
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "workspaces": [
-      {
-        "id": "ws-001",
-        "name": "cdev",
-        "path": "/Users/brianly/Projects/cdev",
-        "port": 16180,
-        "status": "running",
-        "url": "ws://localhost:16180/ws"
-      }
-    ]
-  },
-  "id": 1
-}
+## Workspace Model
 
-// workspace/add
-{
-  "jsonrpc": "2.0",
-  "method": "workspace/add",
-  "params": {
-    "name": "new-project",
-    "path": "/Users/brianly/Projects/new-project"
-  },
-  "id": 2
-}
+Workspaces are persisted in `~/.cdev/workspaces.yaml` and loaded at startup.
 
-// workspace/start
-{
-  "jsonrpc": "2.0",
-  "method": "workspace/start",
-  "params": {
-    "id": "ws-002"
-  },
-  "id": 3
-}
-```
+Each workspace record contains:
+- `id`
+- `name`
+- `path`
+- `auto_start`
+- `created_at`
 
-### iOS App Changes
+Workspaces are registered dynamically via JSON-RPC (`workspace/add`) and do not require a static `repository.path` in `config.yaml`.
 
-#### Connection Management
-```swift
-class WorkspaceConnectionManager {
-    private var managerConnection: WebSocketConnection  // Port 8765
-    private var workspaceConnections: [String: WebSocketConnection]
-    private var activeWorkspaceId: String?
+## Runtime Model
 
-    // Connect to workspace manager first
-    func connectToManager(host: String) async throws
+For each workspace, cdev can manage:
+- Active managed sessions
+- LIVE sessions detected from user terminal state
+- Historical sessions (from Claude session files)
+- Git watcher subscription state
 
-    // Get list of workspaces
-    func listWorkspaces() async throws -> [Workspace]
+This is handled by `internal/session/manager.go` with workspace-aware mappings:
+- workspace -> active session
+- session -> workspace
+- session ID reconciliation when real Claude IDs are resolved
 
-    // Connect to specific workspace
-    func connectToWorkspace(_ workspace: Workspace) async throws
+## Event Routing Model
 
-    // Switch active workspace
-    func switchWorkspace(to id: String) async throws
+Clients can scope their event stream to specific workspaces:
+- `workspace/subscribe`
+- `workspace/unsubscribe`
+- `workspace/subscriptions`
+- `workspace/subscribeAll`
 
-    // Disconnect from workspace
-    func disconnectWorkspace(_ id: String)
-}
-```
+When filtering is enabled, only events for subscribed workspaces (plus global events) are delivered to that client.
 
-#### UI Flow
-```
-1. App Launch
-   └── Connect to Workspace Manager (port 8765)
-       └── Fetch workspace list
-           └── Show workspace selector
+This keeps one shared WebSocket connection while preserving workspace context.
 
-2. Select Workspace
-   └── Start workspace if not running
-       └── Connect to workspace (e.g., port 16180)
-           └── Show workspace UI (sessions, files, git)
+## JSON-RPC Surface (Current)
 
-3. Switch Workspace
-   └── Keep manager connection
-       └── Connect to new workspace port
-           └── Update UI context
-```
+### Workspace configuration methods
 
-### Server Changes Required
+- `workspace/list`
+- `workspace/get`
+- `workspace/add`
+- `workspace/update`
+- `workspace/remove`
+- `workspace/discover`
+- `workspace/status`
+- `workspace/cache/invalidate`
 
-#### 1. New Workspace Manager Command
-```bash
-# Start workspace manager only
-cdev workspace-manager start
+### Workspace subscription methods
 
-# Or integrated mode (manager + default workspace)
-cdev start --with-manager
+- `workspace/subscribe`
+- `workspace/unsubscribe`
+- `workspace/subscriptions`
+- `workspace/subscribeAll`
 
-# Workspace CLI commands
-cdev workspace list
-cdev workspace add /path/to/repo --name "My Project"
-cdev workspace start ws-001
-cdev workspace stop ws-001
-```
+### Session methods commonly used with workspaces
 
-#### 2. Config Changes
-```yaml
-# config.yaml - add workspace manager section
-workspace_manager:
-  enabled: true
-  port: 8765
-  config_path: "~/.cdev/workspaces.yaml"
-```
+- `session/start`
+- `session/send`
+- `session/stop`
+- `session/active`
+- `session/info`
+- `session/state`
+- `session/history`
 
-#### 3. Existing Server Changes (Minimal)
-- Add workspace ID to server metadata
-- Include workspace info in `status/get` response
-- No API changes needed for existing endpoints
+## iOS / IDE Integration Flow
 
-### Implementation Phases
+Recommended high-level flow:
 
-#### Phase 1: Workspace Configuration (1-2 days)
-- [ ] Create workspace config schema
-- [ ] Implement workspace config loader
-- [ ] Add workspace CLI commands (`cdev workspace list/add/remove`)
+1. Connect once to `ws://<host>:16180/ws`.
+2. Call `workspace/list`.
+3. If needed, call `workspace/add` or `workspace/discover`.
+4. Subscribe with `workspace/subscribe` for selected workspaces (or `workspace/subscribeAll`).
+5. Use session APIs with explicit `workspace_id`/`session_id` as needed.
+6. Update UI state from workspace-scoped events.
 
-#### Phase 2: Workspace Manager Service (2-3 days)
-- [ ] Create workspace manager package
-- [ ] Implement process lifecycle management
-- [ ] Add HTTP API for workspace operations
-- [ ] Add JSON-RPC methods
+No workspace-specific daemon ports are required in this model.
 
-#### Phase 3: Multi-Instance Support (1-2 days)
-- [ ] Port allocation management
-- [ ] Process monitoring
-- [ ] Auto-restart on crash
-- [ ] Idle timeout handling
+## Deprecated / Removed from Architecture
 
-#### Phase 4: Integration & Testing (2-3 days)
-- [ ] End-to-end testing
-- [ ] iOS app integration guide
-- [ ] Documentation
+The following concepts are outdated for current cdev architecture and should not be treated as recommended design:
 
-### Migration Path
+- Option B: one cdev server process per workspace
+- Option C: coordinator + worker daemon topology
+- Dedicated workspace-manager daemon port for normal operation
+- Port-pool planning based on per-workspace server instances
+- Workspace lifecycle RPCs that imply spawning/stopping per-workspace daemons
 
-1. **Backward Compatible**: Existing `cdev start` works unchanged
-2. **Opt-in**: Use `--with-manager` or separate `workspace-manager` command
-3. **Gradual Adoption**: iOS app can use single workspace mode initially
+If older documents still reference those concepts, treat them as historical context only.
 
-### Security Considerations
+## Operational Notes
 
-- Workspace manager only listens on localhost by default
-- Each workspace server has independent auth (if configured)
-- Path validation to prevent arbitrary directory access
-- Port range restrictions
-
-### Resource Management
-
-- Limit concurrent running workspaces
-- Auto-stop idle workspaces after configurable timeout
-- Memory/CPU monitoring per workspace
-- Graceful shutdown on system sleep/wake
-
-### Future Enhancements
-
-1. **Remote workspaces**: Connect to remote cdev-agent instances
-2. **Workspace templates**: Quick-start configurations
-3. **Workspace sync**: Share workspace configs across devices
-4. **Workspace groups**: Organize related projects
-
-## API Reference
-
-### Workspace Manager Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/workspaces` | List all workspaces |
-| POST | `/api/workspaces` | Add new workspace |
-| GET | `/api/workspaces/{id}` | Get workspace details |
-| PUT | `/api/workspaces/{id}` | Update workspace |
-| DELETE | `/api/workspaces/{id}` | Remove workspace |
-| POST | `/api/workspaces/{id}/start` | Start workspace server |
-| POST | `/api/workspaces/{id}/stop` | Stop workspace server |
-| GET | `/api/health` | Manager health |
-
-### JSON-RPC Methods
-
-| Method | Description |
-|--------|-------------|
-| `workspace/list` | List all workspaces |
-| `workspace/add` | Add new workspace |
-| `workspace/remove` | Remove workspace |
-| `workspace/start` | Start workspace server |
-| `workspace/stop` | Stop workspace server |
-| `workspace/get` | Get workspace details |
+- Default server endpoint remains `127.0.0.1:16180`.
+- Git watcher lifecycle is subscription-driven (starts on workspace subscribe, stops on unsubscribe/reference count zero).
+- Session ID reconciliation is built in so clients can follow real Claude session IDs cleanly when they appear.
 
 ## Summary
 
-The recommended approach is **Option B: One Server Per Workspace** with a lightweight Workspace Manager coordinator. This:
+The authoritative architecture is:
 
-1. **Preserves current architecture** - Minimal changes to existing codebase
-2. **Provides clean isolation** - Each workspace is independent
-3. **Aligns with Claude CLI** - One working directory per instance
-4. **Enables flexible deployment** - Run only needed workspaces
-5. **Supports future growth** - Easy to add remote workspaces later
+- **Single cdev daemon**
+- **Multi-workspace registry in-process**
+- **Workspace-scoped runtime/session management**
+- **Subscription-based event filtering**
 
-The iOS app will connect to the Workspace Manager to discover and manage workspaces, then connect to individual workspace servers as needed.
+This is the model to use for new development and integration work.
