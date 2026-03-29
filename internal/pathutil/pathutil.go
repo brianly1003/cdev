@@ -20,8 +20,14 @@ import (
 func EncodePath(path string) string {
 	// filepath.Clean normalises separators and removes trailing slashes.
 	// filepath.ToSlash converts OS-specific separators to "/", so the
-	// subsequent replace works identically on Unix, macOS, and Windows.
-	return strings.ReplaceAll(filepath.ToSlash(filepath.Clean(path)), "/", "-")
+	// subsequent replacements work identically on Unix, macOS, and Windows.
+	//
+	// Claude Code also normalizes hidden path segments like ".claude" to
+	// "-claude" inside ~/.claude/projects, so dots must be flattened too.
+	normalized := filepath.ToSlash(filepath.Clean(path))
+	normalized = strings.ReplaceAll(normalized, "/", "-")
+	normalized = strings.ReplaceAll(normalized, ".", "-")
+	return normalized
 }
 
 // ShellCommand returns an *exec.Cmd that runs the given command string

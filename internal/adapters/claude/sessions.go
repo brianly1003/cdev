@@ -41,6 +41,14 @@ type sessionMessage struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type sessionRecord struct {
+	Type       string `json:"type"`
+	GitBranch  string `json:"gitBranch,omitempty"`
+	Content    string `json:"content,omitempty"`
+	LastPrompt string `json:"lastPrompt,omitempty"`
+	Operation  string `json:"operation,omitempty"`
+}
+
 // extractContent extracts text content from the message.
 // Claude's content can be a string or an array of content blocks.
 func (m *sessionMessage) extractContent() string {
@@ -180,8 +188,7 @@ func ListSessions(repoPath string) ([]SessionInfo, error) {
 			continue
 		}
 
-		// Skip empty sessions
-		if info.MessageCount == 0 {
+		if !shouldIncludeSession(info) {
 			continue
 		}
 
@@ -244,6 +251,8 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 
 	messageCount := 0
 	foundSummary := false
+	hasSystemActivity := false
+	sawRecord := false
 
 	reader := jsonl.NewReader(file, 0)
 
@@ -266,29 +275,66 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 			continue
 		}
 
-		var msg sessionMessage
-		if err := json.Unmarshal(line.Data, &msg); err != nil {
+		var record sessionRecord
+		if err := json.Unmarshal(line.Data, &record); err != nil {
 			continue
 		}
+		sawRecord = true
 
-		// Count messages matching Claude CLI logic
-		if msg.Type == "user" && msg.isUserTextMessage() {
-			messageCount++
-		} else if msg.Type == "assistant" && msg.hasTextOrThinkingContent() {
-			// Count assistant messages with "text" or "thinking" content (not tool_use-only)
-			messageCount++
+		if info.Branch == "" && record.GitBranch != "" {
+			info.Branch = record.GitBranch
 		}
 
-		// Get summary from first user message
-		content := msg.extractContent()
-		if !foundSummary && msg.Type == "user" && content != "" {
-			info.Summary = truncateSummary(content, 100)
-			info.Branch = msg.GitBranch
-			foundSummary = true
+		switch record.Type {
+		case "user", "assistant":
+			var msg sessionMessage
+			if err := json.Unmarshal(line.Data, &msg); err != nil {
+				continue
+			}
+
+			if info.Branch == "" && msg.GitBranch != "" {
+				info.Branch = msg.GitBranch
+			}
+
+			// Count messages matching Claude CLI logic
+			if msg.Type == "user" && msg.isUserTextMessage() {
+				messageCount++
+			} else if msg.Type == "assistant" && msg.hasTextOrThinkingContent() {
+				// Count assistant messages with "text" or "thinking" content (not tool_use-only)
+				messageCount++
+			}
+
+			content := msg.extractContent()
+			if !foundSummary && msg.Type == "user" && content != "" {
+				info.Summary = truncateSummary(content, 100)
+				foundSummary = true
+			}
+		case "queue-operation":
+			if !foundSummary && record.Operation == "enqueue" && strings.TrimSpace(record.Content) != "" {
+				info.Summary = truncateSummary(record.Content, 100)
+				foundSummary = true
+			}
+		case "last-prompt":
+			if !foundSummary && strings.TrimSpace(record.LastPrompt) != "" {
+				info.Summary = truncateSummary(record.LastPrompt, 100)
+				foundSummary = true
+			}
+		case "system":
+			hasSystemActivity = true
 		}
 	}
 
 	info.MessageCount = messageCount
+	if !sawRecord {
+		return info, nil
+	}
+	if info.Summary == "" {
+		if hasSystemActivity {
+			info.Summary = shortSessionLabel(sessionID)
+		} else {
+			info.Summary = "(session)"
+		}
+	}
 
 	return info, nil
 }
@@ -303,6 +349,17 @@ func truncateSummary(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func shortSessionLabel(sessionID string) string {
+	if len(sessionID) <= 8 {
+		return sessionID
+	}
+	return sessionID[:8]
+}
+
+func shouldIncludeSession(info SessionInfo) bool {
+	return info.MessageCount > 0 || strings.TrimSpace(info.Summary) != ""
 }
 
 // GetSessionsDir exports the sessions directory path for a repo.

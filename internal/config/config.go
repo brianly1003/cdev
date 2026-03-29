@@ -25,6 +25,13 @@ type Config struct {
 	Permissions PermissionsConfig `mapstructure:"permissions"`
 	Debug       DebugConfig       `mapstructure:"debug"`
 	Discovery   DiscoverySettings `mapstructure:"discovery"`
+	AgentTask   AgentTaskConfig   `mapstructure:"agent_task"`
+}
+
+// AgentTaskConfig holds agent task automation configuration.
+type AgentTaskConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`        // Enable agent task system
+	WebhookSecret string `mapstructure:"webhook_secret"` // HMAC-SHA256 secret for webhook validation
 }
 
 // DiscoverySettings holds workspace discovery configuration from config.yaml.

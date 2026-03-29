@@ -99,6 +99,15 @@ type ClaudeHookPayload struct {
 	Raw map[string]interface{} `json:"-"`
 }
 
+func isBypassPermissionMode(permissionMode string) bool {
+	switch strings.TrimSpace(permissionMode) {
+	case "bypassPermissions", "dangerouslySkipPermissions":
+		return true
+	default:
+		return false
+	}
+}
+
 // HandleHook handles POST /api/hooks/:hookType
 //
 //	@Summary		Receive Claude hook event
@@ -252,6 +261,20 @@ func (h *HooksHandler) handlePermissionRequest(w http.ResponseWriter, payload Cl
 		Str("tool_name", payload.ToolName).
 		Str("tool_use_id", payload.ToolUseID).
 		Msg("handling permission request from PreToolUse hook")
+
+	if isBypassPermissionMode(payload.PermissionMode) {
+		log.Info().
+			Str("session_id", payload.SessionID).
+			Str("tool_use_id", payload.ToolUseID).
+			Str("permission_mode", payload.PermissionMode).
+			Msg("permission request bypassed by runtime permission mode")
+		writeJSON(w, http.StatusOK, map[string]string{
+			"decision": "allow",
+			"scope":    "session",
+			"message":  "bypass_permissions",
+		})
+		return
+	}
 
 	// If permission manager is not configured, fallback to "ask" (desktop prompt)
 	if h.permissionManager == nil {

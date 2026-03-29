@@ -42,6 +42,11 @@ func TestEncodePath(t *testing.T) {
 			path: "/Users/brian/../brian/Projects",
 			want: "-Users-brian-Projects",
 		},
+		{
+			name: "hidden directory segment",
+			path: "/Users/brian/Projects/Lazy/.claude/worktrees/feature-auth",
+			want: "-Users-brian-Projects-Lazy--claude-worktrees-feature-auth",
+		},
 	}
 
 	for _, tt := range tests {

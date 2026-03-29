@@ -57,6 +57,15 @@ const (
 	EventTypeClaudeHookPermission EventType = "claude_hook_permission" // Permission prompt notification
 	EventTypeClaudeHookToolStart  EventType = "claude_hook_tool_start" // PreToolUse hook
 	EventTypeClaudeHookToolEnd    EventType = "claude_hook_tool_end"   // PostToolUse hook
+
+	// Agent task events
+	EventTypeTaskCreated   EventType = "task_created"
+	EventTypeTaskStarted   EventType = "task_started"
+	EventTypeTaskProgress  EventType = "task_progress"
+	EventTypeTaskCompleted EventType = "task_completed"
+	EventTypeTaskFailed    EventType = "task_failed"
+	EventTypeTaskApproved  EventType = "task_approved"
+	EventTypeTaskRejected  EventType = "task_rejected"
 )
 
 // Event is the base interface for all events.
@@ -215,6 +224,24 @@ func NewWorkspaceRemovedEvent(id, name, path string) *BaseEvent {
 		Name: name,
 		Path: path,
 	}, id, "") // workspace_id = id, session_id = empty
+}
+
+// --- Agent Task Event Payloads ---
+
+// TaskEventPayload represents the payload for task lifecycle events.
+type TaskEventPayload struct {
+	TaskID    string `json:"task_id"`
+	TaskType  string `json:"task_type"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	Severity  string `json:"severity,omitempty"`
+	Message   string `json:"message,omitempty"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// NewTaskEvent creates a new task lifecycle event.
+func NewTaskEvent(eventType EventType, workspaceID string, payload TaskEventPayload) *BaseEvent {
+	return NewEventWithContext(eventType, payload, workspaceID, payload.SessionID)
 }
 
 // --- Stream Event Payloads ---

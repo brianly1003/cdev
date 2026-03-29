@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/brianly1003/cdev/internal/permission"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
@@ -241,6 +243,75 @@ func TestSessionManagerSend_AgentTypeValidation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSessionManagerState_ReturnsPendingPermissionFallback(t *testing.T) {
+	permissions := newMockPermissionManager()
+	createdAt := time.Date(2026, time.March, 13, 0, 55, 30, 0, time.UTC)
+	permissions.AddPendingRequest(&permission.Request{
+		ID:          "tool-1",
+		SessionID:   "e04c1d26-1c45-4ed3-b1b8-9cfae4002872",
+		WorkspaceID: "Lazy",
+		ToolName:    "Write",
+		ToolUseID:   "tool-1",
+		CreatedAt:   createdAt,
+	})
+
+	service := NewSessionManagerService(nil)
+	service.SetPermissionManager(permissions)
+
+	raw, err := json.Marshal(map[string]string{
+		"session_id": "e04c1d26-1c45-4ed3-b1b8-9cfae4002872",
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal params: %v", err)
+	}
+
+	result, rpcErr := service.State(context.Background(), raw)
+	if rpcErr != nil {
+		t.Fatalf("State returned error: %+v", rpcErr)
+	}
+
+	state, ok := result.(*session.RuntimeState)
+	if !ok {
+		t.Fatalf("result type = %T, want *session.RuntimeState", result)
+	}
+	if state.ID != "e04c1d26-1c45-4ed3-b1b8-9cfae4002872" {
+		t.Fatalf("state.ID = %q", state.ID)
+	}
+	if state.WorkspaceID != "Lazy" {
+		t.Fatalf("state.WorkspaceID = %q, want %q", state.WorkspaceID, "Lazy")
+	}
+	if state.Status != session.StatusRunning {
+		t.Fatalf("state.Status = %q, want %q", state.Status, session.StatusRunning)
+	}
+	if !state.IsRunning || !state.WaitingForInput {
+		t.Fatalf("state running/input = %v/%v, want true/true", state.IsRunning, state.WaitingForInput)
+	}
+	if state.PendingToolUseID != "tool-1" {
+		t.Fatalf("state.PendingToolUseID = %q, want %q", state.PendingToolUseID, "tool-1")
+	}
+	if state.PendingToolName != "Write" {
+		t.Fatalf("state.PendingToolName = %q, want %q", state.PendingToolName, "Write")
+	}
+	if !state.StartedAt.Equal(createdAt) || !state.LastActive.Equal(createdAt) {
+		t.Fatalf("state timestamps = %v / %v, want %v", state.StartedAt, state.LastActive, createdAt)
+	}
+}
+
+func TestSessionManagerState_MissingSessionReturnsSessionNotFound(t *testing.T) {
+	service := NewSessionManagerService(nil)
+
+	result, rpcErr := service.State(context.Background(), []byte(`{"session_id":"missing"}`))
+	if result != nil {
+		t.Fatalf("result = %#v, want nil", result)
+	}
+	if rpcErr == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if rpcErr.Code != message.SessionNotFound {
+		t.Fatalf("error code = %d, want %d", rpcErr.Code, message.SessionNotFound)
 	}
 }
 

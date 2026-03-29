@@ -22,6 +22,7 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/codex"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
+	"github.com/brianly1003/cdev/internal/permission"
 	"github.com/brianly1003/cdev/internal/rpc/handler"
 	"github.com/brianly1003/cdev/internal/rpc/message"
 	"github.com/brianly1003/cdev/internal/session"
@@ -41,6 +42,7 @@ type SessionManagerService struct {
 	manager        *session.Manager
 	focusProvider  SessionFocusProvider
 	sessionService *SessionService
+	permissions    pendingPermissionProvider
 
 	codexMu              sync.Mutex
 	codexSessions        map[string]*codexPTYSession
@@ -73,6 +75,10 @@ var (
 	// Strip non-printing control chars while keeping newline/tab/carriage-return.
 	codexControlRegex = regexp.MustCompile(`[\x00-\x08\x0b\x0c\x0e-\x1a\x1c-\x1f\x7f]`)
 )
+
+type pendingPermissionProvider interface {
+	ListPendingRequests() []*permission.Request
+}
 
 type codexPTYSession struct {
 	sessionIDMu sync.RWMutex
@@ -119,6 +125,13 @@ func (s *SessionManagerService) SetSessionService(sessionService *SessionService
 	s.sessionService = sessionService
 }
 
+// SetPermissionManager installs an optional pending-permission provider.
+// This lets session/state synthesize runtime state for external Claude hook
+// sessions that are waiting on mobile approval but are not managed PTY sessions.
+func (s *SessionManagerService) SetPermissionManager(provider pendingPermissionProvider) {
+	s.permissions = provider
+}
+
 // RegisterMethods registers all session management methods with the handler.
 func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 	// Session lifecycle methods
@@ -128,6 +141,8 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 		Params: []handler.OpenRPCParam{
 			{Name: "workspace_id", Required: true, Schema: map[string]interface{}{"type": "string"}},
 			{Name: "session_id", Required: false, Schema: map[string]interface{}{"type": "string", "description": "Optional session ID to attach to."}},
+			{Name: "permission_mode", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"default", "acceptEdits", "bypassPermissions", "plan", "interactive"}, "default": "default", "description": "Permission handling mode. Use 'bypassPermissions' to enable runtime-specific bypass flags when supported."}},
+			{Name: "yolo_mode", Required: false, Schema: map[string]interface{}{"type": "boolean", "description": "Runtime-agnostic bypass intent. Enables runtime-specific dangerous auto-approval flags when supported."}},
 			{Name: "agent_type", Required: false, Schema: map[string]interface{}{"type": "string", "enum": []string{"claude", "codex"}, "default": "claude", "description": "Agent runtime type."}},
 		},
 		Result: &handler.OpenRPCResult{
@@ -722,9 +737,11 @@ func (s *SessionManagerService) RegisterMethods(registry *handler.Registry) {
 // Runtime behavior is selected by agent_type (claude or codex).
 func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessage) (interface{}, *message.Error) {
 	var p struct {
-		WorkspaceID string `json:"workspace_id"`
-		SessionID   string `json:"session_id"` // Optional: attach to existing LIVE session
-		AgentType   string `json:"agent_type"`
+		WorkspaceID    string `json:"workspace_id"`
+		SessionID      string `json:"session_id"` // Optional: attach to existing LIVE session
+		PermissionMode string `json:"permission_mode"`
+		YoloMode       bool   `json:"yolo_mode"`
+		AgentType      string `json:"agent_type"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, message.NewError(message.InvalidParams, "failed to parse params: "+err.Error())
@@ -733,12 +750,15 @@ func (s *SessionManagerService) Start(ctx context.Context, params json.RawMessag
 	if p.WorkspaceID == "" {
 		return nil, message.NewError(message.InvalidParams, "workspace_id is required")
 	}
+	if err := validatePermissionMode(p.PermissionMode); err != nil {
+		return nil, err
+	}
 
 	_, runtimeDispatch, dispatchErr := s.resolveRuntimeDispatch(p.AgentType)
 	if dispatchErr != nil {
 		return nil, dispatchErr
 	}
-	return runtimeDispatch.start(ctx, p.WorkspaceID, p.SessionID)
+	return runtimeDispatch.start(ctx, p.WorkspaceID, p.SessionID, p.PermissionMode, p.YoloMode)
 }
 
 // Stop stops a running session.
@@ -903,12 +923,59 @@ func (s *SessionManagerService) State(ctx context.Context, params json.RawMessag
 		return nil, message.NewError(message.InvalidParams, "session_id is required")
 	}
 
+	if s.manager == nil {
+		if state := s.pendingPermissionRuntimeState(p.SessionID); state != nil {
+			return state, nil
+		}
+		return nil, message.ErrSessionNotFound(p.SessionID)
+	}
+
 	sess, err := s.manager.GetSession(p.SessionID)
 	if err != nil {
+		if state := s.pendingPermissionRuntimeState(p.SessionID); state != nil {
+			return state, nil
+		}
+		if strings.Contains(err.Error(), "session not found") {
+			return nil, message.ErrSessionNotFound(p.SessionID)
+		}
 		return nil, message.NewError(message.InternalError, err.Error())
 	}
 
 	return sess.ToRuntimeState(), nil
+}
+
+func (s *SessionManagerService) pendingPermissionRuntimeState(sessionID string) *session.RuntimeState {
+	if s.permissions == nil || strings.TrimSpace(sessionID) == "" {
+		return nil
+	}
+
+	var latest *permission.Request
+	for _, req := range s.permissions.ListPendingRequests() {
+		if req == nil || req.SessionID != sessionID {
+			continue
+		}
+		if latest == nil || req.CreatedAt.After(latest.CreatedAt) {
+			latest = req
+		}
+	}
+	if latest == nil {
+		return nil
+	}
+
+	ts := latest.CreatedAt.UTC()
+	return &session.RuntimeState{
+		ID:               sessionID,
+		WorkspaceID:      latest.WorkspaceID,
+		Status:           session.StatusRunning,
+		StartedAt:        ts,
+		LastActive:       ts,
+		ClaudeState:      "waiting",
+		ClaudeSessionID:  sessionID,
+		IsRunning:        true,
+		WaitingForInput:  true,
+		PendingToolUseID: latest.ToolUseID,
+		PendingToolName:  latest.ToolName,
+	}
 }
 
 // History returns historical sessions for a workspace.
@@ -942,14 +1009,15 @@ func (s *SessionManagerService) History(ctx context.Context, params json.RawMess
 
 	var (
 		history []session.HistoryInfo
+		total   int
 		err     error
 	)
 
 	switch agentType {
 	case sessionManagerAgentCodex:
-		history, err = s.listCodexHistory(p.WorkspaceID, limit)
+		history, total, err = s.listCodexHistory(p.WorkspaceID, limit)
 	default:
-		history, err = s.manager.ListHistory(p.WorkspaceID, limit)
+		history, total, err = s.listClaudeHistoryWithRunning(p.WorkspaceID, limit)
 	}
 	if err != nil {
 		return nil, message.NewError(message.InternalError, err.Error())
@@ -957,8 +1025,73 @@ func (s *SessionManagerService) History(ctx context.Context, params json.RawMess
 
 	return map[string]interface{}{
 		"sessions": history,
-		"total":    len(history),
+		"total":    total,
 	}, nil
+}
+
+func (s *SessionManagerService) listClaudeHistoryWithRunning(workspaceID string, limit int) ([]session.HistoryInfo, int, error) {
+	history, err := s.manager.ListHistory(workspaceID, 0)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	bySessionID := make(map[string]session.HistoryInfo, len(history))
+	for _, item := range history {
+		if strings.TrimSpace(item.WorkspaceID) == "" {
+			item.WorkspaceID = workspaceID
+		}
+		if strings.TrimSpace(item.Status) == "" {
+			item.Status = "historical"
+		}
+		bySessionID[item.SessionID] = item
+	}
+
+	for _, running := range s.manager.ListSessions(workspaceID) {
+		if running.Status != session.StatusRunning && running.Status != session.StatusStarting {
+			continue
+		}
+
+		item, exists := bySessionID[running.ID]
+		if !exists {
+			lastUpdated := running.LastActive
+			item = session.HistoryInfo{
+				SessionID:   running.ID,
+				WorkspaceID: running.WorkspaceID,
+				LastUpdated: lastUpdated,
+			}
+		}
+
+		item.WorkspaceID = running.WorkspaceID
+		item.ProjectPath = firstNonEmpty(item.ProjectPath, running.ProjectPath)
+		item.Status = "running"
+		item.StartedAt = timePtr(running.StartedAt)
+		item.LastActive = timePtr(running.LastActive)
+		if running.LastActive.After(item.LastUpdated) {
+			item.LastUpdated = running.LastActive
+		}
+		bySessionID[running.ID] = item
+	}
+
+	merged := make([]session.HistoryInfo, 0, len(bySessionID))
+	for _, item := range bySessionID {
+		merged = append(merged, item)
+	}
+
+	sort.Slice(merged, func(i, j int) bool {
+		left := historyInfoSortTime(merged[i])
+		right := historyInfoSortTime(merged[j])
+		if left.Equal(right) {
+			return merged[i].SessionID < merged[j].SessionID
+		}
+		return left.After(right)
+	})
+
+	total := len(merged)
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+
+	return merged, total, nil
 }
 
 // GetSessionMessages returns messages from a historical session.
@@ -2522,7 +2655,16 @@ func (s *SessionManagerService) ActivateSession(ctx context.Context, params json
 
 var errCodexSessionNotRunning = errors.New("codex session is not running")
 
-func (s *SessionManagerService) startCodexSession(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error) {
+func enableRuntimeBypass(permissionMode string, yoloMode bool) bool {
+	switch strings.TrimSpace(permissionMode) {
+	case "bypassPermissions", "dangerouslySkipPermissions":
+		return true
+	default:
+		return yoloMode
+	}
+}
+
+func (s *SessionManagerService) startCodexSession(ctx context.Context, workspaceID, sessionID, permissionMode string, yoloMode bool) (interface{}, *message.Error) {
 	if s.manager == nil {
 		return nil, message.NewErrorWithData(
 			message.AgentNotConfigured,
@@ -2588,7 +2730,8 @@ func (s *SessionManagerService) startCodexSession(ctx context.Context, workspace
 
 	before := s.snapshotCodexSessionIDs(ws.Definition.Path)
 	temporaryID := "codex-temp-" + uuid.NewString()
-	if err := s.startCodexProcess(ctx, temporaryID, workspaceID, ws.Definition.Path, []string{}); err != nil {
+	args := buildCodexStartCLIArgs(enableRuntimeBypass(permissionMode, yoloMode))
+	if err := s.startCodexProcess(ctx, temporaryID, workspaceID, ws.Definition.Path, args); err != nil {
 		return nil, codexRuntimeError("session/start", err)
 	}
 
@@ -2868,15 +3011,24 @@ func buildCodexCLIArgs(workspacePath, resumeSessionID, prompt string, yoloMode b
 	args := make([]string, 0, 8)
 	_ = workspacePath // Workspace binding is handled via cmd.Dir.
 	args = append(args, "exec")
-	if yoloMode {
-		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
-	}
+	args = appendCodexBypassArg(args, yoloMode)
 	if resumeSessionID != "" {
 		args = append(args, "resume", resumeSessionID)
 	}
 	// Preserve prompt verbatim (including leading "!") so Codex can interpret bash mode.
 	if prompt != "" {
 		args = append(args, prompt)
+	}
+	return args
+}
+
+func buildCodexStartCLIArgs(yoloMode bool) []string {
+	return appendCodexBypassArg(make([]string, 0, 1), yoloMode)
+}
+
+func appendCodexBypassArg(args []string, yoloMode bool) []string {
+	if yoloMode {
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
 	}
 	return args
 }
@@ -3158,20 +3310,21 @@ func (s *SessionManagerService) emitCodexPermissionResolved(ctx context.Context,
 	s.manager.PublishEvent(evt)
 }
 
-func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) ([]session.HistoryInfo, error) {
+func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) ([]session.HistoryInfo, int, error) {
 	ws, err := s.manager.GetWorkspace(workspaceID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	entries, err := codex.GetGlobalIndexCache().GetSessionsForProject(ws.Definition.Path)
 	if err != nil {
 		if errors.Is(err, codex.ErrProjectNotFound) {
-			return []session.HistoryInfo{}, nil
+			return []session.HistoryInfo{}, 0, nil
 		}
-		return nil, err
+		return nil, 0, err
 	}
 
+	total := len(entries)
 	if limit > 0 && len(entries) > limit {
 		entries = entries[:limit]
 	}
@@ -3193,14 +3346,41 @@ func (s *SessionManagerService) listCodexHistory(workspaceID string, limit int) 
 
 		history = append(history, session.HistoryInfo{
 			SessionID:    entry.SessionID,
+			WorkspaceID:  workspaceID,
 			Summary:      summary,
 			MessageCount: entry.MessageCount,
 			LastUpdated:  lastUpdated,
 			Branch:       entry.GitBranch,
+			ProjectPath:  entry.ProjectPath,
+			Status:       "historical",
 		})
 	}
 
-	return history, nil
+	return history, total, nil
+}
+
+func historyInfoSortTime(item session.HistoryInfo) time.Time {
+	if item.LastActive != nil && item.LastActive.After(item.LastUpdated) {
+		return *item.LastActive
+	}
+	if item.StartedAt != nil && item.StartedAt.After(item.LastUpdated) {
+		return *item.StartedAt
+	}
+	return item.LastUpdated
+}
+
+func timePtr(t time.Time) *time.Time {
+	value := t
+	return &value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func (s *SessionManagerService) resolveCodexSessionForWorkspace(workspaceID, sessionID string) (*codex.SessionIndexEntry, error) {

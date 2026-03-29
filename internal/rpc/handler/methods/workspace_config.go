@@ -365,6 +365,7 @@ func (s *WorkspaceConfigService) buildWorkspaceSessions(ws *workspace.Workspace,
 			"status":       "running",
 			"started_at":   sess.StartedAt,
 			"last_active":  sess.LastActive,
+			"project_path": sess.ProjectPath,
 			"agent_type":   sessionManagerAgentClaude,
 		}
 		if sessionViewers != nil {
@@ -406,6 +407,7 @@ func (s *WorkspaceConfigService) buildWorkspaceSessions(ws *workspace.Workspace,
 			"summary":       hist.Summary,
 			"message_count": hist.MessageCount,
 			"last_updated":  hist.LastUpdated,
+			"project_path":  hist.ProjectPath,
 			"agent_type":    sessionManagerAgentClaude,
 		}
 		if len(viewers) > 0 {
@@ -458,6 +460,7 @@ func (s *WorkspaceConfigService) buildWorkspaceSessions(ws *workspace.Workspace,
 			"summary":       summary,
 			"message_count": hist.MessageCount,
 			"last_updated":  lastUpdated,
+			"project_path":  hist.ProjectPath,
 			"agent_type":    sessionManagerAgentCodex,
 		}
 		if len(viewers) > 0 {

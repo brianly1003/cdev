@@ -114,6 +114,22 @@ func TestBuildCodexCLIArgs_YoloModeAddsBypassFlag(t *testing.T) {
 	}
 }
 
+func TestBuildCodexStartCLIArgs_Default(t *testing.T) {
+	got := buildCodexStartCLIArgs(false)
+	if len(got) != 0 {
+		t.Fatalf("args = %#v, want empty", got)
+	}
+}
+
+func TestBuildCodexStartCLIArgs_YoloModeAddsBypassFlag(t *testing.T) {
+	got := buildCodexStartCLIArgs(true)
+	want := []string{"--dangerously-bypass-approvals-and-sandbox"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+}
+
 func TestSanitizeCodexPTYOutputText_StripsANSIAndControl(t *testing.T) {
 	input := "\x1b[31mERROR:\x1b[0m stream disconnected\x1b[?25h"
 	got := sanitizeCodexPTYOutputText(input)

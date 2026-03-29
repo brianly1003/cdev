@@ -25,6 +25,7 @@ const (
 type Session struct {
 	ID          string    `json:"id"`
 	WorkspaceID string    `json:"workspace_id"`
+	ProjectPath string    `json:"project_path,omitempty"`
 	Status      Status    `json:"status"`
 	StartedAt   time.Time `json:"started_at"`
 	LastActive  time.Time `json:"last_active"`
@@ -159,6 +160,7 @@ func (s *Session) ToInfo() *Info {
 	return &Info{
 		ID:          s.ID,
 		WorkspaceID: s.WorkspaceID,
+		ProjectPath: s.ProjectPath,
 		Status:      s.Status,
 		StartedAt:   s.StartedAt,
 		LastActive:  s.LastActive,
@@ -170,6 +172,7 @@ func (s *Session) ToInfo() *Info {
 type Info struct {
 	ID          string    `json:"id"`
 	WorkspaceID string    `json:"workspace_id"`
+	ProjectPath string    `json:"project_path,omitempty"`
 	Status      Status    `json:"status"`
 	StartedAt   time.Time `json:"started_at"`
 	LastActive  time.Time `json:"last_active"`
@@ -190,12 +193,12 @@ type RuntimeState struct {
 	Error       string    `json:"error,omitempty"`
 
 	// Claude state
-	ClaudeState       string `json:"claude_state"`        // idle, running, error, waiting
-	ClaudeSessionID   string `json:"claude_session_id"`   // For conversation continuity
-	IsRunning         bool   `json:"is_running"`          // Is Claude process running
-	WaitingForInput   bool   `json:"waiting_for_input"`   // Is Claude waiting for user input
-	PendingToolUseID  string `json:"pending_tool_use_id,omitempty"`
-	PendingToolName   string `json:"pending_tool_name,omitempty"`
+	ClaudeState      string `json:"claude_state"`      // idle, running, error, waiting
+	ClaudeSessionID  string `json:"claude_session_id"` // For conversation continuity
+	IsRunning        bool   `json:"is_running"`        // Is Claude process running
+	WaitingForInput  bool   `json:"waiting_for_input"` // Is Claude waiting for user input
+	PendingToolUseID string `json:"pending_tool_use_id,omitempty"`
+	PendingToolName  string `json:"pending_tool_name,omitempty"`
 }
 
 // ToRuntimeState returns the current runtime state for reconnection sync.

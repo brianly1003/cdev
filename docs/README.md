@@ -13,6 +13,7 @@ This directory contains all project documentation organized by category.
 | Understand the protocol | [api/PROTOCOL.md](./api/PROTOCOL.md) |
 | Understand runtime capability contract | [api/RUNTIME-CAPABILITY-REGISTRY.md](./api/RUNTIME-CAPABILITY-REGISTRY.md) |
 | Understand the architecture | [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md) |
+| Understand worktree session design | [architecture/WORKTREE-SESSION-ARCHITECTURE.md](./architecture/WORKTREE-SESSION-ARCHITECTURE.md) |
 | Review security concerns | [security/SECURITY.md](./security/SECURITY.md) |
 | Safely access remotely | [guides/SAFE-REMOTE-ACCESS.md](./guides/SAFE-REMOTE-ACCESS.md) |
 | See planned work | [planning/BACKLOG.md](./planning/BACKLOG.md) |
@@ -21,6 +22,7 @@ This directory contains all project documentation organized by category.
 | **Setup workspace manager** | [guides/WORKSPACE-MANAGER-SETUP.md](./guides/WORKSPACE-MANAGER-SETUP.md) |
 | **Fix a problem** | [guides/TROUBLESHOOTING.md](./guides/TROUBLESHOOTING.md) |
 | **Integrate iOS app** | [mobile/IOS-INTEGRATION-GUIDE.md](./mobile/IOS-INTEGRATION-GUIDE.md) |
+| **View worktree conversations on iOS** | [mobile/IOS-WORKTREE-CONVERSATIONS.md](./mobile/IOS-WORKTREE-CONVERSATIONS.md) |
 | **LIVE session support** | [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) |
 | **Integrate with VS Code** | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) |
 | **Acquisition strategy** | [architecture/ACQUISITION-READY-ARCHITECTURE.md](./architecture/ACQUISITION-READY-ARCHITECTURE.md) |
@@ -47,6 +49,7 @@ docs/
 │   ├── ACQUISITION-READY-ARCHITECTURE.md  # Acquisition strategy
 │   ├── VSCODE-INTEGRATION-STRATEGY.md     # VS Code integration guide
 │   ├── TRANSPORT-ARCHITECTURE-ANALYSIS.md # WebSocket vs HTTP analysis
+│   ├── WORKTREE-SESSION-ARCHITECTURE.md   # Workspace vs project-path/worktree session model
 │   └── MULTI-AGENT-ARCHITECTURE.md        # Multi-agent (Claude/Gemini/Codex)
 ├── security/                  # Security docs
 │   ├── SECURITY.md            # Security guidelines & threat model
@@ -60,6 +63,7 @@ docs/
 │   ├── LIVE-SESSION-INTEGRATION.md    # LIVE session detection & injection
 │   ├── SESSION-AWARENESS.md           # Multi-device session awareness
 │   ├── IOS-HOOKS-INTEGRATION.md       # Hook-based permission bridge
+│   ├── IOS-WORKTREE-CONVERSATIONS.md  # Resume/history UX for worktree sessions
 │   └── DISCONNECT-FLOW.md            # Disconnect flow design
 ├── guides/                    # Guides & Testing docs
 │   ├── WORKSPACE-MANAGER-SETUP.md  # Workspace manager setup with VS Code tunnels
@@ -122,6 +126,7 @@ docs/
 | [architecture/VSCODE-INTEGRATION-STRATEGY.md](./architecture/VSCODE-INTEGRATION-STRATEGY.md) | **Strategy** - Detailed VS Code integration and JSON-RPC 2.0 migration |
 | [architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md](./architecture/TRANSPORT-ARCHITECTURE-ANALYSIS.md) | **Analysis** - WebSocket vs HTTP dual-protocol evaluation |
 | [architecture/MULTI-AGENT-ARCHITECTURE.md](./architecture/MULTI-AGENT-ARCHITECTURE.md) | **Strategy** - Multi-agent support for Claude, Gemini, and Codex |
+| [architecture/WORKTREE-SESSION-ARCHITECTURE.md](./architecture/WORKTREE-SESSION-ARCHITECTURE.md) | **Design** - Workspace-family session lookup across root repos and worktrees |
 
 **Key Topics:**
 - Hexagonal architecture (ports & adapters)
@@ -164,6 +169,7 @@ docs/
 | [mobile/LIVE-SESSION-INTEGRATION.md](./mobile/LIVE-SESSION-INTEGRATION.md) | **LIVE session** detection, injection, and known limitations |
 | [mobile/SESSION-AWARENESS.md](./mobile/SESSION-AWARENESS.md) | Multi-device session awareness |
 | [mobile/IOS-HOOKS-INTEGRATION.md](./mobile/IOS-HOOKS-INTEGRATION.md) | Hook-based permission bridge for external sessions |
+| [mobile/IOS-WORKTREE-CONVERSATIONS.md](./mobile/IOS-WORKTREE-CONVERSATIONS.md) | Worktree-aware `/resume` and session history UX |
 
 **Key Topics:**
 - JSON-RPC 2.0 WebSocket integration

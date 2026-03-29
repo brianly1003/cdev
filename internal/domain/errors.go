@@ -21,6 +21,10 @@ var (
 	ErrInvalidPayload       = errors.New("invalid payload")
 	ErrHubNotRunning        = errors.New("event hub is not running")
 	ErrSubscriberClosed     = errors.New("subscriber is closed")
+	ErrTaskNotFound         = errors.New("task not found")
+	ErrInvalidTaskTransition = errors.New("invalid task status transition")
+	ErrTaskAlreadyRunning   = errors.New("task is already running")
+	ErrWebhookSignatureInvalid = errors.New("webhook signature validation failed")
 )
 
 // Error codes for client responses.
@@ -34,6 +38,9 @@ const (
 	ErrCodeFileTooLarge         = "FILE_TOO_LARGE"
 	ErrCodeGitError             = "GIT_ERROR"
 	ErrCodeInternalError        = "INTERNAL_ERROR"
+	ErrCodeTaskNotFound         = "TASK_NOT_FOUND"
+	ErrCodeInvalidTransition    = "INVALID_TRANSITION"
+	ErrCodeWebhookSignature     = "WEBHOOK_SIGNATURE_INVALID"
 )
 
 // ClaudeError represents an error from Claude CLI operations.

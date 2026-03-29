@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/config"
+	"github.com/brianly1003/cdev/internal/gitutil"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -115,6 +117,59 @@ func (m *ConfigManager) GetWorkspace(id string) (*Workspace, error) {
 		return nil, fmt.Errorf("workspace not found: %s", id)
 	}
 	return ws, nil
+}
+
+// ResolveWorkspace finds a workspace by ID, name (case-insensitive), or path.
+// This supports webhook payloads that may specify workspace by human-readable name
+// (e.g., "Lazy") rather than UUID.
+func (m *ConfigManager) ResolveWorkspace(idOrName string) (*Workspace, error) {
+	m.mu.RLock()
+	if ws, ok := m.workspaces[idOrName]; ok {
+		m.mu.RUnlock()
+		return ws, nil
+	}
+
+	workspaces := make([]*Workspace, 0, len(m.workspaces))
+	for _, ws := range m.workspaces {
+		workspaces = append(workspaces, ws)
+	}
+	m.mu.RUnlock()
+
+	// 1. Try case-insensitive name match.
+	lower := strings.ToLower(idOrName)
+	for _, ws := range workspaces {
+		if strings.ToLower(ws.Definition.Name) == lower {
+			return ws, nil
+		}
+	}
+
+	resolvedPath := gitutil.NormalizePath(idOrName)
+	if resolvedPath == "" {
+		return nil, fmt.Errorf("workspace not found: %s (checked ID, name, path, and repo family)", idOrName)
+	}
+
+	// 2. Try exact path match.
+	for _, ws := range workspaces {
+		if gitutil.NormalizePath(ws.Definition.Path) == resolvedPath {
+			return ws, nil
+		}
+	}
+
+	// 3. Allow paths inside the workspace root.
+	for _, ws := range workspaces {
+		if gitutil.IsWithinPath(ws.Definition.Path, resolvedPath) {
+			return ws, nil
+		}
+	}
+
+	// 4. Allow git worktrees that share the same git common dir.
+	for _, ws := range workspaces {
+		if gitutil.SameRepoFamily(ws.Definition.Path, resolvedPath) {
+			return ws, nil
+		}
+	}
+
+	return nil, fmt.Errorf("workspace not found: %s (checked ID, name, path, subtree, and repo family)", idOrName)
 }
 
 // AddWorkspace adds a new workspace configuration.

@@ -53,7 +53,7 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 // schemaVersion is incremented when the counting logic or schema changes.
 // This forces a complete rebuild of the cache to ensure correct data.
-const schemaVersion = 5 // v5: Count assistant with text OR thinking (not tool_use-only)
+const schemaVersion = 6 // v6: include metadata-only Claude sessions shown by /resume
 
 // New creates a new session cache.
 func New(repoPath string) (*Cache, error) {
@@ -307,7 +307,7 @@ func (c *Cache) fullSync() error {
 			continue
 		}
 
-		if session.MessageCount == 0 {
+		if !shouldCacheSession(session) {
 			continue
 		}
 
@@ -477,7 +477,7 @@ func (c *Cache) syncFile(filePath string) {
 		return
 	}
 
-	if session.MessageCount == 0 {
+	if !shouldCacheSession(session) {
 		return
 	}
 
@@ -546,6 +546,14 @@ type sessionMessage struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type sessionRecord struct {
+	Type       string `json:"type"`
+	GitBranch  string `json:"gitBranch,omitempty"`
+	Content    string `json:"content,omitempty"`
+	LastPrompt string `json:"lastPrompt,omitempty"`
+	Operation  string `json:"operation,omitempty"`
+}
+
 // extractContent extracts text content from the message.
 func (m *sessionMessage) extractContent() string {
 	if m.Message.Content == nil {
@@ -596,6 +604,8 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 
 	messageCount := 0
 	foundSummary := false
+	hasSystemActivity := false
+	sawRecord := false
 
 	reader := jsonl.NewReader(file, 0)
 
@@ -618,28 +628,66 @@ func parseSessionFile(filePath string, sessionID string) (SessionInfo, error) {
 			continue
 		}
 
-		var msg sessionMessage
-		if err := json.Unmarshal(line.Data, &msg); err != nil {
+		var record sessionRecord
+		if err := json.Unmarshal(line.Data, &record); err != nil {
 			continue
 		}
+		sawRecord = true
 
-		// Count messages matching Claude CLI logic
-		if msg.Type == "user" && msg.isUserTextMessage() {
-			messageCount++
-		} else if msg.Type == "assistant" && msg.hasTextOrThinkingContent() {
-			// Count assistant messages with "text" or "thinking" content (not tool_use-only)
-			messageCount++
+		if info.Branch == "" && record.GitBranch != "" {
+			info.Branch = record.GitBranch
 		}
 
-		content := msg.extractContent()
-		if !foundSummary && msg.Type == "user" && content != "" {
-			info.Summary = truncateSummary(content, 100)
-			info.Branch = msg.GitBranch
-			foundSummary = true
+		switch record.Type {
+		case "user", "assistant":
+			var msg sessionMessage
+			if err := json.Unmarshal(line.Data, &msg); err != nil {
+				continue
+			}
+
+			if info.Branch == "" && msg.GitBranch != "" {
+				info.Branch = msg.GitBranch
+			}
+
+			// Count messages matching Claude CLI logic
+			if msg.Type == "user" && msg.isUserTextMessage() {
+				messageCount++
+			} else if msg.Type == "assistant" && msg.hasTextOrThinkingContent() {
+				// Count assistant messages with "text" or "thinking" content (not tool_use-only)
+				messageCount++
+			}
+
+			content := msg.extractContent()
+			if !foundSummary && msg.Type == "user" && content != "" {
+				info.Summary = truncateSummary(content, 100)
+				foundSummary = true
+			}
+		case "queue-operation":
+			if !foundSummary && record.Operation == "enqueue" && strings.TrimSpace(record.Content) != "" {
+				info.Summary = truncateSummary(record.Content, 100)
+				foundSummary = true
+			}
+		case "last-prompt":
+			if !foundSummary && strings.TrimSpace(record.LastPrompt) != "" {
+				info.Summary = truncateSummary(record.LastPrompt, 100)
+				foundSummary = true
+			}
+		case "system":
+			hasSystemActivity = true
 		}
 	}
 
 	info.MessageCount = messageCount
+	if !sawRecord {
+		return info, nil
+	}
+	if info.Summary == "" {
+		if hasSystemActivity {
+			info.Summary = shortSessionLabel(sessionID)
+		} else {
+			info.Summary = "(session)"
+		}
+	}
 
 	return info, nil
 }
@@ -714,6 +762,17 @@ func truncateSummary(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func shortSessionLabel(sessionID string) string {
+	if len(sessionID) <= 8 {
+		return sessionID
+	}
+	return sessionID[:8]
+}
+
+func shouldCacheSession(session SessionInfo) bool {
+	return session.MessageCount > 0 || strings.TrimSpace(session.Summary) != ""
 }
 
 // GetSessionsDir exports the sessions directory path.

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/domain/ports"
+	"github.com/brianly1003/cdev/internal/gitutil"
 	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/brianly1003/cdev/internal/sync"
 	"github.com/brianly1003/cdev/internal/workspace"
@@ -28,6 +30,10 @@ import (
 )
 
 const agentTypeClaude = "claude"
+
+type historicalSessionProjectPathResolver interface {
+	ResolveHistoricalSessionProjectPath(workspaceID, sessionID string) (string, bool, error)
+}
 
 type watchedSessionKey struct {
 	WorkspaceID string
@@ -39,16 +45,25 @@ type watchedSessionStream struct {
 	watchers map[string]bool
 }
 
+type sessionFileWatcherEntry struct {
+	WorkspaceID string
+	RepoPath    string
+	Cancel      context.CancelFunc
+}
+
 // Manager orchestrates multiple Claude sessions across workspaces.
 type Manager struct {
 	sessions                map[string]*Session             // keyed by session ID
 	workspaces              map[string]*workspace.Workspace // keyed by workspace ID
 	activeSessions          map[string]string               // workspace ID -> active session ID
 	activeSessionWorkspaces map[string]string               // session ID -> workspace ID (reverse mapping)
+	sessionAliases          map[string]string               // temporary/old session ID -> canonical session ID
+	sessionProjectPaths     map[string]string               // session ID -> Claude project path
 	gitTrackerManager       *workspace.GitTrackerManager
 	hub                     ports.EventHub
 	cfg                     *config.Config
 	logger                  *slog.Logger
+	historicalPathResolver  historicalSessionProjectPathResolver
 
 	// Configuration
 	idleTimeout time.Duration
@@ -66,9 +81,10 @@ type Manager struct {
 	gitWatcherCounts map[string]int                // workspace ID -> subscriber count (reference counting)
 	gitWatchersMu    sync.Mutex
 
-	// Session file watchers for detecting real session IDs (one per workspace)
-	// Used when starting a new session in a workspace with no existing sessions
-	sessionFileWatchers   map[string]context.CancelFunc // workspaceID -> cancel function
+	// Session file watchers for detecting real session IDs.
+	// Each temporary session ID gets its own watcher so concurrent worktree sessions
+	// in the same workspace do not overwrite each other.
+	sessionFileWatchers   map[string]sessionFileWatcherEntry // temporary session ID -> watcher entry
 	sessionFileWatchersMu sync.Mutex
 
 	ctx    context.Context
@@ -89,11 +105,13 @@ func NewManager(hub ports.EventHub, cfg *config.Config, logger *slog.Logger) *Ma
 		workspaces:              make(map[string]*workspace.Workspace),
 		activeSessions:          make(map[string]string),
 		activeSessionWorkspaces: make(map[string]string),
+		sessionAliases:          make(map[string]string),
+		sessionProjectPaths:     make(map[string]string),
 		gitWatchers:             make(map[string]context.CancelFunc),
 		gitWatcherCounts:        make(map[string]int),
 		streamerSessions:        make(map[watchedSessionKey]*watchedSessionStream),
 		streamerClientSessions:  make(map[string]map[watchedSessionKey]bool),
-		sessionFileWatchers:     make(map[string]context.CancelFunc),
+		sessionFileWatchers:     make(map[string]sessionFileWatcherEntry),
 		hub:                     hub,
 		cfg:                     cfg,
 		logger:                  logger,
@@ -148,11 +166,11 @@ func (m *Manager) Stop() error {
 
 	// Cancel all session file watchers (prevents goroutine leaks)
 	m.sessionFileWatchersMu.Lock()
-	for workspaceID, cancel := range m.sessionFileWatchers {
-		cancel()
-		m.logger.Debug("Cancelled session file watcher", "workspace_id", workspaceID)
+	for temporaryID, entry := range m.sessionFileWatchers {
+		entry.Cancel()
+		m.logger.Debug("Cancelled session file watcher", "workspace_id", entry.WorkspaceID, "temporary_id", temporaryID)
 	}
-	m.sessionFileWatchers = make(map[string]context.CancelFunc)
+	m.sessionFileWatchers = make(map[string]sessionFileWatcherEntry)
 	m.sessionFileWatchersMu.Unlock()
 
 	// Cancel the manager context
@@ -376,6 +394,148 @@ func (m *Manager) OnClientDisconnect(clientID string, subscribedWorkspaces []str
 
 // findWorkspaceForSession searches all workspaces to find which one contains the given session.
 // This is used for LIVE sessions that were discovered but not explicitly activated.
+func (m *Manager) resolveSessionID(sessionID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.resolveSessionIDLocked(sessionID)
+}
+
+// ResolveSessionID returns the canonical session ID after applying any
+// temporary-to-real session alias mapping.
+func (m *Manager) ResolveSessionID(sessionID string) string {
+	return m.resolveSessionID(sessionID)
+}
+
+// SetHistoricalSessionProjectPathResolver installs a fallback resolver for
+// historical session project paths that are no longer discoverable from the
+// live workspace layout, such as cleaned-up task worktrees.
+func (m *Manager) SetHistoricalSessionProjectPathResolver(resolver historicalSessionProjectPathResolver) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.historicalPathResolver = resolver
+}
+
+func (m *Manager) workspaceProjectPaths(workspaceID string) ([]string, error) {
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return m.workspaceProjectPathsForWorkspace(ws), nil
+}
+
+func (m *Manager) workspaceProjectPathsForWorkspace(ws *workspace.Workspace) []string {
+	paths := []string{ws.Definition.Path}
+
+	if worktreePaths, err := gitutil.ListWorktreePaths(ws.Definition.Path); err == nil {
+		paths = append(paths, worktreePaths...)
+	}
+
+	m.mu.RLock()
+	for _, session := range m.sessions {
+		if session.WorkspaceID == ws.Definition.ID && strings.TrimSpace(session.ProjectPath) != "" {
+			paths = append(paths, session.ProjectPath)
+		}
+	}
+	for sessionID, workspaceID := range m.activeSessionWorkspaces {
+		if workspaceID != ws.Definition.ID {
+			continue
+		}
+		if projectPath := strings.TrimSpace(m.sessionProjectPaths[sessionID]); projectPath != "" {
+			paths = append(paths, projectPath)
+		}
+	}
+	m.mu.RUnlock()
+
+	seen := make(map[string]struct{}, len(paths))
+	uniquePaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		normalized := gitutil.NormalizePath(path)
+		if normalized == "" {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		uniquePaths = append(uniquePaths, normalized)
+	}
+
+	return uniquePaths
+}
+
+func (m *Manager) projectPathForSession(sessionID string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	resolvedSessionID := m.resolveSessionIDLocked(sessionID)
+	if projectPath := strings.TrimSpace(m.sessionProjectPaths[resolvedSessionID]); projectPath != "" {
+		return projectPath
+	}
+	if projectPath := strings.TrimSpace(m.sessionProjectPaths[sessionID]); projectPath != "" {
+		return projectPath
+	}
+	return ""
+}
+
+func sessionFileExistsAtProjectPath(projectPath, sessionID string) (bool, error) {
+	sessionFile := filepath.Join(getSessionsDir(projectPath), sessionID+".jsonl")
+	_, err := os.Stat(sessionFile)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (m *Manager) resolveSessionProjectPath(workspaceID, sessionID string) (string, error) {
+	resolvedSessionID := m.resolveSessionID(sessionID)
+
+	if projectPath := m.projectPathForSession(resolvedSessionID); projectPath != "" {
+		exists, err := sessionFileExistsAtProjectPath(projectPath, resolvedSessionID)
+		if err == nil && exists {
+			return projectPath, nil
+		}
+	}
+
+	projectPaths, err := m.workspaceProjectPaths(workspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, projectPath := range projectPaths {
+		exists, err := sessionFileExistsAtProjectPath(projectPath, resolvedSessionID)
+		if err != nil {
+			continue
+		}
+		if exists {
+			return projectPath, nil
+		}
+	}
+
+	m.mu.RLock()
+	resolver := m.historicalPathResolver
+	m.mu.RUnlock()
+	if resolver != nil {
+		projectPath, ok, err := resolver.ResolveHistoricalSessionProjectPath(workspaceID, resolvedSessionID)
+		if err != nil {
+			return "", err
+		}
+		if ok && strings.TrimSpace(projectPath) != "" {
+			exists, err := sessionFileExistsAtProjectPath(projectPath, resolvedSessionID)
+			if err == nil && exists {
+				m.mu.Lock()
+				m.sessionProjectPaths[resolvedSessionID] = projectPath
+				m.mu.Unlock()
+				return projectPath, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("session not found: %s", sessionID)
+}
+
 func (m *Manager) findWorkspaceForSession(sessionID string) string {
 	m.mu.RLock()
 	workspaces := make(map[string]*workspace.Workspace, len(m.workspaces))
@@ -385,7 +545,6 @@ func (m *Manager) findWorkspaceForSession(sessionID string) string {
 	m.mu.RUnlock()
 
 	for workspaceID, ws := range workspaces {
-		// Check if this workspace has the session in its session files
 		exists, _ := m.sessionFileExistsForWorkspace(ws, sessionID)
 		if exists {
 			log.Debug().
@@ -396,8 +555,6 @@ func (m *Manager) findWorkspaceForSession(sessionID string) string {
 		}
 	}
 
-	// Fallback for stale/non-matching session IDs:
-	// infer workspace from LIVE Claude process detection.
 	liveWorkspaceCandidates := make([]string, 0, 1)
 	for workspaceID, ws := range workspaces {
 		detector := live.NewDetector(ws.Definition.Path)
@@ -421,110 +578,74 @@ func (m *Manager) findWorkspaceForSession(sessionID string) string {
 	return ""
 }
 
-// sessionFileExistsForWorkspace checks if a session file exists for a workspace.
-// This is a standalone check that does file I/O only.
 func (m *Manager) sessionFileExistsForWorkspace(ws *workspace.Workspace, sessionID string) (bool, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return false, err
+	resolvedSessionID := m.resolveSessionID(sessionID)
+	for _, projectPath := range m.workspaceProjectPathsForWorkspace(ws) {
+		exists, err := sessionFileExistsAtProjectPath(projectPath, resolvedSessionID)
+		if err != nil {
+			continue
+		}
+		if exists {
+			return true, nil
+		}
 	}
 
-	// Convert workspace path to Claude's project path format (cross-platform)
-	projectPath := pathutil.EncodePath(ws.Definition.Path)
-
-	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
-	_, err = os.Stat(sessionFile)
-	return err == nil, nil
+	return false, nil
 }
 
-// SessionFileExists checks if a session file exists in .claude/projects for the workspace.
-// This validates against the source of truth for Claude Code sessions.
 func (m *Manager) SessionFileExists(workspaceID string, sessionID string) (bool, error) {
-	ws, err := m.GetWorkspace(workspaceID)
+	projectPath, err := m.resolveSessionProjectPath(workspaceID, sessionID)
 	if err != nil {
+		if strings.Contains(err.Error(), "session not found") {
+			return false, nil
+		}
 		return false, err
 	}
 
-	homeDir, err := os.UserHomeDir()
+	resolvedSessionID := m.resolveSessionID(sessionID)
+	exists, err := sessionFileExistsAtProjectPath(projectPath, resolvedSessionID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get home directory: %w", err)
+		return false, err
 	}
-
-	// Convert workspace path to Claude's project path format (cross-platform)
-	projectPath := pathutil.EncodePath(ws.Definition.Path)
-
-	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
-	_, err = os.Stat(sessionFile)
-	exists := err == nil
 
 	log.Debug().
 		Str("workspace_id", workspaceID).
-		Str("session_id", sessionID).
-		Str("session_file", sessionFile).
+		Str("session_id", resolvedSessionID).
+		Str("project_path", projectPath).
 		Bool("exists", exists).
 		Msg("checking session file in .claude/projects")
 
 	return exists, nil
 }
 
-// GetLatestSessionID returns the most recently modified session ID from .claude/projects.
-// This is the source of truth for Claude Code sessions.
-// Only returns main sessions (UUID-formatted files with user interaction), not agent sub-sessions.
-func (m *Manager) GetLatestSessionID(workspaceID string) (string, error) {
-	ws, err := m.GetWorkspace(workspaceID)
-	if err != nil {
-		return "", err
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	// Convert workspace path to Claude's project path format (cross-platform)
-	projectPath := pathutil.EncodePath(ws.Definition.Path)
-
-	sessionsDir := filepath.Join(homeDir, ".claude", "projects", projectPath)
-
+func (m *Manager) latestSessionCandidate(projectPath string) (string, int64, error) {
+	sessionsDir := getSessionsDir(projectPath)
 	entries, err := os.ReadDir(sessionsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil // No sessions directory yet
+			return "", 0, nil
 		}
-		return "", fmt.Errorf("failed to read sessions directory: %w", err)
+		return "", 0, err
 	}
 
-	// Collect valid main sessions (UUID format with user interaction)
-	type sessionCandidate struct {
-		sessionID string
-		modTime   int64
-	}
-	var candidates []sessionCandidate
+	var latestSession string
+	var latestModTime int64
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
 			continue
 		}
-
-		// Skip agent sub-sessions (agent-*.jsonl)
 		if strings.HasPrefix(entry.Name(), "agent-") {
 			continue
 		}
 
-		// Get session ID (filename without .jsonl)
 		sessionID := strings.TrimSuffix(entry.Name(), ".jsonl")
-
-		// Validate UUID format (main sessions have UUID filenames)
 		if _, err := uuid.Parse(sessionID); err != nil {
-			continue // Not a valid UUID, skip
+			continue
 		}
 
-		// Check if file contains "role":"user" (actual user session)
 		sessionPath := filepath.Join(sessionsDir, entry.Name())
 		if !m.sessionHasUserRole(sessionPath) {
-			log.Debug().
-				Str("session_id", sessionID).
-				Msg("skipping session without user interaction")
 			continue
 		}
 
@@ -533,32 +654,37 @@ func (m *Manager) GetLatestSessionID(workspaceID string) (string, error) {
 			continue
 		}
 
-		candidates = append(candidates, sessionCandidate{
-			sessionID: sessionID,
-			modTime:   info.ModTime().UnixNano(),
-		})
-	}
-
-	if len(candidates) == 0 {
-		return "", nil // No valid session files found
-	}
-
-	// Find the most recently modified valid session
-	var latestSession string
-	var latestModTime int64
-	for _, c := range candidates {
-		if c.modTime > latestModTime {
-			latestModTime = c.modTime
-			latestSession = c.sessionID
+		if modTime := info.ModTime().UnixNano(); modTime > latestModTime {
+			latestModTime = modTime
+			latestSession = sessionID
 		}
 	}
 
-	log.Info().
-		Str("workspace_id", workspaceID).
-		Str("session_id", latestSession).
-		Str("sessions_dir", sessionsDir).
-		Int("candidates_count", len(candidates)).
-		Msg("found latest session from .claude/projects")
+	return latestSession, latestModTime, nil
+}
+
+// GetLatestSessionID returns the most recently modified session ID from .claude/projects.
+// This is the source of truth for Claude Code sessions.
+// Only returns main sessions (UUID-formatted files with user interaction), not agent sub-sessions.
+func (m *Manager) GetLatestSessionID(workspaceID string) (string, error) {
+	projectPaths, err := m.workspaceProjectPaths(workspaceID)
+	if err != nil {
+		return "", err
+	}
+
+	var latestSession string
+	var latestModTime int64
+
+	for _, projectPath := range projectPaths {
+		sessionID, modTime, err := m.latestSessionCandidate(projectPath)
+		if err != nil {
+			continue
+		}
+		if modTime > latestModTime {
+			latestModTime = modTime
+			latestSession = sessionID
+		}
+	}
 
 	return latestSession, nil
 }
@@ -627,6 +753,7 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	}
 
 	session := NewSession(sessionID, workspaceID)
+	session.ProjectPath = ws.Definition.Path
 	session.SetStatus(StatusStarting)
 
 	// Create Claude manager for this session
@@ -670,6 +797,7 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 
 	// Store session
 	m.sessions[sessionID] = session
+	m.sessionProjectPaths[sessionID] = ws.Definition.Path
 	session.SetStatus(StatusRunning)
 
 	// Auto-activate this session for the workspace
@@ -685,27 +813,123 @@ func (m *Manager) StartSession(workspaceID string) (*Session, error) {
 	return session, nil
 }
 
+// StartNewSession starts a fresh Claude session with a new UUID.
+// Unlike StartSession (which reuses the most recent historical session for "continue" mode),
+// this method always generates a new session ID. Use this for agent-spawned tasks
+// to avoid colliding with existing human sessions.
+func (m *Manager) StartNewSession(workspaceID string) (*Session, error) {
+	return m.StartNewSessionInDir(workspaceID, "")
+}
+
+// StartNewSessionInDir starts a fresh Claude session with a new UUID, using workDir as
+// the working directory. If workDir is empty, falls back to the workspace path.
+// Use this for agent tasks running in git worktrees so Claude can find .cdev/ files.
+func (m *Manager) StartNewSessionInDir(workspaceID, workDir string) (*Session, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check workspace exists
+	ws, ok := m.workspaces[workspaceID]
+	if !ok {
+		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
+	}
+
+	// Use worktree path if provided, otherwise fall back to workspace path
+	effectiveDir := ws.Definition.Path
+	if workDir != "" {
+		effectiveDir = workDir
+	}
+
+	// Always generate a fresh UUID for task sessions
+	sessionID := uuid.New().String()
+	m.logger.Info("Starting new agent session with fresh ID",
+		"session_id", sessionID,
+		"workspace_id", workspaceID,
+		"work_dir", effectiveDir,
+	)
+
+	session := NewSession(sessionID, workspaceID)
+	session.ProjectPath = effectiveDir
+	session.SetStatus(StatusStarting)
+
+	// Create Claude manager for this session — use effectiveDir (worktree) as workDir
+	claudeManager := claude.NewManagerWithContext(
+		m.hub,
+		m.cfg.Claude.Command,
+		m.cfg.Claude.Args,
+		m.cfg.Claude.TimeoutMinutes,
+		m.cfg.Claude.SkipPermissions,
+		effectiveDir,
+		workspaceID,
+		sessionID,
+		&m.cfg.Logging.Rotation,
+	)
+	session.SetClaudeManager(claudeManager)
+
+	// Track git state from the effective working directory so worktree sessions
+	// see the correct branch/status.
+	gitTracker := git.NewTracker(effectiveDir, m.cfg.Git.Command, m.hub)
+	session.SetGitTracker(gitTracker)
+
+	// Optionally create file watcher (lazy init based on config)
+	if m.cfg.Watcher.Enabled {
+		fileWatcher := watcher.NewWatcherWithWorkspace(
+			effectiveDir,
+			m.hub,
+			m.cfg.Watcher.DebounceMS,
+			m.cfg.Watcher.IgnorePatterns,
+			workspaceID,
+		)
+		session.SetFileWatcher(fileWatcher)
+
+		if err := fileWatcher.Start(m.ctx); err != nil {
+			m.logger.Warn("Failed to start file watcher", "error", err, "workspace_id", workspaceID)
+		}
+	}
+
+	// Store session
+	m.sessions[sessionID] = session
+	m.sessionProjectPaths[sessionID] = effectiveDir
+	session.SetStatus(StatusRunning)
+
+	// Auto-activate this session for the workspace
+	m.activeSessions[workspaceID] = sessionID
+
+	m.logger.Info("Started new agent session",
+		"session_id", sessionID,
+		"workspace_id", workspaceID,
+		"workspace_name", ws.Definition.Name,
+		"path", ws.Definition.Path,
+	)
+
+	return session, nil
+}
+
 // WatchForNewSessionFile watches the .claude/projects directory for new session files.
 // When a new .jsonl file is created (after trust folder is accepted), it emits
 // a session_id_resolved event with the real session ID from Claude.
 //
-// Thread-safety: Only one watcher per workspace is allowed. If a watcher already exists
-// for this workspace, this call is a no-op. The watcher is automatically cleaned up
-// on completion, timeout, or cancellation.
+// Each temporary session ID gets its own watcher. This allows multiple concurrent
+// worktree-backed sessions under the same logical workspace.
 func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, temporaryID, repoPath string) {
-	// Prevent multiple watchers for the same workspace (race condition fix)
+	repoPath = gitutil.NormalizePath(repoPath)
+
 	m.sessionFileWatchersMu.Lock()
-	if _, exists := m.sessionFileWatchers[workspaceID]; exists {
+	if _, exists := m.sessionFileWatchers[temporaryID]; exists {
 		m.sessionFileWatchersMu.Unlock()
-		m.logger.Debug("session file watcher already exists for workspace",
+		m.logger.Debug("session file watcher already exists for session",
 			"workspace_id", workspaceID,
+			"temporary_id", temporaryID,
 		)
 		return
 	}
 
-	// Create cancellable context for this watcher
 	watchCtx, watchCancel := context.WithCancel(ctx)
-	m.sessionFileWatchers[workspaceID] = watchCancel
+	m.sessionFileWatchers[temporaryID] = sessionFileWatcherEntry{
+		WorkspaceID: workspaceID,
+		RepoPath:    repoPath,
+		Cancel:      watchCancel,
+	}
 	m.sessionFileWatchersMu.Unlock()
 
 	sessionsDir := getSessionsDir(repoPath)
@@ -714,14 +938,14 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		m.logger.Error("failed to create session file watcher", "error", err)
-		m.cleanupSessionFileWatcher(workspaceID)
+		m.cleanupSessionFileWatcher(temporaryID)
 		return
 	}
 
 	go func() {
 		defer func() {
 			_ = watcher.Close()
-			m.cleanupSessionFileWatcher(workspaceID)
+			m.cleanupSessionFileWatcher(temporaryID)
 		}()
 
 		// Track if we've found the session
@@ -761,7 +985,7 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 				// Watcher was cancelled - don't emit event here
 				// The caller (FailSessionIDResolution or CancelSessionFileWatcher)
 				// will emit the appropriate event if needed
-				m.logger.Debug("session file watcher cancelled", "workspace_id", workspaceID)
+				m.logger.Debug("session file watcher cancelled", "workspace_id", workspaceID, "temporary_id", temporaryID)
 				return
 
 			case event, ok := <-watcher.Events:
@@ -858,11 +1082,11 @@ func (m *Manager) WatchForNewSessionFile(ctx context.Context, workspaceID, tempo
 	}()
 }
 
-// cleanupSessionFileWatcher removes the watcher tracking for a workspace.
-func (m *Manager) cleanupSessionFileWatcher(workspaceID string) {
+// cleanupSessionFileWatcher removes the watcher tracking for a temporary session ID.
+func (m *Manager) cleanupSessionFileWatcher(temporaryID string) {
 	m.sessionFileWatchersMu.Lock()
 	defer m.sessionFileWatchersMu.Unlock()
-	delete(m.sessionFileWatchers, workspaceID)
+	delete(m.sessionFileWatchers, temporaryID)
 }
 
 // ensureInternalPTYSessionWatch ensures JSONL streaming is active for a resolved PTY session.
@@ -888,16 +1112,16 @@ func (m *Manager) ensureInternalPTYSessionWatch(workspaceID, sessionID string) {
 	)
 }
 
-// CancelSessionFileWatcher cancels an active session file watcher for a workspace.
-// Called when a session is stopped or workspace is removed.
+// CancelSessionFileWatcher cancels an active session file watcher for a temporary session ID.
+// Called when a session is stopped.
 // Does NOT emit any event - use FailSessionIDResolution if you need to emit an event.
-func (m *Manager) CancelSessionFileWatcher(workspaceID string) {
+func (m *Manager) CancelSessionFileWatcher(sessionID string) {
 	m.sessionFileWatchersMu.Lock()
 	defer m.sessionFileWatchersMu.Unlock()
-	if cancel, exists := m.sessionFileWatchers[workspaceID]; exists {
-		cancel()
-		delete(m.sessionFileWatchers, workspaceID)
-		m.logger.Debug("cancelled session file watcher", "workspace_id", workspaceID)
+	if entry, exists := m.sessionFileWatchers[sessionID]; exists {
+		entry.Cancel()
+		delete(m.sessionFileWatchers, sessionID)
+		m.logger.Debug("cancelled session file watcher", "workspace_id", entry.WorkspaceID, "temporary_id", sessionID)
 	}
 }
 
@@ -910,10 +1134,10 @@ func (m *Manager) CancelSessionFileWatcher(workspaceID string) {
 //   - message: Optional human-readable message
 func (m *Manager) FailSessionIDResolution(workspaceID, temporaryID, reason, message string) {
 	m.sessionFileWatchersMu.Lock()
-	cancel, exists := m.sessionFileWatchers[workspaceID]
+	entry, exists := m.sessionFileWatchers[temporaryID]
 	if exists {
-		cancel()
-		delete(m.sessionFileWatchers, workspaceID)
+		entry.Cancel()
+		delete(m.sessionFileWatchers, temporaryID)
 	}
 	m.sessionFileWatchersMu.Unlock()
 
@@ -934,12 +1158,13 @@ func (m *Manager) FailSessionIDResolution(workspaceID, temporaryID, reason, mess
 	}
 }
 
-// HasActiveSessionFileWatcher returns true if there's an active watcher for the workspace.
-func (m *Manager) HasActiveSessionFileWatcher(workspaceID string) bool {
+// HasActiveSessionFileWatcher returns true if the temporary session still has an active watcher.
+func (m *Manager) HasActiveSessionFileWatcher(workspaceID, temporaryID string) bool {
 	m.sessionFileWatchersMu.Lock()
 	defer m.sessionFileWatchersMu.Unlock()
-	_, exists := m.sessionFileWatchers[workspaceID]
-	return exists
+
+	entry, exists := m.sessionFileWatchers[temporaryID]
+	return exists && entry.WorkspaceID == workspaceID
 }
 
 // PublishEvent publishes an event to the hub.
@@ -998,14 +1223,18 @@ func (m *Manager) scanForExistingSessionFile(sessionsDir, temporaryID string) st
 // This is used when resuming a historical session where we know the exact session ID.
 // Note: This is an internal helper - external callers should use StartSession.
 func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Check workspace exists
-	ws, ok := m.workspaces[workspaceID]
-	if !ok {
+	ws, err := m.GetWorkspace(workspaceID)
+	if err != nil {
 		return nil, fmt.Errorf("workspace not found: %s", workspaceID)
 	}
+
+	effectiveDir := ws.Definition.Path
+	if projectPath, err := m.resolveSessionProjectPath(workspaceID, sessionID); err == nil && strings.TrimSpace(projectPath) != "" {
+		effectiveDir = projectPath
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Check if session already exists
 	if existing, ok := m.sessions[sessionID]; ok {
@@ -1026,6 +1255,7 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 	}
 
 	session := NewSession(sessionID, workspaceID)
+	session.ProjectPath = effectiveDir
 	session.SetStatus(StatusStarting)
 
 	// Create Claude manager for this session
@@ -1035,21 +1265,22 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 		m.cfg.Claude.Args,
 		m.cfg.Claude.TimeoutMinutes,
 		m.cfg.Claude.SkipPermissions,
-		ws.Definition.Path,
+		effectiveDir,
 		workspaceID,
 		sessionID,
 		&m.cfg.Logging.Rotation,
 	)
 	session.SetClaudeManager(claudeManager)
 
-	// Create git tracker for this workspace
-	gitTracker := git.NewTracker(ws.Definition.Path, m.cfg.Git.Command, m.hub)
+	// Track git state from the actual Claude project path so resumed worktree
+	// sessions observe the correct branch/worktree.
+	gitTracker := git.NewTracker(effectiveDir, m.cfg.Git.Command, m.hub)
 	session.SetGitTracker(gitTracker)
 
 	// Create file watcher (same as StartSession)
 	if m.cfg.Watcher.Enabled {
 		fileWatcher := watcher.NewWatcherWithWorkspace(
-			ws.Definition.Path,
+			effectiveDir,
 			m.hub,
 			m.cfg.Watcher.DebounceMS,
 			m.cfg.Watcher.IgnorePatterns,
@@ -1065,6 +1296,7 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 
 	// Store session
 	m.sessions[sessionID] = session
+	m.sessionProjectPaths[sessionID] = effectiveDir
 	session.SetStatus(StatusRunning)
 
 	// Auto-activate this session for the workspace
@@ -1075,7 +1307,7 @@ func (m *Manager) startSessionWithID(workspaceID, sessionID string) (*Session, e
 		"session_id", sessionID,
 		"workspace_id", workspaceID,
 		"workspace_name", ws.Definition.Name,
-		"path", ws.Definition.Path,
+		"path", effectiveDir,
 	)
 
 	return session, nil
@@ -1127,8 +1359,11 @@ func (m *Manager) getMostRecentHistoricalSessionID(workspacePath string) string 
 // For managed sessions (started via cdev), this stops the Claude process.
 // For LIVE sessions (watched but not started by cdev), this unwatches and clears active status.
 func (m *Manager) StopSession(sessionID string) error {
+	originalSessionID := sessionID
+
 	// First check if it's a managed session (started by cdev)
 	m.mu.Lock()
+	sessionID = m.resolveSessionIDLocked(sessionID)
 	session, ok := m.sessions[sessionID]
 	if ok {
 		// It's a managed session - stop it while holding the lock
@@ -1161,7 +1396,7 @@ func (m *Manager) StopSession(sessionID string) error {
 	}
 
 	if workspaceID == "" {
-		return fmt.Errorf("session not found: %s", sessionID)
+		return fmt.Errorf("session not found: %s", originalSessionID)
 	}
 
 	// Stop watching/streaming the LIVE session
@@ -1223,7 +1458,7 @@ func (m *Manager) stopSessionInternalWithContext(ctx context.Context, session *S
 
 	// Cancel session file watcher if active (prevents memory leak)
 	// Note: CancelSessionFileWatcher uses its own mutex, safe to call while holding m.mu
-	m.CancelSessionFileWatcher(session.WorkspaceID)
+	m.CancelSessionFileWatcher(session.GetID())
 
 	// Stop Claude manager with the provided context
 	if cm := session.ClaudeManager(); cm != nil {
@@ -1264,7 +1499,8 @@ func (m *Manager) GetSession(sessionID string) (*Session, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	session, ok := m.sessions[sessionID]
+	resolvedSessionID := m.resolveSessionIDLocked(sessionID)
+	session, ok := m.sessions[resolvedSessionID]
 	if !ok {
 		return nil, fmt.Errorf("session not found: %s", sessionID)
 	}
@@ -1336,6 +1572,32 @@ func (m *Manager) GetActiveSession(workspaceID string) string {
 	return m.activeSessions[workspaceID]
 }
 
+// resolveSessionIDLocked resolves aliases to a canonical session ID.
+// The caller must hold m.mu (read or write).
+func (m *Manager) resolveSessionIDLocked(sessionID string) string {
+	currentID := sessionID
+	visited := make(map[string]struct{}, 4)
+
+	for {
+		nextID, hasAlias := m.sessionAliases[currentID]
+		if !hasAlias || nextID == "" || nextID == currentID {
+			return currentID
+		}
+
+		if _, seen := visited[currentID]; seen {
+			m.logger.Warn("Detected cycle in session alias mapping",
+				"session_id", sessionID,
+				"current_id", currentID,
+				"next_id", nextID,
+			)
+			return currentID
+		}
+
+		visited[currentID] = struct{}{}
+		currentID = nextID
+	}
+}
+
 // updateSessionID updates internal state when the real session ID is detected.
 // This is called when Claude creates a new session file with its own UUID.
 // It updates all internal mappings so workspace/list and other APIs return the real ID.
@@ -1349,8 +1611,33 @@ func (m *Manager) updateSessionID(workspaceID, temporaryID, realID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	resolvedTemporaryID := m.resolveSessionIDLocked(temporaryID)
+	if resolvedTemporaryID == realID {
+		m.sessionAliases[temporaryID] = realID
+		if projectPath := strings.TrimSpace(m.sessionProjectPaths[temporaryID]); projectPath != "" {
+			m.sessionProjectPaths[realID] = projectPath
+		}
+		m.logger.Debug("Session ID already resolves to target ID (idempotent skip)",
+			"workspace_id", workspaceID,
+			"temporary_id", temporaryID,
+			"real_id", realID,
+		)
+		return
+	}
+
 	// Idempotency check: if session already exists with realID, skip
 	if _, exists := m.sessions[realID]; exists {
+		m.sessionAliases[temporaryID] = realID
+		if resolvedTemporaryID != temporaryID {
+			m.sessionAliases[resolvedTemporaryID] = realID
+		}
+		if projectPath := strings.TrimSpace(m.sessionProjectPaths[resolvedTemporaryID]); projectPath != "" {
+			m.sessionProjectPaths[realID] = projectPath
+			m.sessionProjectPaths[temporaryID] = projectPath
+			if resolvedTemporaryID != temporaryID {
+				m.sessionProjectPaths[resolvedTemporaryID] = projectPath
+			}
+		}
 		m.logger.Debug("Session ID already updated (idempotent skip)",
 			"workspace_id", workspaceID,
 			"real_id", realID,
@@ -1359,24 +1646,40 @@ func (m *Manager) updateSessionID(workspaceID, temporaryID, realID string) {
 	}
 
 	// Check if session with temporaryID exists
-	session, ok := m.sessions[temporaryID]
+	session, ok := m.sessions[resolvedTemporaryID]
 	if !ok {
 		m.logger.Warn("Session not found for ID update",
 			"workspace_id", workspaceID,
 			"temporary_id", temporaryID,
+			"resolved_temporary_id", resolvedTemporaryID,
 			"real_id", realID,
 		)
 		return
 	}
 
 	// Update active session mapping
-	if m.activeSessions[workspaceID] == temporaryID {
+	if m.activeSessions[workspaceID] == resolvedTemporaryID || m.activeSessions[workspaceID] == temporaryID {
 		m.activeSessions[workspaceID] = realID
 	}
 
 	// Update reverse mapping (session ID -> workspace ID)
 	delete(m.activeSessionWorkspaces, temporaryID)
+	delete(m.activeSessionWorkspaces, resolvedTemporaryID)
 	m.activeSessionWorkspaces[realID] = workspaceID
+
+	projectPath := strings.TrimSpace(m.sessionProjectPaths[resolvedTemporaryID])
+	if projectPath == "" {
+		projectPath = strings.TrimSpace(m.sessionProjectPaths[temporaryID])
+	}
+	delete(m.sessionProjectPaths, resolvedTemporaryID)
+	delete(m.sessionProjectPaths, temporaryID)
+	if projectPath != "" {
+		m.sessionProjectPaths[realID] = projectPath
+		m.sessionProjectPaths[temporaryID] = projectPath
+		if resolvedTemporaryID != temporaryID {
+			m.sessionProjectPaths[resolvedTemporaryID] = projectPath
+		}
+	}
 
 	// Update session's internal ID (thread-safe via SetSessionID)
 	// This also updates ClaudeManager's sessionID for PTY events
@@ -1384,11 +1687,22 @@ func (m *Manager) updateSessionID(workspaceID, temporaryID, realID string) {
 
 	// Re-key in sessions map
 	delete(m.sessions, temporaryID)
+	delete(m.sessions, resolvedTemporaryID)
 	m.sessions[realID] = session
+
+	// Preserve backward compatibility for clients still using temporary IDs.
+	m.sessionAliases[temporaryID] = realID
+	m.sessionAliases[resolvedTemporaryID] = realID
+	for aliasID, targetID := range m.sessionAliases {
+		if targetID == resolvedTemporaryID {
+			m.sessionAliases[aliasID] = realID
+		}
+	}
 
 	m.logger.Info("Updated session ID mapping",
 		"workspace_id", workspaceID,
 		"temporary_id", temporaryID,
+		"resolved_temporary_id", resolvedTemporaryID,
 		"real_id", realID,
 	)
 }
@@ -2303,67 +2617,108 @@ func (m *Manager) GitGetStatus(workspaceID string) (*git.Status, error) {
 
 // HistoryInfo represents historical session information from the session cache.
 type HistoryInfo struct {
-	SessionID    string    `json:"session_id"`
-	Summary      string    `json:"summary"`
-	MessageCount int       `json:"message_count"`
-	LastUpdated  time.Time `json:"last_updated"`
-	Branch       string    `json:"branch,omitempty"`
+	SessionID    string     `json:"session_id"`
+	WorkspaceID  string     `json:"workspace_id,omitempty"`
+	Summary      string     `json:"summary"`
+	MessageCount int        `json:"message_count"`
+	LastUpdated  time.Time  `json:"last_updated"`
+	Branch       string     `json:"branch,omitempty"`
+	ProjectPath  string     `json:"project_path,omitempty"`
+	Status       string     `json:"status,omitempty"`
+	StartedAt    *time.Time `json:"started_at,omitempty"`
+	LastActive   *time.Time `json:"last_active,omitempty"`
 }
 
 // ListHistory returns historical Claude sessions for a workspace.
 // This reads from the Claude session cache at ~/.claude/projects/<encoded-path>
 func (m *Manager) ListHistory(workspaceID string, limit int) ([]HistoryInfo, error) {
-	// Get workspace path
 	ws, err := m.GetWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create session cache for this workspace path
-	cache, err := sessioncache.New(ws.Definition.Path)
-	if err != nil {
-		m.logger.Warn("Failed to create session cache",
-			"workspace_id", workspaceID,
-			"path", ws.Definition.Path,
-			"error", err,
-		)
-		return []HistoryInfo{}, nil // Return empty list on error
-	}
-	defer func() { _ = cache.Stop() }()
-
-	// Force sync to ensure we have fresh data from disk
-	if err := cache.ForceSync(); err != nil {
-		m.logger.Warn("Failed to sync session cache",
-			"workspace_id", workspaceID,
-			"error", err,
-		)
-	}
-
-	// Get session list
-	sessions, err := cache.ListSessions()
-	if err != nil {
-		m.logger.Warn("Failed to list sessions from cache",
-			"workspace_id", workspaceID,
-			"error", err,
-		)
-		return []HistoryInfo{}, nil
-	}
-
-	// Apply limit
-	if limit > 0 && len(sessions) > limit {
-		sessions = sessions[:limit]
-	}
-
-	// Convert to HistoryInfo
-	result := make([]HistoryInfo, len(sessions))
-	for i, s := range sessions {
-		result[i] = HistoryInfo{
-			SessionID:    s.SessionID,
-			Summary:      s.Summary,
-			MessageCount: s.MessageCount,
-			LastUpdated:  s.LastUpdated,
-			Branch:       s.Branch,
+	bySessionID := make(map[string]HistoryInfo)
+	for _, projectPath := range m.workspaceProjectPathsForWorkspace(ws) {
+		cache, err := sessioncache.New(projectPath)
+		if err != nil {
+			m.logger.Warn("Failed to create session cache",
+				"workspace_id", workspaceID,
+				"path", projectPath,
+				"error", err,
+			)
+			continue
 		}
+
+		if err := cache.ForceSync(); err != nil {
+			m.logger.Warn("Failed to sync session cache",
+				"workspace_id", workspaceID,
+				"path", projectPath,
+				"error", err,
+			)
+		}
+
+		sessions, err := cache.ListSessions()
+		_ = cache.Stop()
+		if err != nil {
+			m.logger.Warn("Failed to list sessions from cache",
+				"workspace_id", workspaceID,
+				"path", projectPath,
+				"error", err,
+			)
+			continue
+		}
+
+		for _, s := range sessions {
+			info := HistoryInfo{
+				SessionID:    s.SessionID,
+				WorkspaceID:  workspaceID,
+				Summary:      s.Summary,
+				MessageCount: s.MessageCount,
+				LastUpdated:  s.LastUpdated,
+				Branch:       s.Branch,
+				ProjectPath:  projectPath,
+				Status:       "historical",
+			}
+
+			existing, exists := bySessionID[s.SessionID]
+			if !exists || info.LastUpdated.After(existing.LastUpdated) {
+				bySessionID[s.SessionID] = info
+				continue
+			}
+
+			if existing.ProjectPath == "" {
+				existing.ProjectPath = projectPath
+			}
+			if existing.WorkspaceID == "" {
+				existing.WorkspaceID = workspaceID
+			}
+			if existing.Summary == "" {
+				existing.Summary = info.Summary
+			}
+			if existing.Branch == "" {
+				existing.Branch = info.Branch
+			}
+			if existing.MessageCount == 0 && info.MessageCount > 0 {
+				existing.MessageCount = info.MessageCount
+			}
+			bySessionID[s.SessionID] = existing
+		}
+	}
+
+	result := make([]HistoryInfo, 0, len(bySessionID))
+	for _, info := range bySessionID {
+		result = append(result, info)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].LastUpdated.Equal(result[j].LastUpdated) {
+			return result[i].SessionID < result[j].SessionID
+		}
+		return result[i].LastUpdated.After(result[j].LastUpdated)
+	})
+
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
 	}
 
 	return result, nil
@@ -2403,15 +2758,12 @@ type SessionMessagesResult struct {
 // This reads from the Claude session files at ~/.claude/projects/<encoded-path>
 func (m *Manager) GetSessionMessages(workspaceID, sessionID string, limit, offset int, order string) (*SessionMessagesResult, error) {
 	startTime := time.Now()
-
-	// Get workspace path
-	ws, err := m.GetWorkspace(workspaceID)
+	projectPath, err := m.resolveSessionProjectPath(workspaceID, sessionID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get sessions directory for this workspace
-	sessionsDir := getSessionsDir(ws.Definition.Path)
+	resolvedSessionID := m.resolveSessionID(sessionID)
+	sessionsDir := getSessionsDir(projectPath)
 
 	// Create message cache for this workspace
 	messageCache, err := sessioncache.NewMessageCache(sessionsDir)
@@ -2426,7 +2778,7 @@ func (m *Manager) GetSessionMessages(workspaceID, sessionID string, limit, offse
 	defer func() { _ = messageCache.Close() }()
 
 	// Get messages
-	page, err := messageCache.GetMessages(sessionID, limit, offset, order)
+	page, err := messageCache.GetMessages(resolvedSessionID, limit, offset, order)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get messages: %w", err)
 	}
@@ -2450,7 +2802,7 @@ func (m *Manager) GetSessionMessages(workspaceID, sessionID string, limit, offse
 	queryTimeMs := float64(time.Since(startTime).Microseconds()) / 1000.0
 
 	return &SessionMessagesResult{
-		SessionID:   sessionID,
+		SessionID:   resolvedSessionID,
 		Messages:    messages,
 		Total:       page.Total,
 		Limit:       page.Limit,
@@ -2476,17 +2828,15 @@ func getSessionsDir(repoPath string) string {
 // DeleteHistorySession deletes a historical Claude session file.
 // This removes the .jsonl file from ~/.claude/projects/<encoded-path>/
 func (m *Manager) DeleteHistorySession(workspaceID, sessionID string) error {
-	// Get workspace path
-	ws, err := m.GetWorkspace(workspaceID)
+	projectPath, err := m.resolveSessionProjectPath(workspaceID, sessionID)
 	if err != nil {
-		return fmt.Errorf("workspace not found: %w", err)
+		return err
 	}
-
-	// Get sessions directory for this workspace
-	sessionsDir := getSessionsDir(ws.Definition.Path)
+	resolvedSessionID := m.resolveSessionID(sessionID)
+	sessionsDir := getSessionsDir(projectPath)
 
 	// Construct session file path
-	sessionFile := filepath.Join(sessionsDir, sessionID+".jsonl")
+	sessionFile := filepath.Join(sessionsDir, resolvedSessionID+".jsonl")
 
 	// Check if file exists
 	if _, err := os.Stat(sessionFile); os.IsNotExist(err) {
@@ -2500,7 +2850,8 @@ func (m *Manager) DeleteHistorySession(workspaceID, sessionID string) error {
 
 	m.logger.Info("Deleted historical session",
 		"workspace_id", workspaceID,
-		"session_id", sessionID,
+		"session_id", resolvedSessionID,
+		"project_path", projectPath,
 		"file", sessionFile,
 	)
 
@@ -2525,14 +2876,16 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 	m.streamerMu.Lock()
 	defer m.streamerMu.Unlock()
 
-	// Get workspace path
-	ws, err := m.GetWorkspace(workspaceID)
+	m.mu.RLock()
+	resolvedSessionID := m.resolveSessionIDLocked(sessionID)
+	m.mu.RUnlock()
+	sessionID = resolvedSessionID
+
+	projectPath, err := m.resolveSessionProjectPath(workspaceID, sessionID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get sessions directory for this workspace
-	sessionsDir := getSessionsDir(ws.Definition.Path)
+	sessionsDir := getSessionsDir(projectPath)
 
 	// Verify session file exists
 	sessionPath := filepath.Join(sessionsDir, sessionID+".jsonl")
@@ -2595,6 +2948,7 @@ func (m *Manager) WatchWorkspaceSession(clientID, workspaceID, sessionID string)
 		"client_id", clientID,
 		"workspace_id", workspaceID,
 		"session_id", sessionID,
+		"project_path", projectPath,
 		"sessions_dir", sessionsDir,
 		"watcher_count", 1,
 	)
@@ -2621,6 +2975,11 @@ func (m *Manager) UnwatchWorkspaceSession(clientID string, sessionID string) *Wa
 	}
 
 	sessionID = strings.TrimSpace(sessionID)
+	if sessionID != "" {
+		m.mu.RLock()
+		sessionID = m.resolveSessionIDLocked(sessionID)
+		m.mu.RUnlock()
+	}
 
 	// Select a watched session to remove.
 	// - If sessionID is provided, remove that specific session (workspace chosen deterministically if duplicated).

@@ -17,7 +17,9 @@ import (
 	"github.com/brianly1003/cdev/internal/adapters/git"
 	"github.com/brianly1003/cdev/internal/adapters/repository"
 	"github.com/brianly1003/cdev/internal/adapters/sessioncache"
+	"github.com/brianly1003/cdev/internal/adapters/taskstore"
 	"github.com/brianly1003/cdev/internal/adapters/watcher"
+	"github.com/brianly1003/cdev/internal/agent"
 	"github.com/brianly1003/cdev/internal/config"
 	"github.com/brianly1003/cdev/internal/domain/events"
 	"github.com/brianly1003/cdev/internal/hooks"
@@ -66,6 +68,10 @@ type App struct {
 	sessionManager         *session.Manager
 	workspaceConfigManager *workspace.ConfigManager
 	gitTrackerManager      *workspace.GitTrackerManager
+
+	// Agent task system
+	taskStore   *taskstore.Store
+	taskSpawner *agent.Spawner
 
 	// Permission hook bridge
 	permissionManager *permission.MemoryManager
@@ -331,6 +337,27 @@ func (a *App) Start(ctx context.Context) error {
 		log.Info().Msg("permission hook bridge enabled")
 	}
 
+	// Initialize Agent Task system (task store, spawner)
+	if a.cfg.AgentTask.Enabled {
+		store, err := taskstore.NewStore()
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create agent task store")
+		} else {
+			if repaired, err := store.RepairSessionIDs(); err != nil {
+				log.Warn().Err(err).Msg("failed to repair persisted task session IDs")
+			} else if repaired > 0 {
+				log.Info().Int("tasks_repaired", repaired).Msg("repaired persisted task session IDs")
+			}
+			a.taskStore = store
+			a.sessionManager.SetHistoricalSessionProjectPathResolver(store)
+			sessionAdapter := agent.NewSessionStarterAdapter(a.sessionManager)
+			a.taskSpawner = agent.NewSpawner(store, sessionAdapter, a.sessionManager, a.hub)
+			log.Info().Msg("agent task system initialized")
+		}
+	} else {
+		log.Debug().Msg("agent task system disabled by config")
+	}
+
 	// Initialize Repository Indexer (only if repository.path is configured)
 	if a.cfg.Indexer.Enabled && a.cfg.Repository.Path != "" {
 		repoIndexer, err := repository.NewIndexer(a.cfg.Repository.Path, a.cfg.Indexer.SkipDirectories)
@@ -450,6 +477,9 @@ func (a *App) Start(ctx context.Context) error {
 	// Session manager service (session/start, session/stop, session/send, etc.)
 	sessionManagerService := methods.NewSessionManagerService(a.sessionManager)
 	sessionManagerService.SetSessionService(sessionService)
+	if a.permissionManager != nil {
+		sessionManagerService.SetPermissionManager(a.permissionManager)
+	}
 	sessionManagerService.RegisterMethods(rpcRegistry)
 
 	// Repository service (repository/search, repository/files/list, etc.)
@@ -675,6 +705,18 @@ func (a *App) Start(ctx context.Context) error {
 	hooksHandler.SetWorkspaceResolver(methods.NewWorkspaceIDResolver())
 	a.httpServer.SetHooksHandler(hooksHandler)
 
+	// Set up agent task handler (webhook + REST API)
+	if a.taskStore != nil {
+		taskHandler := httpserver.NewTaskHandler(a.taskStore, a.cfg.AgentTask.WebhookSecret, a.hub)
+		if a.taskSpawner != nil {
+			taskHandler.SetSpawner(a.taskSpawner)
+		}
+		if a.workspaceConfigManager != nil {
+			taskHandler.SetWorkspaceResolver(NewTaskWorkspaceResolverAdapter(a.workspaceConfigManager))
+		}
+		a.httpServer.SetTaskHandler(taskHandler)
+	}
+
 	// Set RPC registry for dynamic OpenRPC spec generation
 	a.httpServer.SetRPCRegistry(rpcRegistry)
 	// Set WebSocket handler for port consolidation
@@ -758,6 +800,13 @@ func (a *App) shutdown() error {
 	}
 	if a.codexStreamer != nil {
 		a.codexStreamer.Close()
+	}
+
+	// Close agent task store
+	if a.taskStore != nil {
+		if err := a.taskStore.Close(); err != nil {
+			log.Error().Err(err).Msg("error closing agent task store")
+		}
 	}
 
 	// Stop repository indexer

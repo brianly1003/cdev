@@ -483,6 +483,51 @@ func TestHandleHook_PermissionRequest_NoPermissionManager(t *testing.T) {
 	}
 }
 
+func TestHandleHook_PermissionRequest_BypassPermissionsAutoAllows(t *testing.T) {
+	handler, h, capture := setupHooksTest(nil)
+	defer stopTestHub(t, h)
+
+	pm := &hooksPermissionManager{}
+	handler.SetPermissionManager(pm)
+
+	payload := ClaudeHookPayload{
+		SessionID:      "sess-bypass",
+		ToolName:       "Bash",
+		ToolUseID:      "tu-bypass-1",
+		PermissionMode: "bypassPermissions",
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/hooks/permission-request", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	handler.HandleHook(w, req)
+	drainHookEvents()
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var result map[string]string
+	_ = json.Unmarshal(respBody, &result)
+	if result["decision"] != "allow" {
+		t.Fatalf("expected decision 'allow', got %q", result["decision"])
+	}
+
+	if len(pm.addedRequests) != 0 {
+		t.Fatalf("expected no pending requests, got %d", len(pm.addedRequests))
+	}
+
+	for _, evt := range capture.getEvents() {
+		if evt.Type() == events.EventTypePTYPermission {
+			t.Fatal("did not expect pty_permission event for bypassPermissions")
+		}
+	}
+}
+
 func TestHandleHook_MethodNotAllowed(t *testing.T) {
 	handler, h, _ := setupHooksTest(nil)
 	defer stopTestHub(t, h)

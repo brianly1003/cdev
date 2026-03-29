@@ -1423,3 +1423,24 @@ func (a *WorkspacePathResolverAdapter) GetWorkspacePath(workspaceID string) (str
 	}
 	return ws.Definition.Path, nil
 }
+
+// TaskWorkspaceResolverAdapter implements httpserver.WorkspaceResolver.
+// It resolves workspace identifiers (ID, name, or path) to workspace IDs
+// for the webhook handler.
+type TaskWorkspaceResolverAdapter struct {
+	configManager *workspace.ConfigManager
+}
+
+// NewTaskWorkspaceResolverAdapter creates a new task workspace resolver adapter.
+func NewTaskWorkspaceResolverAdapter(configManager *workspace.ConfigManager) *TaskWorkspaceResolverAdapter {
+	return &TaskWorkspaceResolverAdapter{configManager: configManager}
+}
+
+// ResolveWorkspaceID resolves a workspace identifier to its UUID.
+func (a *TaskWorkspaceResolverAdapter) ResolveWorkspaceID(idOrName string) (string, error) {
+	ws, err := a.configManager.ResolveWorkspace(idOrName)
+	if err != nil {
+		return "", err
+	}
+	return ws.Definition.ID, nil
+}

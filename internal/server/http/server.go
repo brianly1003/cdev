@@ -205,6 +205,16 @@ func (s *Server) SetDebugHandler(handler *DebugHandler) {
 	handler.Register(s.mux)
 }
 
+// SetTaskHandler registers agent task routes (webhook + REST API).
+func (s *Server) SetTaskHandler(handler *TaskHandler) {
+	if handler == nil {
+		log.Warn().Msg("task handler is nil, agent task routes will not be available")
+		return
+	}
+	handler.RegisterRoutes(s.mux)
+	log.Info().Msg("agent task routes registered: /api/tasks/*")
+}
+
 // SetHooksHandler sets up Claude hooks endpoints for receiving events from external Claude sessions.
 // This enables real-time event capture from Claude running in VS Code, Cursor, or terminal.
 func (s *Server) SetHooksHandler(handler *HooksHandler) {
@@ -540,6 +550,7 @@ func defaultAuthAllowlist() []string {
 		"/api/auth/refresh",
 		"/api/auth/revoke",
 		"/api/auth/pairing/",
+		"/api/tasks/webhook",
 	}
 }
 

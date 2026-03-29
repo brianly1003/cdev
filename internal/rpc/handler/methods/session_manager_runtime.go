@@ -13,7 +13,7 @@ import (
 )
 
 type sessionRuntimeDispatch struct {
-	start   func(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error)
+	start   func(ctx context.Context, workspaceID, sessionID, permissionMode string, yoloMode bool) (interface{}, *message.Error)
 	stop    func(ctx context.Context, sessionID string) (interface{}, *message.Error)
 	send    func(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string, yoloMode bool) (interface{}, *message.Error)
 	input   func(ctx context.Context, sessionID, input, key string) (interface{}, *message.Error)
@@ -78,7 +78,7 @@ func (s *SessionManagerService) resolveRuntimeDispatchForWorkspaceSession(rawAge
 	return s.resolveRuntimeDispatch(rawAgentType)
 }
 
-func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspaceID, sessionID string) (interface{}, *message.Error) {
+func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspaceID, sessionID, permissionMode string, yoloMode bool) (interface{}, *message.Error) {
 	if s.manager == nil {
 		return nil, message.NewError(message.AgentNotConfigured, "claude session manager is not configured")
 	}
@@ -210,6 +210,8 @@ func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspac
 	// Start Claude in interactive PTY mode (no initial prompt).
 	claudeManager := newSession.ClaudeManager()
 	if claudeManager != nil {
+		enableBypass := enableRuntimeBypass(permissionMode, yoloMode)
+
 		// Set up callback to detect when Claude exits without creating a session.
 		// This handles the case where user declines trust folder (clicks "No").
 		temporaryID := newSession.ID
@@ -217,7 +219,7 @@ func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspac
 		claudeManager.SetOnPTYComplete(func(sid string) {
 			// Check if there's still an active watcher - if so, Claude exited
 			// without creating a session file (user likely declined trust).
-			if s.manager.HasActiveSessionFileWatcher(workspace) {
+			if s.manager.HasActiveSessionFileWatcher(workspace, temporaryID) {
 				s.manager.FailSessionIDResolution(
 					workspace,
 					temporaryID,
@@ -229,7 +231,7 @@ func (s *SessionManagerService) startClaudeSession(ctx context.Context, workspac
 
 		go func() {
 			// Start Claude with empty prompt for interactive mode.
-			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID, false); err != nil {
+			if err := claudeManager.StartWithPTY(ctx, "", "new", newSession.ID, enableBypass); err != nil {
 				// Log error but don't fail - session is still created.
 				// The user can send a prompt via session/send.
 				fmt.Printf("Warning: failed to start Claude in interactive mode: %v\n", err)
@@ -299,7 +301,7 @@ func (s *SessionManagerService) sendClaudePrompt(ctx context.Context, workspaceI
 			temporaryID := newSession.ID
 			workspace := workspaceID
 			claudeManager.SetOnPTYComplete(func(sid string) {
-				if s.manager.HasActiveSessionFileWatcher(workspace) {
+				if s.manager.HasActiveSessionFileWatcher(workspace, temporaryID) {
 					s.manager.FailSessionIDResolution(
 						workspace,
 						temporaryID,
@@ -471,7 +473,7 @@ func (s *SessionManagerService) respondCodexSessionRPC(ctx context.Context, sess
 func (s *SessionManagerService) sendCodexPromptWithPermissionMode(ctx context.Context, workspaceID, sessionID, prompt, mode, permissionMode string, yoloMode bool) (interface{}, *message.Error) {
 	// Keep this runtime-agnostic: permission mode can request bypass semantics,
 	// and yolo_mode is the explicit runtime-independent bypass signal.
-	enableBypass := yoloMode || permissionMode == "bypassPermissions"
+	enableBypass := enableRuntimeBypass(permissionMode, yoloMode)
 	return s.sendCodexPrompt(ctx, workspaceID, sessionID, prompt, mode, enableBypass)
 }
 

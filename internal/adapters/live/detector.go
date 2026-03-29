@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brianly1003/cdev/internal/gitutil"
 	"github.com/brianly1003/cdev/internal/pathutil"
 	"github.com/rs/zerolog/log"
 )
@@ -124,20 +125,23 @@ func (d *Detector) sessionFileExists(sessionID string) bool {
 		return false
 	}
 
-	// Convert workspace path to Claude's project path format (cross-platform)
-	projectPath := pathutil.EncodePath(d.workspacePath)
+	for _, projectPath := range d.workspaceProjectPaths() {
+		sessionFile := filepath.Join(homeDir, ".claude", "projects", pathutil.EncodePath(projectPath), sessionID+".jsonl")
+		_, err = os.Stat(sessionFile)
+		exists := err == nil
 
-	sessionFile := filepath.Join(homeDir, ".claude", "projects", projectPath, sessionID+".jsonl")
-	_, err = os.Stat(sessionFile)
-	exists := err == nil
+		log.Debug().
+			Str("session_id", sessionID).
+			Str("session_file", sessionFile).
+			Bool("exists", exists).
+			Msg("checking session file existence")
 
-	log.Debug().
-		Str("session_id", sessionID).
-		Str("session_file", sessionFile).
-		Bool("exists", exists).
-		Msg("checking session file existence")
+		if exists {
+			return true
+		}
+	}
 
-	return exists
+	return false
 }
 
 // DetectAll finds all LIVE Claude processes.
@@ -218,8 +222,8 @@ func (d *Detector) refreshCache() {
 		// Get working directory of the process
 		workDir := d.getProcessWorkDir(pid)
 
-		// Filter by workspace path if specified
-		if d.workspacePath != "" && workDir != d.workspacePath {
+		// Filter by repo family so the parent workspace matches any git worktree.
+		if d.workspacePath != "" && !gitutil.SameRepoFamily(d.workspacePath, workDir) {
 			continue
 		}
 
@@ -351,6 +355,33 @@ func (d *Detector) getProcessWorkDir(pid int) string {
 	}
 
 	return ""
+}
+
+func (d *Detector) workspaceProjectPaths() []string {
+	if strings.TrimSpace(d.workspacePath) == "" {
+		return nil
+	}
+
+	paths := []string{d.workspacePath}
+	if worktreePaths, err := gitutil.ListWorktreePaths(d.workspacePath); err == nil {
+		paths = append(paths, worktreePaths...)
+	}
+
+	seen := make(map[string]struct{}, len(paths))
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		normalized := gitutil.NormalizePath(path)
+		if normalized == "" {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+
+	return result
 }
 
 // findSessionID finds the most recently active session for a Claude process.

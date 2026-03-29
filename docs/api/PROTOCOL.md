@@ -1,8 +1,8 @@
 # cdev Protocol Specification
 
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Status:** Implemented
-**Last Updated:** January 30, 2026
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -16,7 +16,8 @@ The cdev protocol defines the communication standard between cdev (server) and c
 
 | Version | Description |
 |---------|-------------|
-| 2.0 | JSON-RPC 2.0 with agent-agnostic naming (current) |
+| 2.3 | Agent Task Protocol — autonomous task lifecycle, revision loop, task events |
+| 2.0 | JSON-RPC 2.0 with agent-agnostic naming |
 
 ### Design Principles
 
@@ -77,10 +78,11 @@ Authorization: Bearer <access-token>
 2. [WebSocket Events (Server → Client)](#websocket-events-server--client)
 3. [WebSocket Commands (Client → Server)](#websocket-commands-client--server)
 4. [HTTP API](#http-api)
-5. [Connection Lifecycle](#connection-lifecycle)
-6. [Error Handling](#error-handling)
-7. [Protocol Gaps & TODOs](#protocol-gaps--todos)
-8. [Version History](#version-history)
+5. [Agent Task Protocol](#agent-task-protocol)
+6. [Connection Lifecycle](#connection-lifecycle)
+7. [Error Handling](#error-handling)
+8. [Protocol Gaps & TODOs](#protocol-gaps--todos)
+9. [Version History](#version-history)
 
 ---
 
@@ -171,6 +173,14 @@ The preferred format for new clients. Follows the JSON-RPC 2.0 specification.
 | `repository/files/tree` | Get directory tree |
 | `repository/stats` | Get repository statistics |
 | `repository/index/rebuild` | Trigger index rebuild |
+| `agent/task/create` | Create task from manual input |
+| `agent/task/create_from_webhook` | Create task from signed webhook event |
+| `agent/task/list` | List tasks with filters |
+| `agent/task/get` | Get task detail + timeline |
+| `agent/task/approve` | Approve and complete a task |
+| `agent/task/reject` | Reject a task result |
+| `agent/task/revise` | Submit revision feedback |
+| `agent/task/cancel` | Cancel a running task |
 
 Runtime registry contract reference: `docs/api/RUNTIME-CAPABILITY-REGISTRY.md`
 
@@ -546,6 +556,154 @@ Stopped watching a Claude session.
 }
 ```
 
+### Agent Task Events
+
+#### `task_created`
+
+New autonomous task submitted.
+
+```json
+{
+  "event": "task_created",
+  "timestamp": "2026-03-01T00:00:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "source": "dashboard-webhook",
+    "workspace_id": "lazy",
+    "title": "Fix Telegram missing WorkflowConditions",
+    "status": "pending",
+    "risk_level": "medium",
+    "autonomy_mode": "bounded-auto",
+    "trigger": {
+      "type": "replay",
+      "ref": "docs/replays/new-member-withdrawal-wrong-tsm-transfer.json"
+    }
+  }
+}
+```
+
+#### `task_status_changed`
+
+Any task state transition.
+
+```json
+{
+  "event": "task_status_changed",
+  "timestamp": "2026-03-01T00:30:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "from": "running",
+    "to": "validating",
+    "metadata": {
+      "files_changed": 3,
+      "tests_added": 5
+    }
+  }
+}
+```
+
+#### `task_progress`
+
+Agent progress update during execution.
+
+```json
+{
+  "event": "task_progress",
+  "timestamp": "2026-03-01T00:15:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "message": "Running dotnet test...",
+    "step": 3,
+    "total": 5,
+    "iteration": 1,
+    "tool_calls_used": 42
+  }
+}
+```
+
+#### `task_needs_approval`
+
+Task ready for human review. Clients should display task summary, diff, and approve/reject/revise controls.
+
+```json
+{
+  "event": "task_needs_approval",
+  "timestamp": "2026-03-01T00:45:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "title": "Fix Telegram missing WorkflowConditions",
+    "risk_level": "medium",
+    "result": {
+      "files_changed": ["ChatTransferService.cs", "TransferWorkflowConditionsTests.cs"],
+      "build_status": "pass",
+      "test_status": "724 passed, 0 failed",
+      "summary": "Added centralized fallback for WorkflowConditions in RecordTransferChatBotAction",
+      "branch": "task/fix-telegram-conditions",
+      "pr_url": null
+    }
+  }
+}
+```
+
+#### `task_revision_requested`
+
+Human submitted revision feedback. Agent will apply delta changes.
+
+```json
+{
+  "event": "task_revision_requested",
+  "timestamp": "2026-03-01T01:00:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "feedback": "Remove promotion remark, change Summary label to Info",
+    "revision_number": 1,
+    "max_revisions": 3
+  }
+}
+```
+
+#### `task_completed`
+
+Task finished successfully.
+
+```json
+{
+  "event": "task_completed",
+  "timestamp": "2026-03-01T01:15:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "result": {
+      "files_changed": ["ChatTransferService.cs", "TransferWorkflowConditionsTests.cs"],
+      "build_status": "pass",
+      "test_status": "724 passed, 0 failed",
+      "summary": "Added centralized fallback for WorkflowConditions...",
+      "branch": "task/fix-telegram-conditions",
+      "pr_url": "https://github.com/org/repo/pull/42"
+    },
+    "revisions_applied": 2,
+    "total_duration_sec": 285
+  }
+}
+```
+
+#### `task_failed`
+
+Task failed. Includes whether it can be retried.
+
+```json
+{
+  "event": "task_failed",
+  "timestamp": "2026-03-01T00:30:00.000Z",
+  "payload": {
+    "task_id": "task_abc123",
+    "error": "Build failed after 3 retry attempts",
+    "retriable": false,
+    "attempt": 2,
+    "max_retries": 2
+  }
+}
+```
+
 ### Connection Events
 
 #### `heartbeat`
@@ -663,6 +821,69 @@ Commands are sent as JSON-RPC 2.0 requests.
 }
 ```
 
+### Agent Task Methods
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 10,
+  "method": "agent/task/create",
+  "params": {
+    "workspace_id": "lazy",
+    "title": "Fix Telegram missing WorkflowConditions",
+    "description": "Plugin conditions not included in transfer notification",
+    "autonomy_mode": "bounded-auto",
+    "policy": {
+      "max_iterations": 50,
+      "max_duration_sec": 600,
+      "max_tool_calls": 200,
+      "max_files_changed": 10,
+      "max_revisions": 3,
+      "require_approval": ["git-push", "git-merge"]
+    }
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 11,
+  "method": "agent/task/list",
+  "params": {
+    "workspace_id": "lazy",
+    "status": "awaiting_approval",
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "method": "agent/task/approve",
+  "params": {
+    "task_id": "task_abc123",
+    "merge": true
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "method": "agent/task/revise",
+  "params": {
+    "task_id": "task_abc123",
+    "feedback": "Remove promotion remark, change Summary label to Info",
+    "files_hint": ["ChatTransferService.cs"]
+  }
+}
+```
+
 ---
 
 ## HTTP API
@@ -717,6 +938,374 @@ Commands are sent as JSON-RPC 2.0 requests.
 | GET | `/api/repository/files/list` | List indexed files |
 | GET | `/api/repository/files/tree` | Get file tree |
 | GET | `/api/repository/stats` | Repository statistics |
+
+### Task Operations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/tasks/webhook` | Create task from signed webhook event (any trigger type) |
+| POST | `/api/tasks` | Create task from manual input |
+| GET | `/api/tasks` | List tasks (filterable by status, workspace, date) |
+| GET | `/api/tasks/{id}` | Get task detail + timeline |
+| POST | `/api/tasks/{id}/approve` | Approve and complete task |
+| POST | `/api/tasks/{id}/reject` | Reject task result |
+| POST | `/api/tasks/{id}/revise` | Submit revision feedback |
+| POST | `/api/tasks/{id}/cancel` | Cancel running task |
+| GET | `/api/events/stream` | SSE stream for all task events |
+| GET | `/api/events/stream?task_id={id}` | SSE stream for single task |
+
+---
+
+## Agent Task Protocol
+
+This section defines the autonomous task lifecycle — how external systems (dashboards, CI/CD, monitoring, issue trackers) submit coding tasks, how cdev executes them, and how approval surfaces (cdev-ios, Slack bots, web dashboards) review and refine results. The protocol is project-agnostic: any workspace with build/test commands can participate.
+
+### AgentTask Model
+
+```json
+{
+  "id":              "task_abc123",
+  "source":          "dashboard-webhook",
+  "workspace_id":    "lazy",
+  "workspace_path":  "/Users/dev/Projects/Lazy",
+  "title":           "Fix Telegram missing WorkflowConditions",
+  "description":     "Plugin conditions not included in transfer notification",
+  "status":          "awaiting_approval",
+  "risk_level":      "medium",
+  "autonomy_mode":   "bounded-auto",
+  "attempt":         1,
+  "max_retries":     2,
+  "policy": {
+    "max_iterations":    50,
+    "max_duration_sec":  600,
+    "max_tool_calls":    200,
+    "max_files_changed": 10,
+    "max_revisions":     3,
+    "require_approval":  ["git-push", "git-merge"]
+  },
+  "result": {
+    "files_changed":  ["ChatTransferService.cs", "TransferWorkflowConditionsTests.cs"],
+    "build_status":   "pass",
+    "test_status":    "724 passed, 0 failed",
+    "summary":        "Added centralized fallback for WorkflowConditions...",
+    "branch":         "task/fix-telegram-conditions",
+    "pr_url":         null
+  },
+  "trigger": {
+    "type":          "replay",
+    "ref":           "docs/replays/new-member-withdrawal-wrong-tsm-transfer.json",
+    "hash":          "sha256:abc123..."
+  },
+  "timeline":        [],
+  "created_at":      "2026-03-01T00:00:00Z",
+  "updated_at":      "2026-03-01T00:45:00Z"
+}
+```
+
+### Task State Machine
+
+```
+pending ──► planning ──► running ──► validating ──► awaiting_approval ──► completed
+                              │                           │
+                              ▼                           ├──► revision ──► validating ──► awaiting_approval
+                           failed                         │
+                              │                           └──► rejected ──► failed
+                              ▼
+                     (retry) planning
+                        or
+                      rolled_back
+```
+
+| State | Description | Valid Transitions |
+|-------|-------------|-------------------|
+| `pending` | Task created, queued for execution | → `planning` |
+| `planning` | Agent analyzing task, building plan | → `running`, `failed` |
+| `running` | Agent executing code changes | → `validating`, `failed` |
+| `validating` | Build + test gates running | → `awaiting_approval`, `failed` |
+| `awaiting_approval` | Human review required | → `completed`, `revision`, `rejected` |
+| `revision` | Agent applying human feedback | → `validating` |
+| `completed` | Task finished successfully | terminal |
+| `failed` | Task failed (may retry) | → `planning` (retry), `rolled_back` |
+| `rolled_back` | Changes reverted | terminal |
+| `rejected` | Human rejected the result | → `failed` |
+
+**Rules:**
+- Retry only on transient/tool/runtime errors, capped by `max_retries`
+- Any policy violation moves to `failed` immediately (no retry)
+- Revision loop capped at `max_revisions` (default: 3)
+
+### Revision Loop
+
+The revision loop handles the reality of autonomous coding: the agent gets 85% right, humans refine the remaining 15%.
+
+```
+1. Agent completes task → status: awaiting_approval
+2. Human reviews diff/result on any approval surface (cdev-ios, WebAdmin, Slack)
+3. Human sends revision: agent/task/revise { feedback: "Remove promotion line" }
+4. cdev spawns new Claude Code session on same branch
+5. Agent applies delta changes, runs build + test
+6. Task returns to: awaiting_approval
+7. Repeat up to max_revisions (default: 3)
+```
+
+**Revision request payload:**
+
+```json
+{
+  "task_id":    "task_abc123",
+  "feedback":   "Remove promotion remark, change Summary label to Info",
+  "priority":   "normal",
+  "files_hint": ["ChatTransferService.cs"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `task_id` | string | yes | Task to revise |
+| `feedback` | string | yes | Free-text human feedback |
+| `priority` | string | no | `normal` (default) or `urgent` |
+| `files_hint` | string[] | no | Files to focus on |
+
+**Why revision instead of reject + new task?**
+- **Context preservation**: same branch, same worktree, agent only applies delta
+- **Speed**: revision takes seconds, new task takes minutes
+- **Cost**: revision uses ~5% of the tokens of a full task run
+- **Learning**: revision feedback is extractable as preferences for future tasks
+
+### Autonomy Modes
+
+| Mode | Behavior | When to Use |
+|------|----------|-------------|
+| `supervised` | Human approval required for all write/merge-risk operations | New integrations, untested workflows |
+| `bounded-auto` | Auto-approve low-risk ops, human approval for high-risk | Default for production projects |
+| `full-auto-bounded` | Agent completes and auto-merges if tests pass | Whitelisted repos, well-tested workflows |
+
+### Webhook Ingestion (Task Sources)
+
+Task sources (dashboards, CI/CD, monitoring) create tasks via signed webhooks. The trigger artifact is generic — cdev does not interpret it, it passes it to the agent session.
+
+**Request:**
+
+```
+POST /api/tasks/webhook
+Content-Type: application/json
+X-Cdev-Signature: sha256=<HMAC-SHA256(body, shared_secret)>
+X-Cdev-Timestamp: <unix_seconds>
+X-Cdev-Event-Id: <unique_id>
+```
+
+**Payload:**
+
+```json
+{
+  "event_id":       "evt_unique_123",
+  "trigger": {
+    "type":         "replay",
+    "ref":          "docs/replays/2026-02-28-forgot-username-001.json",
+    "hash":         "sha256:abc123..."
+  },
+  "workspace":      "lazy",
+  "autonomy_mode":  "bounded-auto",
+  "policy": {
+    "max_iterations":    50,
+    "max_duration_sec":  600,
+    "max_tool_calls":    200,
+    "max_files_changed": 10,
+    "require_approval":  ["git-push", "git-merge"]
+  }
+}
+```
+
+**The `trigger` object:**
+
+The trigger tells the agent *what went wrong* and *where to find the evidence*. Think of it like an email attachment — `type` is the file format, `ref` is the file path or URL, and `hash` is the checksum for deduplication.
+
+- **`type`** — How to interpret the artifact (determines which project command runs)
+- **`ref`** — Pointer to the evidence: a file path inside the repo, an external URL, or free text. cdev never opens or parses this value — it passes it directly to the agent session. The workspace's project commands (e.g., `/fix-issue`, `/analyze-replay`) interpret it based on `type`.
+- **`hash`** — SHA-256 of the artifact content, used for idempotency (`event_id + trigger.hash` must be unique)
+
+**Trigger types with real-world examples:**
+
+#### `replay` — Failed conversation replay
+
+A customer chatted with a livechat bot, got routed incorrectly, and the dashboard captured the conversation as a JSON fixture.
+
+```json
+{
+  "type": "replay",
+  "ref": "docs/replays/new-member-withdrawal-wrong-tsm-transfer.json",
+  "hash": "sha256:9f2c4a..."
+}
+```
+
+The agent runs: `/analyze-replay docs/replays/new-member-withdrawal-wrong-tsm-transfer.json`
+It reads the conversation turns, identifies the routing bug, and fixes it.
+
+#### `error` — Error tracking event (Sentry, Datadog, etc.)
+
+Sentry catches a `NullReferenceException` in production. The monitoring dashboard sends a webhook to cdev.
+
+```json
+{
+  "type": "error",
+  "ref": "https://sentry.io/api/0/issues/12345/?format=json",
+  "hash": "sha256:a1b2c3..."
+}
+```
+
+The agent fetches or reads the error details (stack trace, file, line number) and runs: `/fix-issue NullReferenceException at PaymentService.cs:142 when user has no profile`
+
+`ref` can be a Sentry/Datadog URL, or a local path to an exported error JSON file.
+
+#### `ci_failure` — Failed CI/CD pipeline
+
+GitHub Actions runs tests and 3 fail. CI sends a webhook to cdev.
+
+```json
+{
+  "type": "ci_failure",
+  "ref": "https://github.com/org/repo/actions/runs/987654321",
+  "hash": "sha256:c3d4e5..."
+}
+```
+
+The agent reads the CI run output, identifies which tests failed and why, then fixes the code.
+
+`ref` can be a GitHub Actions run URL, GitLab pipeline URL, or path to a test report artifact.
+
+#### `issue` — Bug tracker issue (GitHub, Linear, Jira)
+
+A developer files a GitHub issue: "Login page shows 500 error when email contains a plus sign".
+
+```json
+{
+  "type": "issue",
+  "ref": "https://github.com/org/repo/issues/789",
+  "hash": "sha256:e5f6g7..."
+}
+```
+
+The agent reads the issue title and body (e.g., via `gh issue view 789`), then runs: `/fix-issue Login page shows 500 error when email contains a plus sign`
+
+`ref` can be a GitHub issue URL, Linear issue ID, or Jira ticket key.
+
+#### `alert` — Monitoring / performance regression
+
+An APM tool detects response time increased 3x after a deploy.
+
+```json
+{
+  "type": "alert",
+  "ref": "https://app.datadoghq.com/apm/traces?query=service:api&start=1709251200",
+  "hash": "sha256:h8i9j0..."
+}
+```
+
+The agent investigates the performance regression, profiles the changed code, and optimizes.
+
+#### `task_yaml` — Structured task definition
+
+A task was created via the WebAdmin dashboard using `/create-task`, producing a structured YAML file with anchors, expected/actual behavior, and constraints.
+
+```json
+{
+  "type": "task_yaml",
+  "ref": "docs/tasks/2026-03-01-fix-telegram-missing-workflow-conditions.yaml",
+  "hash": "sha256:k1l2m3..."
+}
+```
+
+The agent reads the YAML directly — it contains file/method anchors, reproduction steps, and acceptance criteria — then runs: `/fix-issue docs/tasks/2026-03-01-fix-telegram-missing-workflow-conditions.yaml`
+
+This is the richest trigger type because the YAML provides structured context instead of requiring the agent to discover it.
+
+#### `manual` — Human description (no artifact)
+
+A developer describes a bug in free text, with no external artifact.
+
+```json
+{
+  "type": "manual",
+  "ref": "",
+  "hash": "sha256:n4o5p6..."
+}
+```
+
+The task `title` and `description` fields contain all the context. The agent runs: `/fix-issue {task.description}`
+
+`ref` is empty or omitted. The hash is computed from the task description for idempotency.
+
+**Validation rules:**
+- Reject if HMAC signature invalid
+- Reject if timestamp drift > 5 minutes
+- Reject if `event_id + trigger.hash` already processed (idempotency)
+
+### Task Execution Workflow
+
+Per autonomous task:
+
+1. Create isolated git worktree + task branch
+2. Spawn AI coding session (Claude Code, Codex, etc.) in worktree workspace
+3. Route to project command based on `trigger.type`:
+   - `replay` → `/analyze-replay {trigger.ref}` — agent reads conversation turns from the fixture
+   - `task_yaml` → `/fix-issue {trigger.ref}` — agent reads structured YAML with anchors and constraints
+   - `issue` → `/fix-issue {task.title}` — agent uses title + description as natural language input
+   - `error` → `/fix-issue {task.description}` — agent extracts stack trace, file, line from error context
+   - `ci_failure` → `/fix-issue {task.description}` — agent reads test report, identifies failing tests
+   - `alert` → `/fix-issue {task.description}` — agent investigates performance regression
+   - `manual` → `/fix-issue {task.description}` — agent works from developer's free-text description
+4. Run workspace-defined validation gates (from workspace config):
+   - Build command (e.g., `dotnet build`, `npm run build`, `go build ./...`)
+   - Test command (e.g., `dotnet test`, `npm test`, `go test ./...`)
+5. Package result: files changed, test/build status, summary, PR metadata
+6. Transition to `awaiting_approval` if policy requires, else `completed`
+
+**Note:** cdev does not hardcode project commands. Each workspace defines its own build/test/fix commands in its workspace config. The trigger type routing above is the default convention — workspaces can override it.
+
+### Integration Guide
+
+#### Adding a Task Source (e.g., dashboard, CI/CD, monitoring)
+
+1. Register a webhook secret with cdev admin
+2. POST trigger events to `/api/tasks/webhook` with HMAC signature and appropriate `trigger.type`
+3. Subscribe to task events via SSE (`GET /api/events/stream`) or WebSocket
+4. (Optional) Add UI for revision feedback via `agent/task/revise`
+
+#### Adding an Approval Surface (e.g., Slack bot)
+
+1. Obtain API key with approver role
+2. Subscribe to `task_needs_approval` events via SSE or WebSocket
+3. Display task summary + diff to human
+4. Call `agent/task/approve`, `agent/task/reject`, or `agent/task/revise`
+
+Minimal integration (approve/reject only):
+```
+GET  /api/tasks?status=awaiting_approval   → show pending tasks
+POST /api/tasks/{id}/approve               → approve
+POST /api/tasks/{id}/reject                → reject
+```
+
+Full integration (with revision):
+```
+POST /api/tasks/{id}/revise
+Body: { "feedback": "Remove promotion remark, change Summary to Info" }
+```
+
+#### Adding a Monitoring Dashboard
+
+1. Obtain API key with viewer role
+2. `GET /api/tasks` with filters for status, date range, workspace
+3. Subscribe to SSE stream for real-time updates
+4. Display timeline events for each task
+
+### Authorization Roles
+
+| Role | Permissions |
+|------|-------------|
+| `task-source` | Create tasks (webhook or manual) |
+| `viewer` | List and get tasks, subscribe to events |
+| `approver` | Approve, reject, revise tasks |
+| `admin` | All operations + cancel + config |
 
 ---
 
@@ -777,6 +1366,13 @@ In failed state: Retry every 60s
 | `PATH_TRAVERSAL` | Path escapes repository root |
 | `GIT_ERROR` | Git operation failed |
 | `SESSION_NOT_FOUND` | Session ID not found |
+| `TASK_NOT_FOUND` | Task ID does not exist |
+| `INVALID_TRANSITION` | State transition not allowed (e.g., approve a running task) |
+| `REVISION_LIMIT` | Max revisions reached for this task |
+| `POLICY_VIOLATION` | Task exceeded budget limits |
+| `DUPLICATE_EVENT` | Idempotent replay — event already processed |
+| `SIGNATURE_INVALID` | HMAC signature validation failed |
+| `TIMESTAMP_DRIFT` | Webhook timestamp too old or too new |
 | `INTERNAL_ERROR` | Unexpected server error |
 
 ### Error Response Format
@@ -833,6 +1429,9 @@ In failed state: Retry every 60s
 | Binary file support | Handle images, PDFs in file operations | P3 |
 | Streaming file uploads | Upload large files in chunks | P3 |
 | End-to-end encryption | Encrypt payloads for security | P3 |
+| Task preference memory | Learn from revision feedback to reduce future revisions | P3 |
+| Task batching | Submit multiple tasks as a batch with dependency ordering | P3 |
+| Task templates | Reusable task templates for common fix patterns | P3 |
 
 ---
 
@@ -883,12 +1482,46 @@ In failed state: Retry every 60s
     - Client can request retransmission
 ```
 
+### Week 4-5: Agent Task Protocol Implementation
+
+```
+[ ] Add AgentTask domain model
+    - internal/domain/events/agent_task.go
+    - State machine with transition validation
+    - Timeline event recording
+
+[ ] Add agent/task/* JSON-RPC handlers
+    - Create, list, get, approve, reject, revise, cancel
+    - Idempotent webhook ingestion with HMAC validation
+    - Generic trigger artifact support (replay, error, ci_failure, issue, etc.)
+
+[ ] Add task event types
+    - task_created, task_status_changed, task_progress
+    - task_needs_approval, task_revision_requested
+    - task_completed, task_failed
+
+[ ] Add task spawner
+    - Worktree isolation per task
+    - Claude Code session spawning
+    - Policy enforcement (budgets, limits)
+
+[ ] Add SSE endpoint for task events
+    - GET /api/events/stream (all tasks)
+    - GET /api/events/stream?task_id={id} (single task)
+
+[ ] Add authorization roles
+    - task-source, viewer, approver, admin
+    - Role-based access control for task endpoints
+```
+
 ---
 
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.3.0 | 1 Mar 2026 | Agent Task Protocol: `agent/task/*` methods, task lifecycle events, revision loop, webhook ingestion, autonomy modes, authorization roles |
+| 2.2.0 | 30 Jan 2026 | Auth pairing flow, runtime capability registry, repository indexer |
 | 2.0.0 | 21 Dec 2025 | JSON-RPC 2.0 adoption, agent-agnostic naming, port consolidation |
 | 1.0.0-draft | Dec 2025 | Initial draft specification |
 
@@ -902,6 +1535,20 @@ Key changes from 1.0 to 2.0:
 4. **Unified Endpoint**: WebSocket at `/ws` instead of root
 5. **OpenRPC Discovery**: Auto-generated spec at `/api/rpc/discover`
 6. **Capability Negotiation**: `initialize`/`initialized` handshake
+
+---
+
+### Migration to 2.3
+
+Key changes from 2.2 to 2.3:
+
+1. **Agent Task Methods**: New `agent/task/*` method family for autonomous task lifecycle
+2. **Task Events**: 7 new event types for task lifecycle tracking (`task_created`, `task_status_changed`, `task_progress`, `task_needs_approval`, `task_revision_requested`, `task_completed`, `task_failed`)
+3. **Webhook Ingestion**: HMAC-signed `POST /api/tasks/replay` for task sources
+4. **SSE Streaming**: `GET /api/events/stream` for real-time task event subscriptions
+5. **Revision Loop**: First-class `agent/task/revise` for human-in-the-loop refinement
+6. **Authorization Roles**: `task-source`, `viewer`, `approver`, `admin`
+7. **Task Error Codes**: `TASK_NOT_FOUND`, `INVALID_TRANSITION`, `REVISION_LIMIT`, `POLICY_VIOLATION`, `DUPLICATE_EVENT`, `SIGNATURE_INVALID`, `TIMESTAMP_DRIFT`
 
 ---
 

@@ -40,14 +40,16 @@ const (
 
 // Manager implements the ClaudeManager port interface.
 type Manager struct {
-	command         string
-	args            []string
-	timeout         time.Duration
-	hub             ports.EventHub
-	logDir          string
-	workDir         string
-	skipPermissions bool
-	rotationConfig  *config.LogRotationConfig
+	command           string
+	args              []string
+	launchArgs        []string
+	timeout           time.Duration
+	hub               ports.EventHub
+	logDir            string
+	workDir           string
+	stripWorktreeArgs bool
+	skipPermissions   bool
+	rotationConfig    *config.LogRotationConfig
 
 	// Workspace/Session context for multi-workspace support
 	workspaceID string
@@ -93,15 +95,17 @@ type Manager struct {
 // NewManager creates a new Claude CLI manager (legacy constructor for backward compatibility).
 func NewManager(command string, args []string, timeoutMinutes int, hub ports.EventHub, skipPermissions bool, rotationConfig *config.LogRotationConfig) *Manager {
 	return &Manager{
-		command:         command,
-		args:            args,
-		timeout:         time.Duration(timeoutMinutes) * time.Minute,
-		hub:             hub,
-		state:           events.ClaudeStateIdle,
-		logDir:          "", // Empty means no file logging
-		workDir:         "", // Empty means use current directory
-		skipPermissions: skipPermissions,
-		rotationConfig:  rotationConfig,
+		command:           command,
+		args:              args,
+		launchArgs:        nil,
+		timeout:           time.Duration(timeoutMinutes) * time.Minute,
+		hub:               hub,
+		state:             events.ClaudeStateIdle,
+		logDir:            "", // Empty means no file logging
+		workDir:           "", // Empty means use current directory
+		stripWorktreeArgs: false,
+		skipPermissions:   skipPermissions,
+		rotationConfig:    rotationConfig,
 	}
 }
 
@@ -109,16 +113,18 @@ func NewManager(command string, args []string, timeoutMinutes int, hub ports.Eve
 // This is the preferred constructor for multi-workspace support.
 func NewManagerWithContext(hub ports.EventHub, command string, args []string, timeoutMinutes int, skipPermissions bool, workDir, workspaceID, sessionID string, rotationConfig *config.LogRotationConfig) *Manager {
 	m := &Manager{
-		command:         command,
-		args:            args,
-		timeout:         time.Duration(timeoutMinutes) * time.Minute,
-		hub:             hub,
-		state:           events.ClaudeStateIdle,
-		workDir:         workDir,
-		skipPermissions: skipPermissions,
-		workspaceID:     workspaceID,
-		sessionID:       sessionID,
-		rotationConfig:  rotationConfig,
+		command:           command,
+		args:              args,
+		launchArgs:        nil,
+		timeout:           time.Duration(timeoutMinutes) * time.Minute,
+		hub:               hub,
+		state:             events.ClaudeStateIdle,
+		workDir:           workDir,
+		stripWorktreeArgs: true,
+		skipPermissions:   skipPermissions,
+		workspaceID:       workspaceID,
+		sessionID:         sessionID,
+		rotationConfig:    rotationConfig,
 	}
 
 	// Setup log directory in workspace
@@ -177,6 +183,17 @@ func (m *Manager) SetWorkDir(dir string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.workDir = dir
+}
+
+// SetLaunchArgs sets session-scoped Claude CLI arguments appended before mode/prompt args.
+func (m *Manager) SetLaunchArgs(args []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(args) == 0 {
+		m.launchArgs = nil
+		return
+	}
+	m.launchArgs = append([]string(nil), args...)
 }
 
 // SetOnPTYComplete sets a callback that's called when PTY streaming finishes.
@@ -239,6 +256,21 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	// Build command arguments
 	cmdArgs := make([]string, len(m.args))
 	copy(cmdArgs, m.args)
+	permissionMode = normalizePermissionMode(permissionMode)
+	if m.stripWorktreeArgs {
+		var removed []string
+		cmdArgs, removed = stripWorktreeFlags(cmdArgs)
+		if len(removed) > 0 {
+			log.Warn().
+				Strs("removed_args", removed).
+				Str("workspace_id", m.workspaceID).
+				Str("session_id", m.sessionID).
+				Msg("stripped Claude worktree flags from managed session")
+		}
+	}
+	if len(m.launchArgs) > 0 {
+		cmdArgs = append(cmdArgs, m.launchArgs...)
+	}
 
 	// Add session mode flags
 	switch mode {
@@ -255,10 +287,10 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 
 	// Handle permission mode
 	// Priority: explicit permissionMode parameter > skipPermissions config
-	if permissionMode != "" && permissionMode != "default" {
+	if shouldAppendPermissionModeFlag(permissionMode, cmdArgs) {
 		// Use explicit --permission-mode flag for acceptEdits, bypassPermissions, plan
 		cmdArgs = append(cmdArgs, "--permission-mode", permissionMode)
-	} else if m.skipPermissions {
+	} else if m.skipPermissions && !hasCLIArg(cmdArgs, "--dangerously-skip-permissions") {
 		// Fallback to config-based skip permissions
 		cmdArgs = append(cmdArgs, "--dangerously-skip-permissions")
 	}
@@ -273,6 +305,7 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	log.Debug().
 		Str("command", m.command).
 		Strs("args", cmdArgs).
+		Strs("launch_args", m.launchArgs).
 		Str("work_dir", m.workDir).
 		Bool("skip_permissions", m.skipPermissions).
 		Msg("spawning claude process")
@@ -455,6 +488,59 @@ func (m *Manager) StartWithSession(ctx context.Context, prompt string, mode Sess
 	return nil
 }
 
+func stripWorktreeFlags(args []string) ([]string, []string) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+
+	filtered := make([]string, 0, len(args))
+	removed := make([]string, 0, 2)
+	for _, arg := range args {
+		switch {
+		case arg == "-w", arg == "--worktree", strings.HasPrefix(arg, "--worktree="):
+			removed = append(removed, arg)
+			continue
+		default:
+			filtered = append(filtered, arg)
+		}
+	}
+
+	return filtered, removed
+}
+
+func hasCLIArg(args []string, target string) bool {
+	for _, arg := range args {
+		if arg == target {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizePermissionMode(permissionMode string) string {
+	switch permissionMode {
+	case "dangerouslySkipPermissions":
+		// Legacy internal alias - Claude CLI expects bypassPermissions.
+		return "bypassPermissions"
+	default:
+		return permissionMode
+	}
+}
+
+func shouldAppendPermissionModeFlag(permissionMode string, cmdArgs []string) bool {
+	if permissionMode == "" || permissionMode == "default" {
+		return false
+	}
+
+	// If the direct bypass flag is already present, do not append the equivalent
+	// permission-mode form.
+	if permissionMode == "bypassPermissions" && hasCLIArg(cmdArgs, "--dangerously-skip-permissions") {
+		return false
+	}
+
+	return true
+}
+
 // StartWithPTY spawns Claude CLI with a pseudo-terminal for true interactive support.
 // This allows permission prompts to work interactively from remote clients.
 // The PTY makes Claude think it's running in a real terminal.
@@ -486,6 +572,10 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 		cmdArgs = append(cmdArgs, "--resume", sessionID)
 	}
 
+	if len(m.launchArgs) > 0 {
+		cmdArgs = append(cmdArgs, m.launchArgs...)
+	}
+
 	if yoloMode {
 		cmdArgs = append(cmdArgs, "--allow-dangerously-skip-permissions")
 	}
@@ -496,6 +586,7 @@ func (m *Manager) StartWithPTY(ctx context.Context, prompt string, mode SessionM
 	log.Debug().
 		Str("command", m.command).
 		Strs("args", cmdArgs).
+		Strs("launch_args", m.launchArgs).
 		Str("work_dir", m.workDir).
 		Bool("pty_mode", true).
 		Msg("spawning claude process with PTY")

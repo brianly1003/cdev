@@ -5,11 +5,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/brianly1003/cdev/internal/config"
+	"github.com/brianly1003/cdev/internal/gitutil"
 	"github.com/brianly1003/cdev/internal/testutil"
 	"github.com/brianly1003/cdev/internal/workspace"
 )
@@ -216,13 +216,7 @@ func newSessionTestManager(t *testing.T, workspaceID, workspacePath string) *Man
 func createClaudeSessionFile(t *testing.T, workspacePath, sessionID string) {
 	t.Helper()
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("failed to resolve home directory: %v", err)
-	}
-
-	encodedPath := strings.ReplaceAll(filepath.Clean(workspacePath), "/", "-")
-	sessionsDir := filepath.Join(homeDir, ".claude", "projects", encodedPath)
+	sessionsDir := getSessionsDir(gitutil.NormalizePath(workspacePath))
 	if err := os.MkdirAll(sessionsDir, 0o755); err != nil {
 		t.Fatalf("failed to create sessions dir: %v", err)
 	}

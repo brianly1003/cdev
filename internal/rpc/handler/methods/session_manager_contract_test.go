@@ -20,6 +20,13 @@ func TestSessionManagerProtocolContract_MethodMetadata(t *testing.T) {
 	}
 	assertParamContract(t, startMeta, "workspace_id", true)
 	assertParamContract(t, startMeta, "session_id", false)
+	startPermission := assertParamContract(t, startMeta, "permission_mode", false)
+	assertSchemaDefault(t, startPermission, "default")
+	assertSchemaEnumContains(t, startPermission, "default", "acceptEdits", "bypassPermissions", "plan", "interactive")
+	startYolo := assertParamContract(t, startMeta, "yolo_mode", false)
+	if got, _ := startYolo.Schema["type"].(string); got != "boolean" {
+		t.Fatalf("session/start yolo_mode type = %q, want %q", got, "boolean")
+	}
 	startAgent := assertParamContract(t, startMeta, "agent_type", false)
 	assertSchemaDefault(t, startAgent, "claude")
 	assertSchemaEnumContains(t, startAgent, "claude", "codex")
@@ -93,6 +100,19 @@ func TestSessionManagerProtocolContract_SessionStart(t *testing.T) {
 		}
 		if !containsSubstr(rpcErr.Message, "claude session manager is not configured") {
 			t.Fatalf("error message = %q, want claude manager not configured", rpcErr.Message)
+		}
+	})
+
+	t.Run("invalid permission_mode returns invalid params", func(t *testing.T) {
+		_, rpcErr := service.Start(context.Background(), []byte(`{"workspace_id":"ws-1","permission_mode":"invalid"}`))
+		if rpcErr == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if rpcErr.Code != message.InvalidParams {
+			t.Fatalf("error code = %d, want %d", rpcErr.Code, message.InvalidParams)
+		}
+		if !containsSubstr(rpcErr.Message, "permission_mode must be one of") {
+			t.Fatalf("error message = %q, want permission_mode validation", rpcErr.Message)
 		}
 	})
 

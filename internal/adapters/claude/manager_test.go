@@ -333,6 +333,104 @@ func TestManager_Args(t *testing.T) {
 	}
 }
 
+func TestNewManagerWithContext_StripsWorktreeArgs(t *testing.T) {
+	hub := newMockEventHub()
+	m := NewManagerWithContext(hub, "claude", []string{"-p", "-w", "--worktree"}, 5, false, "/tmp/workspace", "ws-123", "session-456", nil)
+
+	if !m.stripWorktreeArgs {
+		t.Fatal("stripWorktreeArgs should be enabled for managed sessions")
+	}
+}
+
+func TestStripWorktreeFlags(t *testing.T) {
+	args := []string{
+		"-p",
+		"-w",
+		"--verbose",
+		"--worktree",
+		"--output-format", "stream-json",
+		"--worktree=true",
+	}
+
+	got, removed := stripWorktreeFlags(args)
+
+	want := []string{"-p", "--verbose", "--output-format", "stream-json"}
+	if len(got) != len(want) {
+		t.Fatalf("filtered args length = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("filtered args[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+
+	wantRemoved := []string{"-w", "--worktree", "--worktree=true"}
+	if len(removed) != len(wantRemoved) {
+		t.Fatalf("removed args length = %d, want %d (%v)", len(removed), len(wantRemoved), removed)
+	}
+	for i := range wantRemoved {
+		if removed[i] != wantRemoved[i] {
+			t.Fatalf("removed args[%d] = %q, want %q", i, removed[i], wantRemoved[i])
+		}
+	}
+}
+
+func TestNormalizePermissionMode(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "legacy alias", in: "dangerouslySkipPermissions", want: "bypassPermissions"},
+		{name: "documented bypass mode", in: "bypassPermissions", want: "bypassPermissions"},
+		{name: "empty", in: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizePermissionMode(tt.in); got != tt.want {
+				t.Fatalf("normalizePermissionMode(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestShouldAppendPermissionModeFlag(t *testing.T) {
+	tests := []struct {
+		name           string
+		permissionMode string
+		args           []string
+		want           bool
+	}{
+		{
+			name:           "append documented bypass mode when no direct flag present",
+			permissionMode: "bypassPermissions",
+			args:           []string{"-p"},
+			want:           true,
+		},
+		{
+			name:           "skip bypass mode when dangerous flag already present",
+			permissionMode: "bypassPermissions",
+			args:           []string{"-p", "--dangerously-skip-permissions"},
+			want:           false,
+		},
+		{
+			name:           "skip empty permission mode",
+			permissionMode: "",
+			args:           []string{"-p"},
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldAppendPermissionModeFlag(tt.permissionMode, tt.args); got != tt.want {
+				t.Fatalf("shouldAppendPermissionModeFlag(%q, %v) = %v, want %v", tt.permissionMode, tt.args, got, tt.want)
+			}
+		})
+	}
+}
+
 // --- LogDir Tests ---
 
 func TestManager_LogDir_WithWorkDir(t *testing.T) {
